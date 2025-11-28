@@ -95,6 +95,7 @@ def build_static_frame(cover_img, artist: str, title: str) -> Image.Image:
         try:
             return ImageFont.truetype(img_cfg["font_path"], size)
         except:
+            print(f"using default font, {img_cfg["font_path"]} not found")
             return ImageFont.load_default()
 
     font_size = FONT_START_SIZE
