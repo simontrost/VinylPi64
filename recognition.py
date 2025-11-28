@@ -76,6 +76,5 @@ async def recognize_and_render():
         tick += 1           # 1 Pixel pro Frame
         await asyncio.sleep(0.05)  # Scroll-Geschwindigkeit
 
-
-def run_recognition():
+def run_recognition(*args, **kwargs):
     asyncio.run(recognize_and_render())
