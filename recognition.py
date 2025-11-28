@@ -3,7 +3,8 @@ from shazamio import Shazam
 from PIL import Image
 
 from config_loader import CONFIG
-from image_utils import load_image, build_static_frame, send_to_pixoo
+from image_utils import load_image, build_static_frame
+from divoom_api import PixooClient, PixooError
 from audio_capture import record_sample
 
 
@@ -38,6 +39,7 @@ async def recognize_and_render():
 
     tick = 0
     first_frame_saved = False
+    pixoo = PixooClient()
 
     while True:
         # Frame mit aktuellem Tick (für Marquee)
@@ -64,8 +66,12 @@ async def recognize_and_render():
 
             first_frame_saved = True
 
-        # An Pixoo senden
-        send_to_pixoo(frame)
+        # An Pixoo senden (statt send_to_pixoo)
+        try:
+            pixoo.send_frame(frame)
+        except PixooError as e:
+            print(f"Pixoo not available or API-error: {e}")
+            break
 
         tick += 1           # 1 Pixel pro Frame
         await asyncio.sleep(0.05)  # Scroll-Geschwindigkeit
