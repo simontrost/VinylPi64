@@ -52,15 +52,17 @@ def text_size(text, font):
     return bbox[2] - bbox[0], bbox[3] - bbox[1]
 
 
+from PIL import Image, ImageDraw, ImageFont
+
 def build_static_frame(cover_img, artist: str, title: str) -> Image.Image:
     img_cfg = CONFIG["image"]
 
-    CANVAS_SIZE = img_cfg["canvas_size"]  
+    CANVAS_SIZE = img_cfg["canvas_size"]   
     COVER_SIZE = 46                        
     TOP_MARGIN = 1                        
-    GAP_BETWEEN_COVER_AND_BAND = 3         
-    GAP_BETWEEN_LINES = 3               
-    FONT_SIZE = 5                          
+    GAP_BETWEEN_COVER_AND_BAND = 3      
+    GAP_BETWEEN_LINES = 3                  
+    TARGET_GLYPH_HEIGHT = 5                
 
     bg_r, bg_g, bg_b = img_cfg["background_color"]
     canvas = Image.new("RGB", (CANVAS_SIZE, CANVAS_SIZE), (bg_r, bg_g, bg_b))
@@ -79,17 +81,36 @@ def build_static_frame(cover_img, artist: str, title: str) -> Image.Image:
     y_cover = TOP_MARGIN
     canvas.paste(cover_resized, (x_cover, y_cover))
 
-    # Font laden (5x5 Pixel-Font)
-    def load_font():
+    def load_font(size):
         try:
-            return ImageFont.truetype(img_cfg["font_path"], FONT_SIZE)
+            return ImageFont.truetype(img_cfg["font_path"], size)
         except Exception:
             print(f'using default font, {img_cfg["font_path"]} not found')
             return ImageFont.load_default()
 
-    font = load_font()
+    def measure_text_height(font, text="A"):
+        dummy = Image.new("RGB", (1, 1))
+        d = ImageDraw.Draw(dummy)
+        bbox = d.textbbox((0, 0), text, font=font)
+        return bbox[3] - bbox[1]
 
-    if img_cfg.get("uppercase", True):
+    best_font = load_font(5)
+    best_h = measure_text_height(best_font)
+    for size in range(1, 25): 
+        f = load_font(size)
+        h_test = measure_text_height(f)
+        if h_test == TARGET_GLYPH_HEIGHT:
+            best_font = f
+            best_h = h_test
+            break
+        if abs(h_test - TARGET_GLYPH_HEIGHT) < abs(best_h - TARGET_GLYPH_HEIGHT):
+            best_font = f
+            best_h = h_test
+
+    font = best_font
+    glyph_h = best_h  
+
+    if img_cfg.get("uppercase", False):
         artist = artist.upper()
         title = title.upper()
 
@@ -100,7 +121,7 @@ def build_static_frame(cover_img, artist: str, title: str) -> Image.Image:
         return bbox[2] - bbox[0], bbox[3] - bbox[1]
 
     def fit_width(txt, font):
-        max_w = CANVAS_SIZE  
+        max_w = CANVAS_SIZE 
         w, _ = text_size(txt, font)
         if w <= max_w:
             return txt
@@ -112,13 +133,13 @@ def build_static_frame(cover_img, artist: str, title: str) -> Image.Image:
     artist = fit_width(artist, font)
     title  = fit_width(title, font)
 
-    w1, h1 = text_size(artist, font) 
-    w2, h2 = text_size(title, font)
+    w1, _ = text_size(artist, font)
+    w2, _ = text_size(title, font)
 
     draw = ImageDraw.Draw(canvas)
 
     y_band = TOP_MARGIN + COVER_SIZE + GAP_BETWEEN_COVER_AND_BAND
-    y_title = y_band + h1 + GAP_BETWEEN_LINES
+    y_title = y_band + glyph_h + GAP_BETWEEN_LINES
 
     x_band = (CANVAS_SIZE - w1) // 2
     x_title = (CANVAS_SIZE - w2) // 2
