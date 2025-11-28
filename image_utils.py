@@ -94,21 +94,22 @@ def build_static_frame(cover_img, artist: str, title: str) -> Image.Image:
         except OSError:
             return ImageFont.load_default()
 
-    if img_cfg["use_dynamic_font"]:
-        font = load_font(img_cfg["font_size"])  
-    else:
-        font = load_font(img_cfg["font_size"])
+    base_font_size = img_cfg["font_size"]
+    line_height_target = img_cfg.get("line_height", None)      
+    line_spacing = img_cfg.get("line_spacing_margin", 1)           
+    bottom_margin = img_cfg.get("bottom_margin", 0)               
 
-    if img_cfg["uppercase"]:
+    if img_cfg.get("uppercase", False):
         artist = artist.upper()
         title = title.upper()
 
-    line1 = artist
-    line2 = title
-
     max_width = CANVAS_SIZE - 2
 
-    def fit_text(line):
+    text_area_top = y_cover + COVER_SIZE + GAP_BETWEEN_COVER_TEXT
+    text_area_bottom = CANVAS_SIZE - bottom_margin
+    available_h = text_area_bottom - text_area_top 
+
+    def fit_text(line: str, font):
         w, _ = text_size(line, font)
         if w <= max_width:
             return line
@@ -117,22 +118,65 @@ def build_static_frame(cover_img, artist: str, title: str) -> Image.Image:
             w, _ = text_size(line, font)
         return line
 
-    line1 = fit_text(line1)
-    line2 = fit_text(line2)
+    use_dynamic = img_cfg.get("use_dynamic_font", False)
 
-    w1, h1 = text_size(line1, font)
-    w2, h2 = text_size(line2, font)
+    if use_dynamic:
+        chosen_font = load_font(base_font_size)
+        chosen_line1 = artist
+        chosen_line2 = title
+        chosen_h1 = chosen_h2 = 0
 
-    remaining_h = CANVAS_SIZE - text_area_top
-    total_text_h = h1 + 1 + h2
-    y_text_start = text_area_top + max(0, (remaining_h - total_text_h) // 2)
+        for size in range(base_font_size, 2, -1):
+            f = load_font(size)
+            l1 = fit_text(artist, f)
+            l2 = fit_text(title, f)
+
+            _, h1 = text_size(l1, f)
+            _, h2 = text_size(l2, f)
+            total_h = h1 + line_spacing + h2
+
+            cond_height = total_h <= available_h
+            cond_line = True
+            if line_height_target is not None:
+                cond_line = (h1 <= line_height_target and h2 <= line_height_target)
+
+            if cond_height and cond_line:
+                chosen_font = f
+                chosen_line1, chosen_line2 = l1, l2
+                chosen_h1, chosen_h2 = h1, h2
+                break
+
+        if chosen_h1 == 0 and chosen_h2 == 0:
+            chosen_font = load_font(3)
+            chosen_line1 = fit_text(artist, chosen_font)
+            chosen_line2 = fit_text(title, chosen_font)
+            _, chosen_h1 = text_size(chosen_line1, chosen_font)
+            _, chosen_h2 = text_size(chosen_line2, chosen_font)
+
+        font = chosen_font
+        line1, line2 = chosen_line1, chosen_line2
+        h1, h2 = chosen_h1, chosen_h2
+
+    else:
+        font = load_font(base_font_size)
+        line1 = fit_text(artist, font)
+        line2 = fit_text(title, font)
+        _, h1 = text_size(line1, font)
+        _, h2 = text_size(line2, font)
+
+    w1, _ = text_size(line1, font)
+    w2, _ = text_size(line2, font)
+
+    total_text_h = h1 + line_spacing + h2
+    y_text_start = text_area_top + max(0, (available_h - total_text_h) // 2)
 
     x1 = (CANVAS_SIZE - w1) // 2
     y1 = y_text_start
     draw.text((x1, y1), line1, font=font, fill=text_color)
 
     x2 = (CANVAS_SIZE - w2) // 2
-    y2 = y1 + h1 + 1
+    y2 = y1 + h1 + line_spacing
     draw.text((x2, y2), line2, font=font, fill=text_color)
 
     return canvas
+
