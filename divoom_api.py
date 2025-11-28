@@ -6,6 +6,7 @@ from typing import Optional
 
 import requests
 from PIL import Image
+from pathlib import Path
 
 from config_loader import CONFIG
 from pixoo_discovery import discover_pixoo_ip
@@ -13,6 +14,8 @@ from pixoo_discovery import discover_pixoo_ip
 class PixooError(Exception):
     pass
 
+
+CONFIG_PATH = Path("config.json")
 
 class PixooClient:
     def __init__(self, ip: Optional[str] = None, timeout: Optional[float] = None):
@@ -34,14 +37,24 @@ class PixooClient:
                     )
                 self.ip = discovered
 
-        self.timeout = (
-            timeout if timeout is not None else divoom_cfg.get("timeout", 0.3)
-        )
-        self.gif_speed_ms = divoom_cfg.get("gif_speed_ms", 100)
-        self.auto_reset_gif_id = divoom_cfg.get("auto_reset_gif_id", True)
+                CONFIG.setdefault("divoom", {})
+                CONFIG["divoom"]["ip"] = discovered
 
-        self.base_url = f"http://{self.ip}/post"
-        print(f"PixooClient using IP: {self.ip}")
+                try:
+                    if CONFIG_PATH.exists():
+                        with CONFIG_PATH.open("r", encoding="utf-8") as f:
+                            cfg_file = json.load(f)
+                    else:
+                        cfg_file = {}
+
+                    cfg_file.setdefault("divoom", {})
+                    cfg_file["divoom"]["ip"] = discovered
+
+                    with CONFIG_PATH.open("w", encoding="utf-8") as f:
+                        json.dump(cfg_file, f, indent=4)
+                    print(f"Saved Pixoo IP to config.json: {discovered}")
+                except Exception as e:
+                    print(f"Warning: could not save Pixoo IP to config.json: {e}")
 
 
     def _post(self, payload: dict) -> dict:
