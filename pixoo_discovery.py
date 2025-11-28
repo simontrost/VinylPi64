@@ -11,9 +11,17 @@ def _probe_ip(ip: str, timeout: float) -> bool:
     url = f"http://{ip}/post"
     payload = {"Command": "Channel/GetAllConf"}
 
+    divoom_cfg = CONFIG.get("divoom", {})
+
     try:
         resp = requests.post(url, json=payload, timeout=timeout)
         resp.raise_for_status()
+
+        server_header = resp.headers.get("Server", "").lower()
+        if divoom_cfg["device_name"] in server_header:
+            print(f"Pixoo ({divoom_cfg["device_name"]}) found by server-header at {ip}")
+            return True
+
         data = resp.json()
     except Exception:
         return False
@@ -21,12 +29,15 @@ def _probe_ip(ip: str, timeout: float) -> bool:
     if not isinstance(data, dict):
         return False
 
-    if "error_code" in data or "DeviceName" in data or "Brightness" in data:
-        print(f"Pixoo like response from: {ip}: {data}")
+    if "DeviceName" in data:
+        print(f"Pixoo found (DeviceName match) at {ip}: {data['DeviceName']}")
+        return True
+
+    if "error_code" in data or "Brightness" in data:
+        print(f"Pixoo-like response from {ip}: {data}")
         return True
 
     return False
-
 
 def discover_pixoo_ip() -> Optional[str]:
     divoom_cfg = CONFIG.get("divoom", {})

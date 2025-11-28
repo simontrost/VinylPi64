@@ -55,13 +55,13 @@ hint: you might need to `sudo apt install git` first
 python3 -m venv venv
 source venv/bin/activate
 ```
-hint: you might need to `sudo apt install -y python3-venv python3-dev libportaudio2`first
+hint: you might need to `sudo apt install -y python3-venv python3-dev`first
 
 ### 3. Install dependencies
 ```bash
 pip install -r requirements.txt
 ```
-
+hint: you might need to `pip install --upgrade pip`first
 ### 4. Check for your audio device:
 ```
 arecord -l

@@ -26,7 +26,8 @@
   },
   "divoom": {
     "ip": "", 
-    "timeout": 0.3,
+    "device_name": "espressif",
+    "timeout": 2.0,
     "gif_speed_ms": 100,
     "auto_reset_gif_id": true,
     "discovery": {
@@ -46,7 +47,10 @@
     "enabled": true,
     "image_path": "assets/fallback.png"
   },
-
+  "behavior": {
+    "loop": false,
+    "loop_delay_seconds": 20
+  },
   "output": {
     "pixoo_frame_path": "pixoo64_static.png",
     "preview_path": "pixoo64_static_preview.png"
