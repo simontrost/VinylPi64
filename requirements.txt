@@ -1,0 +1,5 @@
+shazamio==0.4.0
+sounddevice==0.4.6
+soundfile==0.12.1
+pillow==10.2.0
+requests==2.32.3
