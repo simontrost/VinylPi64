@@ -18,6 +18,28 @@ class PixooError(Exception):
 CONFIG_PATH = Path("config.json")
 
 class PixooClient:
+from __future__ import annotations
+
+import base64
+import json
+from pathlib import Path
+from typing import Optional
+
+import requests
+from PIL import Image
+
+from config_loader import CONFIG
+from pixoo_discovery import discover_pixoo_ip
+
+
+CONFIG_PATH = Path("config.json")
+
+
+class PixooError(Exception):
+    pass
+
+
+class PixooClient:
     def __init__(self, ip: Optional[str] = None, timeout: Optional[float] = None):
         divoom_cfg = CONFIG.get("divoom", {})
 
@@ -55,6 +77,16 @@ class PixooClient:
                     print(f"Saved Pixoo IP to config.json: {discovered}")
                 except Exception as e:
                     print(f"Warning: could not save Pixoo IP to config.json: {e}")
+
+        self.timeout = (
+            timeout if timeout is not None else divoom_cfg.get("timeout", 0.3)
+        )
+        self.gif_speed_ms = divoom_cfg.get("gif_speed_ms", 100)
+
+        self.auto_reset_gif_id = divoom_cfg.get("auto_reset_gif_id", True)
+
+        self.base_url = f"http://{self.ip}/post"
+        print(f"PixooClient using IP: {self.ip}")
 
 
     def _post(self, payload: dict) -> dict:
