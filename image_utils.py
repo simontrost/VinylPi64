@@ -136,4 +136,12 @@ def build_static_frame(cover_img, artist: str, title: str) -> Image.Image:
     draw.text((x1, y1), artist, font=final_font, fill=text_color)
     draw.text((x2, y2), title, font=final_font, fill=text_color)
 
+    bg_r, bg_g, bg_b = img_cfg["background_color"]
+    pixels = canvas.load()
+    for y in range(text_area_top, CANVAS_SIZE):
+        for x in range(CANVAS_SIZE):
+            r, g, b = pixels[x, y]
+            if (r, g, b) != (bg_r, bg_g, bg_b):
+                pixels[x, y] = (0, 0, 0)
+
     return canvas
