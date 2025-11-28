@@ -15,30 +15,6 @@ class PixooError(Exception):
     pass
 
 
-CONFIG_PATH = Path("config.json")
-
-class PixooClient:
-from __future__ import annotations
-
-import base64
-import json
-from pathlib import Path
-from typing import Optional
-
-import requests
-from PIL import Image
-
-from config_loader import CONFIG
-from pixoo_discovery import discover_pixoo_ip
-
-
-CONFIG_PATH = Path("config.json")
-
-
-class PixooError(Exception):
-    pass
-
-
 class PixooClient:
     def __init__(self, ip: Optional[str] = None, timeout: Optional[float] = None):
         divoom_cfg = CONFIG.get("divoom", {})
