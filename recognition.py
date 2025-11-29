@@ -1,23 +1,23 @@
 import asyncio
+import time
 from shazamio import Shazam
 from PIL import Image
 
 from config_loader import CONFIG
 from image_utils import load_image, build_static_frame
 from divoom_api import PixooClient, PixooError
-from audio_capture import record_sample
 
 
-async def recognize_and_render():
+async def recognize_and_render(wav_bytes: bytes):
     print("Starte Shazam-Erkennung ...")
     shazam = Shazam()
 
-    audio_cfg = CONFIG["audio"]
     debug_cfg = CONFIG["debug"]
     img_cfg = CONFIG["image"]
+    behavior_cfg = CONFIG.get("behavior", {})
 
-    # Audio aufnehmen
-    wav_bytes = record_sample()
+    # wie lange soll angezeigt/gescrollt werden?
+    display_seconds = behavior_cfg.get("display_duration_seconds", 10.0)
 
     # Track erkennen
     result = await shazam.recognize(wav_bytes)
@@ -41,7 +41,10 @@ async def recognize_and_render():
     first_frame_saved = False
     pixoo = PixooClient()
 
-    while True:
+    start_time = time.monotonic()
+
+    # NUR für eine bestimmte Zeit scrollen, dann zurückkehren
+    while time.monotonic() - start_time < display_seconds:
         # Frame mit aktuellem Tick (für Marquee)
         frame = build_static_frame(cover_img, artist, title, tick=tick)
 
@@ -66,15 +69,15 @@ async def recognize_and_render():
 
             first_frame_saved = True
 
-        # An Pixoo senden (statt send_to_pixoo)
+        # An Pixoo senden
         try:
             pixoo.send_frame(frame)
         except PixooError as e:
             print(f"Pixoo not available or API-error: {e}")
             break
 
-        tick += 1           # 1 Pixel pro Frame
-        await asyncio.sleep(0.05)  # Scroll-Geschwindigkeit
+        tick += 15       
+        await asyncio.sleep(0.05) 
 
-def run_recognition(*args, **kwargs):
-    asyncio.run(recognize_and_render())
+def run_recognition(wav_bytes: bytes):
+    asyncio.run(recognize_and_render(wav_bytes))
