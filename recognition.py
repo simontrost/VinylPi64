@@ -100,18 +100,12 @@ def _scroll_loop(cover_img, artist: str, title: str):
 
 
 def start_scrolling_display(cover_img, artist: str, title: str):
-    """
-    Stoppt ggf. den alten Scroll-Thread und startet einen neuen
-    für den übergebenen Song.
-    """
     global _scroll_thread, _scroll_stop_event
 
-    # alten Thread stoppen
     if _scroll_thread is not None and _scroll_thread.is_alive():
         _scroll_stop_event.set()
         _scroll_thread.join()
 
-    # neues Stop-Event & Thread
     _scroll_stop_event = threading.Event()
     _scroll_thread = threading.Thread(
         target=_scroll_loop,
@@ -119,3 +113,43 @@ def start_scrolling_display(cover_img, artist: str, title: str):
         daemon=True,
     )
     _scroll_thread.start()
+
+
+
+def show_fallback_image():
+    """
+    Zeigt das Fallback-Bild (aus CONFIG["fallback"]) statisch auf dem Pixoo
+    und stoppt ggf. den laufenden Scroll-Thread.
+    """
+    fallback_cfg = CONFIG.get("fallback", {})
+    if not fallback_cfg.get("enabled", False):
+        print("Fallback disabled in config, nothing to show.")
+        return
+
+    path = fallback_cfg.get("image_path")
+    if not path:
+        print("Fallback image path not set.")
+        return
+
+    img_cfg = CONFIG["image"]
+    size = img_cfg["canvas_size"]
+
+    # laufenden Scroll-Thread stoppen
+    global _scroll_thread, _scroll_stop_event
+    if _scroll_thread is not None and _scroll_thread.is_alive():
+        _scroll_stop_event.set()
+        _scroll_thread.join()
+
+    try:
+        # Bild laden (lokaler Pfad) und auf 64x64 skalieren
+        fallback_img = Image.open(path).convert("RGB")
+        fallback_resized = fallback_img.resize(
+            (size, size),
+            Image.Resampling.NEAREST  # schön „pixelig“
+        )
+
+        pixoo = PixooClient()
+        pixoo.send_frame(fallback_resized)
+        print(f"Fallback image '{path}' sent to Pixoo.")
+    except Exception as e:
+        print(f"Error showing fallback image: {e}")

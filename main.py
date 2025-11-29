@@ -1,7 +1,7 @@
 # main.py
 import time
 from audio_capture import record_sample
-from recognition import recognize_song, start_scrolling_display
+from recognition import recognize_song, start_scrolling_display, show_fallback_image
 from config_loader import CONFIG
 
 
@@ -28,6 +28,7 @@ def main_loop():
             result = recognize_song(wav_bytes)
             if result is None:
                 print("Keine gültige Erkennung, nächster Versuch...")
+                show_fallback_image()
             else:
                 artist, title, cover_img = result
 
