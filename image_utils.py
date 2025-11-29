@@ -4,7 +4,6 @@ import requests
 from PIL import Image, ImageDraw, ImageFont
 from config_loader import CONFIG
 
-
 def load_image(path_or_url: str) -> Image.Image:
     if path_or_url.startswith("http://") or path_or_url.startswith("https://"):
         resp = requests.get(path_or_url, timeout=15)
@@ -52,9 +51,6 @@ def text_size(text, font):
     return bbox[2] - bbox[0], bbox[3] - bbox[1]
 
 
-from PIL import Image, ImageDraw, ImageFont
-
-from PIL import Image, ImageDraw, ImageFont
 
 def build_static_frame(cover_img, artist: str, title: str, tick: int = 0) -> Image.Image:
     img_cfg = CONFIG["image"]
@@ -66,10 +62,11 @@ def build_static_frame(cover_img, artist: str, title: str, tick: int = 0) -> Ima
     GAP_BETWEEN_LINES = 3                  # 3 Pixel
     TARGET_GLYPH_HEIGHT = 5                # wir wollen 5 Pixel hohe Schrift
 
-    bg_r, bg_g, bg_b = img_cfg["background_color"]
+    bg_r, bg_g, bg_b = dynamic_bg_color(cover_img)
     canvas = Image.new("RGB", (CANVAS_SIZE, CANVAS_SIZE), (bg_r, bg_g, bg_b))
 
-    # Cover quadratisch zuschneiden und auf 46x46 skalieren
+    text_color = (255, 255, 255)
+
     w, h = cover_img.size
     side = min(w, h)
     left = (w - side) // 2
@@ -77,9 +74,7 @@ def build_static_frame(cover_img, artist: str, title: str, tick: int = 0) -> Ima
     cover_square = cover_img.crop((left, top, left + side, top + side))
     cover_resized = cover_square.resize((COVER_SIZE, COVER_SIZE), Image.Resampling.BILINEAR)
 
-    # Textfarbe: einfacher Kontrast zum Hintergrund (Schwarz oder Weiß)
-    bg_lum = relative_luminance((bg_r, bg_g, bg_b))
-    text_color = (0, 0, 0) if bg_lum > 127 else (255, 255, 255)
+    text_color = (255, 255, 255)
 
     # Cover platzieren: 1 Pixel oben frei, horizontal zentriert
     x_cover = (CANVAS_SIZE - COVER_SIZE) // 2
@@ -159,3 +154,66 @@ def build_static_frame(cover_img, artist: str, title: str, tick: int = 0) -> Ima
     draw.text((x_title, y_title), title,  font=font, fill=text_color)
 
     return canvas
+
+import colorsys
+
+def dynamic_bg_color(cover_img: Image.Image, num_colors: int = 8):
+
+    small = cover_img.resize((64, 64), Image.Resampling.BILINEAR)
+
+    pal_img = small.convert("P", palette=Image.ADAPTIVE, colors=num_colors)
+    palette = pal_img.getpalette() 
+    color_counts = pal_img.getcolors() 
+
+    if not color_counts:
+        return (40, 40, 40)
+
+    color_counts.sort(reverse=True, key=lambda x: x[0])
+
+    candidates = []
+    for rank, (count, idx) in enumerate(color_counts):
+        r = palette[3 * idx + 0]
+        g = palette[3 * idx + 1]
+        b = palette[3 * idx + 2]
+
+        h, s, v = colorsys.rgb_to_hsv(r / 255.0, g / 255.0, b / 255.0)
+        lum = relative_luminance((r, g, b))
+
+        if s < 0.25:
+            continue    
+        if lum < 30 or lum > 230:
+            continue      
+
+        score = count
+        if rank == 0:
+            score *= 0.7 
+
+        candidates.append((score, (r, g, b)))
+
+    if not candidates:
+        _, idx = color_counts[0]
+        r = palette[3 * idx + 0]
+        g = palette[3 * idx + 1]
+        b = palette[3 * idx + 2]
+        base = (r, g, b)
+    else:
+        # bester Kandidat
+        _, base = max(candidates, key=lambda x: x[0])
+
+    r, g, b = base
+
+    lum = relative_luminance((r, g, b))
+    target_min, target_max = 60, 180
+
+    if lum < target_min:
+        factor = target_min / max(lum, 1)
+        r = min(int(r * factor), 255)
+        g = min(int(g * factor), 255)
+        b = min(int(b * factor), 255)
+    elif lum > target_max:
+        factor = target_max / lum
+        r = int(r * factor)
+        g = int(g * factor)
+        b = int(b * factor)
+
+    return (r, g, b)
