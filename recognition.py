@@ -1,4 +1,6 @@
+# recognition.py
 import asyncio
+import threading
 import time
 from shazamio import Shazam
 from PIL import Image
@@ -7,77 +9,113 @@ from config_loader import CONFIG
 from image_utils import load_image, build_static_frame
 from divoom_api import PixooClient, PixooError
 
+_scroll_thread = None
+_scroll_stop_event = threading.Event()
 
-async def recognize_and_render(wav_bytes: bytes):
+
+async def _recognize_async(wav_bytes: bytes):
     print("Starte Shazam-Erkennung ...")
     shazam = Shazam()
 
     debug_cfg = CONFIG["debug"]
-    img_cfg = CONFIG["image"]
-    behavior_cfg = CONFIG.get("behavior", {})
+    shazam_cfg = CONFIG.get("shazam", {})
+    timeout_s = shazam_cfg.get("timeout_seconds", 15)
 
-    # wie lange soll angezeigt/gescrollt werden?
-    display_seconds = behavior_cfg.get("display_duration_seconds", 10.0)
+    result = await asyncio.wait_for(shazam.recognize(wav_bytes), timeout=timeout_s)
 
-    # Track erkennen
-    result = await shazam.recognize(wav_bytes)
-    track = result.get("track", {})
+    track = result.get("track") or {}
     title = track.get("title") or "UNKNOWN"
     artist = track.get("subtitle") or "UNKNOWN"
-    cover_url = track.get("images", {}).get("coverart")
+    images = track.get("images") or {}
+    cover_url = images.get("coverart")
 
-    if debug_cfg["logs"]:
+    if debug_cfg.get("logs", False):
         print(f"Erkannt: {artist} – {title}")
         print(f"Cover-URL: {cover_url}")
 
     if not cover_url:
-        print("Kein Cover gefunden – abbrechen.")
-        return
+        print("Kein Cover gefunden.")
+        return None
 
-    # Cover laden
     cover_img = load_image(cover_url)
+    return artist, title, cover_img
 
+
+def recognize_song(wav_bytes: bytes):
+    try:
+        return asyncio.run(_recognize_async(wav_bytes))
+    except Exception as e:
+        print(f"Fehler bei der Erkennung: {e}")
+        return None
+
+def _scroll_loop(cover_img, artist: str, title: str):
+    """
+    Läuft in einem separaten Thread und schickt kontinuierlich Frames
+    an den Pixoo, bis _scroll_stop_event gesetzt wird.
+    """
+    debug_cfg = CONFIG["debug"]
+    img_cfg = CONFIG["image"]
+    output_cfg = CONFIG.get("output", {})
+
+    pixoo = PixooClient()
     tick = 0
     first_frame_saved = False
-    pixoo = PixooClient()
 
-    start_time = time.monotonic()
-
-    # NUR für eine bestimmte Zeit scrollen, dann zurückkehren
-    while time.monotonic() - start_time < display_seconds:
-        # Frame mit aktuellem Tick (für Marquee)
+    while not _scroll_stop_event.is_set():
         frame = build_static_frame(cover_img, artist, title, tick=tick)
 
-        # Debug-Frame & Preview nur einmal (beim ersten Durchlauf) speichern
+        # Debug/Preview nur einmal speichern
         if not first_frame_saved:
-            if debug_cfg["pixoo_frame_path"]:
-                frame.save(debug_cfg["pixoo_frame_path"])
-                if debug_cfg["logs"]:
-                    print(f"Finished: {debug_cfg['pixoo_frame_path']} created.")
+            pixoo_frame_path = output_cfg.get("pixoo_frame_path", "")
+            preview_path = output_cfg.get("preview_path", "")
 
-            scale = img_cfg["preview_scale"]
-            size = img_cfg["canvas_size"]
-            preview = frame.resize(
-                (size * scale, size * scale),
-                Image.Resampling.NEAREST
-            )
+            if pixoo_frame_path:
+                frame.save(pixoo_frame_path)
+                if debug_cfg.get("logs", False):
+                    print(f"Finished: {pixoo_frame_path} created.")
 
-            if debug_cfg["preview_path"]:
-                preview.save(debug_cfg["preview_path"])
-                if debug_cfg["logs"]:
-                    print(f"Finished: {debug_cfg['preview_path']} created.")
+            if preview_path:
+                scale = img_cfg["preview_scale"]
+                size = img_cfg["canvas_size"]
+                preview = frame.resize(
+                    (size * scale, size * scale),
+                    Image.Resampling.NEAREST
+                )
+                preview.save(preview_path)
+                if debug_cfg.get("logs", False):
+                    print(f"Finished: {preview_path} created.")
 
             first_frame_saved = True
 
-        # An Pixoo senden
+        # an Pixoo senden
         try:
             pixoo.send_frame(frame)
         except PixooError as e:
             print(f"Pixoo not available or API-error: {e}")
             break
 
-        tick += 15       
-        await asyncio.sleep(0.05) 
+        tick += 1
+        time.sleep(0.05)  # Scroll-Geschwindigkeit, hier bewusst blocking
+                          # (wir sind ja in einem eigenen Thread)
 
-def run_recognition(wav_bytes: bytes):
-    asyncio.run(recognize_and_render(wav_bytes))
+
+def start_scrolling_display(cover_img, artist: str, title: str):
+    """
+    Stoppt ggf. den alten Scroll-Thread und startet einen neuen
+    für den übergebenen Song.
+    """
+    global _scroll_thread, _scroll_stop_event
+
+    # alten Thread stoppen
+    if _scroll_thread is not None and _scroll_thread.is_alive():
+        _scroll_stop_event.set()
+        _scroll_thread.join()
+
+    # neues Stop-Event & Thread
+    _scroll_stop_event = threading.Event()
+    _scroll_thread = threading.Thread(
+        target=_scroll_loop,
+        args=(cover_img, artist, title),
+        daemon=True,
+    )
+    _scroll_thread.start()
