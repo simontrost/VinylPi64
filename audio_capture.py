@@ -29,7 +29,7 @@ def choose_input_device_interactive():
 
 def record_sample():
     audio_cfg = CONFIG["audio"]
-
+    debug_cfg = CONFIG["debug"]
     sample_rate = audio_cfg["sample_rate"]
     seconds = audio_cfg["sample_seconds"]
     channels = audio_cfg["channels"]
@@ -42,9 +42,9 @@ def record_sample():
     sf.write(buffer, audio, sample_rate, format="WAV")
     wav_bytes = buffer.getvalue()
 
-    debug_path = audio_cfg.get("output_wav", "")
-    if debug_path:
-        sf.write(debug_path, audio, sample_rate, format="WAV")
-        print(f"Debug-WAV gespeichert: {debug_path}")
+    debug_wav_path = debug_cfg["wav_path"]
+    if debug_wav_path:
+        sf.write(debug_wav_path, audio, sample_rate, format="WAV")
+        print(f"Saved WAV file at: {debug_wav_path}")
 
     return wav_bytes
