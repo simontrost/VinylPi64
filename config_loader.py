@@ -17,10 +17,10 @@ CONFIG_DEFAULTS = {
         "line_spacing_margin": 3,
         "font_path": "assets/Pixel5.ttf",
         "font_size": 5,
-        "use_dynamic_bg": true,
+        "use_dynamic_bg": True,
         "manual_bg_color": [0, 0, 0],
         "text_color": [255, 255, 255],
-        "uppercase": true,
+        "uppercase": True,
         "preview_scale": 8,
         "marquee_speed": 15
     },
@@ -28,27 +28,27 @@ CONFIG_DEFAULTS = {
         "ip": "",
         "device_name": "espressif",
         "timeout": 2.0,
-        "auto_reset_gif_id": true,
+        "auto_reset_gif_id": True,
         "discovery": {
-            "enabled": true,
+            "enabled": True,
             "subnet_prefix": "192.168.2.",
             "ip_range_start": 100,
             "ip_range_end": 199
         }
     },
     "debug": {
-        "logs": false,
+        "logs": False,
         "pixoo_frame_path": "",
         "preview_path": "",
         "wav_path": ""
     },
     "fallback": {
-        "enabled": true,
+        "enabled": True,
         "image_path": "assets/fallback.jpg",
         "allowed_failures": 2
     },
     "behavior": {
-        "loop": true,
+        "loop": True,
         "loop_delay_seconds": 1,
 	"display_duration_seconds": 8
     },
