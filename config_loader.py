@@ -4,42 +4,54 @@ from copy import deepcopy
 CONFIG_DEFAULTS = {
     "audio": {
         "device_name_contains": "USB AUDIO",
-        "sample_seconds": 10,
+        "sample_seconds": 4,
         "sample_rate": 44100,
-        "channels": 1
+        "channels": 1,
+        "output_wav": ""
     },
     "image": {
         "canvas_size": 64,
         "top_margin": 1,
-        "bottom_margin": 1,
         "cover_size": 46,
         "margin_image_text": 3,
-        "line_height": 5,
         "line_spacing_margin": 3,
-        "font_path": "DejaVuSans.ttf",
-        "font_size":5,
-        "use_dynamic_font": True,
-        "background_color": [255, 255, 255],
-        "text_color_mode": "dominant",
-        "text_color_manual": [0, 0, 0],
-        "uppercase": True,
-        "preview_scale": 8
+        "font_path": "assets/Pixel5.ttf",
+        "font_size": 5,
+        "use_dynamic_bg": true,
+        "manual_bg_color": [0, 0, 0],
+        "text_color": [255, 255, 255],
+        "uppercase": true,
+        "preview_scale": 8,
+        "marquee_speed": 15
     },
-    "fallback": {
-        "enabled": True,
-        "image_path": "assets/fallback.png"
+    "divoom": {
+        "ip": "",
+        "device_name": "espressif",
+        "timeout": 2.0,
+        "auto_reset_gif_id": true,
+        "discovery": {
+            "enabled": true,
+            "subnet_prefix": "192.168.2.",
+            "ip_range_start": 100,
+            "ip_range_end": 199
+        }
     },
-
     "debug": {
-        "logs" : False,
+        "logs": false,
         "pixoo_frame_path": "",
         "preview_path": "",
-        "output_wav": ""
-
+        "wav_path": ""
     },
-    "shazam": {
-        "timeout_seconds": 15
-    }
+    "fallback": {
+        "enabled": true,
+        "image_path": "assets/fallback.jpg",
+        "allowed_failures": 2
+    },
+    "behavior": {
+        "loop": true,
+        "loop_delay_seconds": 1,
+	"display_duration_seconds": 8
+    },
 }
 
 

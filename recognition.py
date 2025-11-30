@@ -34,7 +34,7 @@ async def _recognize_async(wav_bytes: bytes):
         print(f"Cover-URL: {cover_url}")
 
     if not cover_url:
-        print("Kein Cover gefunden.")
+        print("No cover image found in Shazam response.")
         return None
 
     cover_img = load_image(cover_url)
@@ -45,14 +45,10 @@ def recognize_song(wav_bytes: bytes):
     try:
         return asyncio.run(_recognize_async(wav_bytes))
     except Exception as e:
-        print(f"Fehler bei der Erkennung: {e}")
+        print(f"Errow while detecting: {e}")
         return None
 
 def _scroll_loop(cover_img, artist: str, title: str):
-    """
-    Läuft in einem separaten Thread und schickt kontinuierlich Frames
-    an den Pixoo, bis _scroll_stop_event gesetzt wird.
-    """
     debug_cfg = CONFIG["debug"]
     img_cfg = CONFIG["image"]
     output_cfg = CONFIG.get("output", {})
@@ -64,7 +60,6 @@ def _scroll_loop(cover_img, artist: str, title: str):
     while not _scroll_stop_event.is_set():
         frame = build_static_frame(cover_img, artist, title, tick=tick)
 
-        # Debug/Preview nur einmal speichern
         if not first_frame_saved:
             pixoo_frame_path = output_cfg.get("pixoo_frame_path", "")
             preview_path = output_cfg.get("preview_path", "")
@@ -87,16 +82,14 @@ def _scroll_loop(cover_img, artist: str, title: str):
 
             first_frame_saved = True
 
-        # an Pixoo senden
         try:
             pixoo.send_frame(frame)
         except PixooError as e:
             print(f"Pixoo not available or API-error: {e}")
             break
 
-        tick += 1
-        time.sleep(0.05)  # Scroll-Geschwindigkeit, hier bewusst blocking
-                          # (wir sind ja in einem eigenen Thread)
+        tick += img_cfg.get("marquee_speed", 15)
+        time.sleep(0.05)  
 
 
 def start_scrolling_display(cover_img, artist: str, title: str):
@@ -117,10 +110,6 @@ def start_scrolling_display(cover_img, artist: str, title: str):
 
 
 def show_fallback_image():
-    """
-    Zeigt das Fallback-Bild (aus CONFIG["fallback"]) statisch auf dem Pixoo
-    und stoppt ggf. den laufenden Scroll-Thread.
-    """
     fallback_cfg = CONFIG.get("fallback", {})
     if not fallback_cfg.get("enabled", False):
         print("Fallback disabled in config, nothing to show.")
@@ -134,18 +123,16 @@ def show_fallback_image():
     img_cfg = CONFIG["image"]
     size = img_cfg["canvas_size"]
 
-    # laufenden Scroll-Thread stoppen
     global _scroll_thread, _scroll_stop_event
     if _scroll_thread is not None and _scroll_thread.is_alive():
         _scroll_stop_event.set()
         _scroll_thread.join()
 
     try:
-        # Bild laden (lokaler Pfad) und auf 64x64 skalieren
         fallback_img = Image.open(path).convert("RGB")
         fallback_resized = fallback_img.resize(
             (size, size),
-            Image.Resampling.NEAREST  # schön „pixelig“
+            Image.Resampling.NEAREST 
         )
 
         pixoo = PixooClient()
