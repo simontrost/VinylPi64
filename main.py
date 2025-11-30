@@ -13,6 +13,7 @@ def main_loop():
 
     last_song_id = None              # (artist, title) des zuletzt erkannten Songs
     last_display_was_fallback = False
+    consecutive_failures = 0         # Anzahl aufeinanderfolgender Erkennungsfehler
 
     while True:
         try:
@@ -27,33 +28,45 @@ def main_loop():
 
             # --- Shazam-Erkennung ---
             result = recognize_song(wav_bytes)
+
+            # =========================
+            #  FALL: KEIN SONG ERKANNT
+            # =========================
             if result is None:
-                print("Keine gültige Erkennung – Fallback anzeigen.")
-                show_fallback_image()
+                consecutive_failures += 1
+                if debug_log:
+                    print(f"Keine gültige Erkennung (#{consecutive_failures} in Folge).")
 
-                # Merken, dass jetzt Fallback auf dem Pixoo liegt
-                last_display_was_fallback = True
-                # last_song_id lassen wir so, damit wir noch wissen,
-                # welcher Song „in der Luft“ war, falls du das später brauchen willst.
+                # Fallback erst ab z.B. 3 Fehlschlägen in Folge
+                if consecutive_failures >= 3 and not last_display_was_fallback:
+                    print(">= 3 Erkennungsfehler in Folge – Fallback anzeigen.")
+                    show_fallback_image()
+                    last_display_was_fallback = True
+                # last_song_id bleibt bewusst unverändert
             else:
-                artist, title, cover_img = result
+                # ==================
+                #  FALL: SONG ERKANNT
+                # ==================
+                consecutive_failures = 0  # Fehlerzähler resetten
 
+                artist, title, cover_img = result
                 song_id = (
                     artist.strip().casefold(),
                     title.strip().casefold(),
                 )
 
-                # FALL 1: gleicher Song und es lief bereits dieser Song → nichts tun
+                # Gleicher Song wie vorher und aktuell KEIN Fallback aktiv:
+                # -> nix neu rendern, Scroll-Thread läuft weiter
                 if song_id == last_song_id and not last_display_was_fallback:
                     if debug_log:
                         print("Gleicher Song wie zuvor – Pixoo-Update übersprungen.")
-                    # Scroll-Thread läuft weiter wie gehabt
-
-                # FALL 2: neuer Song ODER Fallback war aktiv → neu rendern & scrollen
                 else:
+                    # Entweder neuer Song ODER Fallback war aktiv
                     if debug_log:
-                        if last_display_was_fallback:
-                            print("Gleicher Song wie zuvor, aber Fallback war aktiv – Pixoo wird aktualisiert.")
+                        if last_display_was_fallback and song_id == last_song_id:
+                            print("Gleicher Song wie zuvor, aber Fallback aktiv – Pixoo wird aktualisiert.")
+                        elif last_display_was_fallback:
+                            print("Neuer Song nach Fallback – Pixoo wird aktualisiert.")
                         else:
                             print("Neuer Song erkannt – Pixoo wird aktualisiert.")
 
