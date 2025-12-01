@@ -18,6 +18,7 @@ class PixooError(Exception):
 class PixooClient:
     def __init__(self, ip: Optional[str] = None, timeout: Optional[float] = None):
         divoom_cfg = CONFIG.get("divoom", {})
+        debug_log = CONFIG["debug"]["logs"]
 
         self.timeout = timeout if timeout is not None else divoom_cfg.get("timeout", 0.3)
         self.gif_speed_ms = divoom_cfg.get("gif_speed_ms", 100)
@@ -66,13 +67,14 @@ class PixooClient:
                 with CONFIG_PATH.open("w", encoding="utf-8") as f:
                     json.dump(cfg_file, f, indent=4)
 
-                if CONFIG.get("debug", {}).get("logs", False):
+                if debug_log:
                     print(f"Saved Pixoo IP to config.json: {self.ip}")
             except Exception as e:
                 print(f"Warning: could not save Pixoo IP to config.json: {e}")
 
         self.base_url = f"http://{self.ip}/post"
-        print(f"PixooClient using IP: {self.ip}")
+        if debug_log
+            print(f"PixooClient using IP: {self.ip}")
 
 
 

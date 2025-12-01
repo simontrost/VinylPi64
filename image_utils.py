@@ -2,15 +2,19 @@ from io import BytesIO
 from collections import Counter
 import requests
 from PIL import Image, ImageDraw, ImageFont
-from config_loader import CONFIG
 
+from config_loader import CONFIG
 def load_image(path_or_url: str) -> Image.Image:
+    if not path_or_url:
+        raise ValueError("load_image: path_or_url is None or empty")
+
     if path_or_url.startswith("http://") or path_or_url.startswith("https://"):
         resp = requests.get(path_or_url, timeout=15)
         resp.raise_for_status()
         img = Image.open(BytesIO(resp.content))
     else:
         img = Image.open(path_or_url)
+
     return img.convert("RGB")
 
 
