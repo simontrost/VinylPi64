@@ -69,7 +69,7 @@ hint: you might need to `sudo apt install -y python3-venv python3-dev`first
 ```bash
 pip install -r requirements.txt
 ```
-hint: you might need to `pip install --upgrade pip`first
+hint: you might need to `pip install --upgrade pip` first
 ### 4. Check for your audio device:
 ```
 arecord -l
@@ -81,10 +81,61 @@ hint: you might also want to get ffmpeg `sudo apt install ffmpeg`
 ```bash
 nano config.json
 ```
-- configure it as you want
-- set at least the ip adress of your device (or subnet and let it detect)
-- set the audio device you want to use
-- optionally set a default image
+Configure:
+- the Pixoo IP (or enable subnet discovery)
+- the audio device name
+- fallback image path
+- preview paths
+- debug logs, etc
+
+### 6. Execute
+with active env:
+```bash
+python3 main.py
+```
+
+## Autostart on boot
+
+### 1. Create service file:
+create a file: 
+```bash
+sudo nano /etc/systemd/system/vinylpi.service
+```
+with the following content and adjust the username and paths
+
+```bash
+[Unit]
+Description=VinylPi64 – autostart on boot
+After=network-online.target sound.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=username
+WorkingDirectory=/home/user/VinylPi64
+ExecStart=/home/user/VinylPi64/venv/bin/python -u /home/user/VinylPi64/main.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Save and exit
+
+### 2. Activate
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable vinylpi.service
+sudo systemctl start vinylpi.service
+```
+hint: check with `sudo systemctl status vinylpi.service` (should be "active (running)")
+
+### 3. Logs
+if something is not working check
+```bash
+journalctl -u vinylpi.service -f
+```
 
 ## Licence 
 
