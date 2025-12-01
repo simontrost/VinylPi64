@@ -1,8 +1,5 @@
 import json
 from copy import deepcopy
-from pathlib import Path
-
-CONFIG_PATH = Path("config.json")
 
 CONFIG_DEFAULTS = {
     "audio": {
