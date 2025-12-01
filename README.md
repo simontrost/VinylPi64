@@ -1,14 +1,18 @@
 # VinylPi64
 
-VinylPi is a Raspberry Pi project that listens to audio from a turntable, identifies the currently playing song using **ShazamIO**, fetches album metadata and artwork, generates a **64×64 pixel frame**, and displays it on a **Divoom Pixoo-64**.
+VinylPi is a Raspberry Pi project that listens to audio from a turntable, identifies the currently playing song using **ShazamIO**, fetches album metadata and artwork, generates a **64×64 pixel frame**, and displays it on a **Divoom Pixoo**.
+
+<p align="left">
+  <img src="assets/fallback.png" width="400" alt="VinylPi Logo">
+</p>
 
 **Important: Hardware-specific implementation**
 
-This project is built specifically for **my own hardware setup**:
+I built this project specifically for my own hardware setup:
 
-- Raspberry Pi Zero 2 W  
-- Audio-Technica **AT-LP120XUSB** (USB class-compliant turntable)  
-- Divoom **Pixoo-64** (WiFi model)  
+- [Raspberry Pi Zero 2 W](https://www.raspberrypi.com/products/raspberry-pi-zero-2-w/)  
+- [Audio-Technica AT-LP120XUSB](https://www.audio-technica.com/en-us/at-lp120xusb)
+- [Divoom Pixoo-64](https://divoom.com/products/pixoo-64)
 
 If you use different hardware, you will most likely have to modify parts of the code, like:
 - **turntable without USB**: you will need a soundcard or USB microphone on your pi
@@ -22,13 +26,17 @@ If you use different hardware, you will most likely have to modify parts of the 
 - Album cover retrieval  
 - Custom **64×64 pixel renderer**  
   - centered album cover  
-  - Automatic contrasting color for artist/title  
-  - white layout with spacing  
+  - dynamic background, customizeable font
+  - marquee text for long titles
+  - fallback image
 - Send results to pixel diplay
 ---
 
 ## Example Output
 
+<p align="left">
+  <img src="assets/preview.png" width="600" alt="Preview results">
+</p>
 
 ## Installation
 
@@ -67,6 +75,7 @@ hint: you might need to `pip install --upgrade pip`first
 arecord -l
 ```
 eg:  `0 USB AUDIO CODEC: Audio (hw:0,0), ALSA (2 in, 2 out)`
+hint: you might also want to get ffmpeg `sudo apt install ffmpeg`
 
 ### 5. Configuration:
 ```bash

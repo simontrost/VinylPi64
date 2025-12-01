@@ -8,7 +8,7 @@ import requests
 from PIL import Image
 from pathlib import Path
 
-from config_loader import CONFIG
+from config_loader import CONFIG,  CONFIG_PATH
 from pixoo_discovery import discover_pixoo_ip
 
 class PixooError(Exception):

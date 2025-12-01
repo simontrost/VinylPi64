@@ -1,19 +1,16 @@
 import time
+
 from audio_capture import record_sample
-from recognition import recognize_song, start_scrolling_display, show_fallback_image
+from recognition import run_recognition
 from config_loader import CONFIG
 
 
 def main_loop():
-    delay = CONFIG["behavior"].get("loop_delay_seconds", 20)
+    delay = CONFIG["behavior"].get("loop_delay_seconds", 5)
     debug_log = CONFIG["debug"]["logs"]
-    fallback = CONFIG["fallback"]
 
-    print(f"\nStarting to loop VinylPi64 (every {delay}s)\n")
-
-    last_song_id = None              
-    last_display_was_fallback = False
-    consecutive_failures = 0        
+    if debug_log:
+        print(f"\nStarting to loop VinylPi64 (every {delay}s)\n")
 
     while True:
         try:
@@ -26,40 +23,12 @@ def main_loop():
                 time.sleep(5)
                 continue
 
-            result = recognize_song(wav_bytes)
+            # Shazam + Pixoo + Fallback passiert nun komplett in recognition.run_recognition
+            run_recognition(wav_bytes)
 
-            if result is None:
-                consecutive_failures += 1
-                if debug_log:
-                    print(f"No song detected for (#{consecutive_failures} times in a row).")
-
-                if consecutive_failures >= fallback["allowed_failures"] and not last_display_was_fallback:
-                    show_fallback_image()
-                    last_display_was_fallback = True
-            else:
-                consecutive_failures = 0 
-
-                artist, title, cover_img = result
-                song_id = (
-                    artist.strip().casefold(),
-                    title.strip().casefold(),
-                )
-                if song_id == last_song_id and not last_display_was_fallback:
-                    if debug_log:
-                        print("Same song as before, skipping Pixoo update.")
-                else:
-                    if debug_log:
-                        if last_display_was_fallback and song_id == last_song_id:
-                            print("Same song as before after Fallback, updating Pixoo.")
-                        elif last_display_was_fallback:
-                            print("New song detected after Fallback, updating Pixoo.")
-                        else:
-                            print("New song detected, updating Pixoo.")
-
-                    start_scrolling_display(cover_img, artist, title)
-                    last_song_id = song_id
-                    last_display_was_fallback = False
-
+        except KeyboardInterrupt:
+            print("Interrupted by user, exiting.")
+            break
         except Exception as e:
             print(f"Error in loop: {e}")
 
