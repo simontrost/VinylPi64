@@ -52,8 +52,7 @@ CONFIG_DEFAULTS = {
     },
     "behavior": {
         "loop": True,
-        "loop_delay_seconds": 1,
-	"display_duration_seconds": 8
+        "loop_delay_seconds": 1
     },
 }
 
