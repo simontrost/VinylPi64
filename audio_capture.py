@@ -9,11 +9,13 @@ INPUT_DEVICE_INDEX = None
 
 def auto_detect_usb_device():
     needle = CONFIG["audio"]["device_name_contains"].upper()
+    debug_log = CONFIG["debug"]["logs"]
+
     devices = sd.query_devices()
     for idx, dev in enumerate(devices):
         name = dev.get("name", "")
         max_in = dev.get("max_input_channels", 0)
-        if max_in > 0 and needle in name.upper():
+        if max_in > 0 and needle in name.upper() and debug_log:
             print(f"Auto-Detected Turntable Device: #{idx} -> {name}")
             return idx
 
@@ -28,6 +30,7 @@ def choose_input_device_interactive():
 
 
 def record_sample():
+    debug_log = CONFIG["debug"]["logs"]
     audio_cfg = CONFIG["audio"]
     debug_cfg = CONFIG["debug"]
     sample_rate = audio_cfg["sample_rate"]
@@ -45,6 +48,7 @@ def record_sample():
     debug_wav_path = debug_cfg["wav_path"]
     if debug_wav_path:
         sf.write(debug_wav_path, audio, sample_rate, format="WAV")
-        print(f"Saved WAV file at: {debug_wav_path}")
+        if debug_log:
+            print(f"Saved WAV file at: {debug_wav_path}")
 
     return wav_bytes

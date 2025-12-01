@@ -14,10 +14,12 @@ _scroll_stop_event = threading.Event()
 
 
 async def _recognize_async(wav_bytes: bytes):
-    print("Starte Shazam-Erkennung ...")
+    debug_log = CONFIG["debug"]["logs"]
+    if debug_log:
+        print("Starte Shazam-Erkennung ...")
+
     shazam = Shazam()
 
-    debug_cfg = CONFIG["debug"]
     shazam_cfg = CONFIG.get("shazam", {})
     timeout_s = shazam_cfg.get("timeout_seconds", 15)
 
@@ -29,11 +31,11 @@ async def _recognize_async(wav_bytes: bytes):
     images = track.get("images") or {}
     cover_url = images.get("coverart")
 
-    if debug_cfg.get("logs", False):
-        print(f"Erkannt: {artist} – {title}")
+    if debug_log:
+        print(f"Detected: {artist} – {title}")
         print(f"Cover-URL: {cover_url}")
 
-    if not cover_url:
+    if not cover_url and debug_log:
         print("No cover image found in Shazam response.")
         return None
 
@@ -45,10 +47,11 @@ def recognize_song(wav_bytes: bytes):
     try:
         return asyncio.run(_recognize_async(wav_bytes))
     except Exception as e:
-        print(f"Errow while detecting: {e}")
+        print(f"Error while detecting: {e}")
         return None
 
 def _scroll_loop(cover_img, artist: str, title: str):
+    debug_log = CONFIG["debug"]["logs"]
     debug_cfg = CONFIG["debug"]
     img_cfg = CONFIG["image"]
 
@@ -65,7 +68,7 @@ def _scroll_loop(cover_img, artist: str, title: str):
 
             if pixoo_frame_path:
                 frame.save(pixoo_frame_path)
-                if debug_cfg.get("logs", False):
+                if debug_log:
                     print(f"Finished: {pixoo_frame_path} created.")
 
             if preview_path:
@@ -76,7 +79,7 @@ def _scroll_loop(cover_img, artist: str, title: str):
                     Image.Resampling.NEAREST
                 )
                 preview.save(preview_path)
-                if debug_cfg.get("logs", False):
+                if debug_log:
                     print(f"Finished: {preview_path} created.")
 
             first_frame_saved = True
@@ -109,13 +112,14 @@ def start_scrolling_display(cover_img, artist: str, title: str):
 
 
 def show_fallback_image():
+    debug_log = CONFIG["debug"]["logs"]
     fallback_cfg = CONFIG.get("fallback", {})
-    if not fallback_cfg.get("enabled", False):
+    if not fallback_cfg.get("enabled", False) and debug_log:
         print("Fallback disabled in config, nothing to show.")
         return
 
     path = fallback_cfg.get("image_path")
-    if not path:
+    if not path and debug_log:
         print("Fallback image path not set.")
         return
 
@@ -136,6 +140,7 @@ def show_fallback_image():
 
         pixoo = PixooClient()
         pixoo.send_frame(fallback_resized)
-        print(f"Fallback image '{path}' sent to Pixoo.")
+        if debug_log:
+            print(f"Fallback image '{path}' sent to Pixoo.")
     except Exception as e:
         print(f"Error showing fallback image: {e}")

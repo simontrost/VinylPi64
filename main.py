@@ -9,7 +9,8 @@ def main_loop():
     debug_log = CONFIG["debug"]["logs"]
     fallback = CONFIG["fallback"]
 
-    print(f"\nStarting to loop VinylPi64 (every {delay}s)\n")
+    if debug_log:
+        print(f"\nStarting to loop VinylPi64 (every {delay}s)\n")
 
     last_song_id = None              
     last_display_was_fallback = False
