@@ -73,7 +73,7 @@ class PixooClient:
                 print(f"Warning: could not save Pixoo IP to config.json: {e}")
 
         self.base_url = f"http://{self.ip}/post"
-        if debug_log
+        if debug_log:
             print(f"PixooClient using IP: {self.ip}")
 
 
