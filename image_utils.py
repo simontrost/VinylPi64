@@ -61,7 +61,7 @@ def build_static_frame(cover_img, artist: str, title: str, tick: int = 0) -> Ima
     GAP_BETWEEN_COVER_AND_BAND = img_cfg["margin_image_text"]
     GAP_BETWEEN_LINES = img_cfg["line_spacing_margin"]                 
     TARGET_GLYPH_HEIGHT = img_cfg["font_size"]              
-    TEXT_COLOR = img_cfg["text_color"]
+    TEXT_COLOR = tuple(img_cfg["text_color"])  
     USE_DYNAMIC_BG = img_cfg.get("use_dynamic_bg", True)
     
     if(USE_DYNAMIC_BG):
