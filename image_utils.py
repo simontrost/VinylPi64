@@ -131,7 +131,6 @@ def build_static_frame(cover_img, artist: str, title: str, tick: int = 0) -> Ima
     y_title = y_band + glyph_h + GAP_BETWEEN_LINES
 
     def compute_x(w_text: int, tick: int) -> int:
-        """Gibt die X-Position für statisch oder scrollend zurück."""
         if w_text <= CANVAS_SIZE:
             return (CANVAS_SIZE - w_text) // 2
         else:

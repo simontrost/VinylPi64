@@ -51,7 +51,6 @@ def recognize_song(wav_bytes: bytes):
 def _scroll_loop(cover_img, artist: str, title: str):
     debug_cfg = CONFIG["debug"]
     img_cfg = CONFIG["image"]
-    output_cfg = CONFIG.get("output", {})
 
     pixoo = PixooClient()
     tick = 0
@@ -61,8 +60,8 @@ def _scroll_loop(cover_img, artist: str, title: str):
         frame = build_static_frame(cover_img, artist, title, tick=tick)
 
         if not first_frame_saved:
-            pixoo_frame_path = output_cfg.get("pixoo_frame_path", "")
-            preview_path = output_cfg.get("preview_path", "")
+            pixoo_frame_path = debug_cfg.get("pixoo_frame_path", "")
+            preview_path = debug_cfg.get("preview_path", "")
 
             if pixoo_frame_path:
                 frame.save(pixoo_frame_path)
