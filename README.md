@@ -152,11 +152,9 @@ if something is not working check
 journalctl -u vinylpi.service -f
 ```
 
-## Licence 
+## License
 
-Creative Commons Attribution–NonCommercial 4.0
-- Allowed: use, modify, share
-- Not allowed: commercial use
+This project is licensed under the MIT License.
 
 Full license text:
-https://creativecommons.org/licenses/by-nc/4.0/legalcode.txt
+https://opensource.org/licenses/MIT
