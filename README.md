@@ -38,6 +38,10 @@ If you use different hardware, you will most likely have to modify parts of the 
   <img src="assets/preview.png" width="600" alt="Preview results">
 </p>
 
+<p align="left">
+  <img src="assets/example.jpg" height="600" alt="Preview results">
+</p>
+
 ## Installation
 
 
