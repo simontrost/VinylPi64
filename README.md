@@ -8,7 +8,8 @@
   <img src="https://img.shields.io/badge/python-3.11+-yellow" />
 
   <!-- License -->
-  <img src="https://img.shields.io/badge/licence-MIT--licensed%20components-green" />
+  <img src="https://img.shields.io/badge/license-CC--BY--NC%204.0-blue" />
+  
 </p>
 
 VinylPi is a Raspberry Pi project that listens to audio from a turntable, identifies the currently playing song using **ShazamIO**, fetches album metadata and artwork, generates a **64×64 pixel frame**, and displays it on a **Divoom Pixoo**.
@@ -151,10 +152,8 @@ if something is not working check
 ```bash
 journalctl -u vinylpi.service -f
 ```
-
 ## License
-
-This project is licensed under the MIT License.
+Creative Commons Attribution–NonCommercial 4.0
 
 Full license text:
-https://opensource.org/licenses/MIT
+https://creativecommons.org/licenses/by-nc/4.0/legalcode.txt

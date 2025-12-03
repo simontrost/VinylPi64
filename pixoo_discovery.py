@@ -1,9 +1,6 @@
 from __future__ import annotations
-
 from typing import Optional
-
 import requests
-
 from config_loader import CONFIG
 
 

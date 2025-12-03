@@ -4,9 +4,6 @@ import io
 
 from config_loader import CONFIG
 
-INPUT_DEVICE_INDEX = None
-
-
 def auto_detect_usb_device():
     needle = CONFIG["audio"]["device_name_contains"].upper()
     debug_log = CONFIG["debug"]["logs"]
@@ -19,15 +16,8 @@ def auto_detect_usb_device():
             print(f"Auto-Detected Turntable Device: #{idx} -> {name}")
             return idx
 
-    print("No appropriate audio device was found.")
+    print("No appropriate audio device was found. Try using 'arecord -l'\n Set the name in the config.json file.")
     return None
-
-
-def choose_input_device_interactive():
-    print(sd.query_devices())
-    idx = int(input("Choose your desired input device: "))
-    return idx
-
 
 def record_sample():
     debug_log = CONFIG["debug"]["logs"]
@@ -36,6 +26,7 @@ def record_sample():
     sample_rate = audio_cfg["sample_rate"]
     seconds = audio_cfg["sample_seconds"]
     channels = audio_cfg["channels"]
+    debug_wav_path = debug_cfg["wav_path"]
 
     audio = sd.rec(int(seconds * sample_rate), samplerate=sample_rate,
                    channels=channels, dtype="int16")
@@ -45,7 +36,6 @@ def record_sample():
     sf.write(buffer, audio, sample_rate, format="WAV")
     wav_bytes = buffer.getvalue()
 
-    debug_wav_path = debug_cfg["wav_path"]
     if debug_wav_path:
         sf.write(debug_wav_path, audio, sample_rate, format="WAV")
         if debug_log:

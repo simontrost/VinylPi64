@@ -45,7 +45,6 @@
         "allowed_failures": 2
     },
     "behavior": {
-        "loop": true,
         "loop_delay_seconds": 1
     }
 }

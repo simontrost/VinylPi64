@@ -3,9 +3,8 @@ from audio_capture import record_sample
 from recognition import recognize_song, start_scrolling_display, show_fallback_image
 from config_loader import CONFIG
 
-
 def main_loop():
-    delay = CONFIG["behavior"].get("loop_delay_seconds", 20)
+    delay = CONFIG["behavior"].get("loop_delay_seconds", 10)
     debug_log = CONFIG["debug"]["logs"]
     fallback = CONFIG["fallback"]
 

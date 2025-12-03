@@ -29,7 +29,7 @@ CONFIG_DEFAULTS = {
     },
     "divoom": {
         "ip": "",
-        "device_name": "espressif",
+        "device_name": "",
         "timeout": 2.0,
         "auto_reset_gif_id": True,
         "discovery": {
@@ -40,7 +40,7 @@ CONFIG_DEFAULTS = {
         }
     },
     "debug": {
-        "logs": False,
+        "logs": True,
         "pixoo_frame_path": "",
         "preview_path": "",
         "wav_path": ""
@@ -51,7 +51,6 @@ CONFIG_DEFAULTS = {
         "allowed_failures": 2
     },
     "behavior": {
-        "loop": True,
         "loop_delay_seconds": 1
     },
 }
