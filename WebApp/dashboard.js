@@ -35,5 +35,54 @@ async function loadStatus() {
     }
 }
 
+async function loadRecognizerStatus() {
+    const statusEl = document.getElementById("rec-status");
+    const btnStart = document.getElementById("btn-start-rec");
+    const btnStop = document.getElementById("btn-stop-rec");
+
+    if (!statusEl || !btnStart || !btnStop) return;
+
+    try {
+        const r = await fetch("/api/recognizer/status");
+        const data = await r.json();
+
+        if (data.running) {
+            statusEl.textContent = "Läuft";
+            statusEl.classList.add("status-running");
+            statusEl.classList.remove("status-stopped");
+            btnStart.disabled = true;
+            btnStop.disabled = false;
+        } else {
+            statusEl.textContent = "Gestoppt";
+            statusEl.classList.add("status-stopped");
+            statusEl.classList.remove("status-running");
+            btnStart.disabled = false;
+            btnStop.disabled = true;
+        }
+    } catch (e) {
+        console.error(e);
+        statusEl.textContent = "Statusfehler";
+        btnStart.disabled = false;
+        btnStop.disabled = false;
+    }
+}
+
+async function startRecognizer() {
+    await fetch("/api/recognizer/start", { method: "POST" });
+    await loadRecognizerStatus();
+}
+
+async function stopRecognizer() {
+    await fetch("/api/recognizer/stop", { method: "POST" });
+    await loadRecognizerStatus();
+}
+
+document.getElementById("btn-start-rec")?.addEventListener("click", startRecognizer);
+document.getElementById("btn-stop-rec")?.addEventListener("click", stopRecognizer);
+
 loadStatus();
 setInterval(loadStatus, 5000);
+
+loadRecognizerStatus();
+setInterval(loadRecognizerStatus, 5000);
+

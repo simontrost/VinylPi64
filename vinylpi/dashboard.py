@@ -5,6 +5,10 @@ import time
 from pathlib import Path
 from werkzeug.utils import secure_filename
 
+import subprocess
+import threading
+import sys
+
 BASE_DIR = Path(__file__).resolve().parents[1]
 WEBAPP_DIR = BASE_DIR / "WebApp"
 
@@ -20,6 +24,49 @@ STATUS_PATH = Path("/tmp/vinylpi_status.json")
 UPLOAD_DIR = BASE_DIR / "assets" / "fallback"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 ALLOWED_EXT = {"png", "jpg", "jpeg"}
+
+_recognizer_proc = None
+_rec_lock = threading.Lock()
+
+def _is_recognizer_running():
+    global _recognizer_proc
+    if _recognizer_proc is None:
+        return False
+    if _recognizer_proc.poll() is None:
+        return True
+    _recognizer_proc = None
+    return False
+
+
+def _start_recognizer():
+    global _recognizer_proc
+    with _rec_lock:
+        if _is_recognizer_running():
+            return False  
+
+        cmd = [sys.executable, "-u", str(BASE_DIR / "main.py")]
+        _recognizer_proc = subprocess.Popen(
+            cmd,
+            cwd=BASE_DIR
+        )
+        return True
+
+
+def _stop_recognizer():
+    global _recognizer_proc
+    with _rec_lock:
+        if not _is_recognizer_running():
+            _recognizer_proc = None
+            return False  
+
+        _recognizer_proc.terminate()
+        try:
+            _recognizer_proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            _recognizer_proc.kill()
+        finally:
+            _recognizer_proc = None
+        return True
 
 @app.get("/api/fallback-images")
 def api_list_fallback_images():
@@ -141,6 +188,23 @@ def api_config_update():
     data = request.json
     CONFIG_PATH.write_text(json.dumps(data, indent=4), encoding="utf-8")
     return jsonify({"ok": True})
+
+@app.get("/api/recognizer/status")
+def api_recognizer_status():
+    running = _is_recognizer_running()
+    return jsonify({"running": running})
+
+
+@app.post("/api/recognizer/start")
+def api_recognizer_start():
+    started = _start_recognizer()
+    return jsonify({"ok": True, "started": started, "running": _is_recognizer_running()})
+
+
+@app.post("/api/recognizer/stop")
+def api_recognizer_stop():
+    stopped = _stop_recognizer()
+    return jsonify({"ok": True, "stopped": stopped, "running": _is_recognizer_running()})
 
 
 if __name__ == "__main__":

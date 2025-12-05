@@ -116,6 +116,41 @@ body {
     opacity: 0.8;
 }
 
+.control-section {
+    margin-top: 1.5rem;
+    padding: 1rem;
+    background: #111;
+    border-radius: 12px;
+    border: 1px solid #333;
+}
+
+.status-badge {
+    display: inline-block;
+    padding: 0.3rem 0.6rem;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    margin-bottom: 0.5rem;
+    background: #333;
+}
+
+.status-running {
+    background: #14532d;
+}
+
+.status-stopped {
+    background: #4b1d1d;
+}
+
+.button-row {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.button-row button {
+    flex: 1;
+}
+
+
 /* -------- Settings-Seite -------- */
 
 .section-title {
