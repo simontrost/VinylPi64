@@ -12,10 +12,10 @@
   
 </p>
 
-VinylPi is a Raspberry Pi project that listens to audio from a turntable, identifies the currently playing song using **ShazamIO**, fetches album metadata and artwork, generates a **64×64 pixel frame**, and displays it on a **Divoom Pixoo**.
+VinylPi is a Raspberry Pi project that listens to audio from a turntable, identifies the currently playing song using **ShazamIO**, fetches album metadata and artwork, generates a **64×64 pixel frame**, and displays it on a **Divoom Pixoo**. It also features a webapp with a dashboard and settings.
 
 <p align="left">
-  <img src="assets/fallback.png" width="400" alt="VinylPi Logo">
+  <img src="assets/fallback/fallback.png" width="400" alt="VinylPi Logo">
 </p>
 
 **Important: Hardware-specific implementation**
@@ -43,17 +43,30 @@ If you use different hardware, you will most likely have to modify parts of the 
   - marquee text for long titles/bands
   - fallback image
 - Send results to pixel diplay
+- local WebApp with dashboard and settings
 ---
 
 ## Example Output
+
+### Preview
 
 <p align="left">
   <img src="assets/preview.png" width="600" alt="Preview results">
 </p>
 
+### Setup
+
 <p align="left">
   <img src="assets/example.jpg" height="600" alt="Preview results">
 </p>
+
+### WebApp Desktop
+
+| <img src="assets/webapp_dashboard_desktop.png" width="600" /> | <img src="assets/webapp_settings_desktop.png" width="600" /> |
+
+### WebApp Mobile
+
+| <img src="assets/webapp_dashboard_mobile.jpeg" height="600" /> | <img src="assets/webapp_settings_mobile.jpeg" height="600" /> |
 
 ## Installation
 
@@ -108,8 +121,9 @@ Configure:
 ### 6. Execute
 with active env:
 ```bash
-python3 main.py
+python vinylpi/dashboard.py
 ```
+hint: you can start the actual music detection from the webapp: `http://vinylpi.local:5000/`or via `python vinylpi/main.py`
 
 ## Autostart on boot
 
@@ -122,17 +136,15 @@ with the following content and adjust the username and paths
 
 ```bash
 [Unit]
-Description=VinylPi64 – autostart on boot
-After=network-online.target sound.target
+Description=VinylPi Dashboard
+After=network-online.target
 Wants=network-online.target
 
 [Service]
-Type=simple
-User=username
-WorkingDirectory=/home/user/VinylPi64
-ExecStart=/home/user/VinylPi64/venv/bin/python -u /home/user/VinylPi64/main.py
+User=pi
+WorkingDirectory=/home/pi/VinylPi64
+ExecStart=/home/pi/VinylPi64/venv/bin/gunicorn --bind 0.0.0.0:5000 vinylpi.dashboard:app
 Restart=on-failure
-RestartSec=5
 
 [Install]
 WantedBy=multi-user.target

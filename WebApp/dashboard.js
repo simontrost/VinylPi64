@@ -50,7 +50,7 @@ async function loadRecognizerStatus() {
             statusEl.textContent = "Running";
             statusEl.classList.add("rec-status-running");
         } else {
-            statusEl.textContent = "Gestoppt";
+            statusEl.textContent = "Stopped";
             statusEl.classList.add("rec-status-stopped");
         }
     } catch (e) {
