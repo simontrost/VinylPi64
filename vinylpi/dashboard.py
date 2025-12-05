@@ -1,4 +1,3 @@
-# dashboard.py
 from flask import Flask, request, jsonify, send_from_directory
 import json
 import time
@@ -28,6 +27,17 @@ ALLOWED_EXT = {"png", "jpg", "jpeg"}
 _recognizer_proc = None
 _rec_lock = threading.Lock()
 
+
+def _get_debug_logs_flag() -> bool:
+    try:
+        if CONFIG_PATH.exists():
+            cfg = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
+            return (cfg.get("debug") or {}).get("logs", False)
+    except Exception as e:
+        print(f"Could not read debug.logs from config: {e}")
+    return False
+
+
 def _is_recognizer_running():
     global _recognizer_proc
     if _recognizer_proc is None:
@@ -42,13 +52,21 @@ def _start_recognizer():
     global _recognizer_proc
     with _rec_lock:
         if _is_recognizer_running():
-            return False  
+            return False
 
         cmd = [sys.executable, "-u", str(BASE_DIR / "vinylpi" / "main.py")]
-        _recognizer_proc = subprocess.Popen(
-            cmd,
-            cwd=BASE_DIR
-        )
+        debug_log = _get_debug_logs_flag()
+
+        if debug_log:
+            _recognizer_proc = subprocess.Popen(cmd, cwd=BASE_DIR)
+        else:
+            _recognizer_proc = subprocess.Popen(
+                cmd,
+                cwd=BASE_DIR,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+
         return True
 
 

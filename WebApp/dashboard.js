@@ -9,26 +9,26 @@ async function loadStatus() {
         const coverEl = document.getElementById("song-cover");
 
         if (st.error) {
-            titleEl.innerText = "Keine Daten";
+            titleEl.innerText = "No data";
             artistEl.innerText = "";
             albumEl.innerText = "";
             coverEl.src = "/logo.png";
             return;
         }
 
-        const title = st.title || "Unbekannter Titel";
-        const artist = st.artist || "Unbekannter Artist";
+        const title = st.title || "Unknown title";
+        const artist = st.artist || "Unknown artist";
         const album = st.album || "";
 
         artistEl.innerText = artist;
         titleEl.innerText = title;
-        albumEl.innerText = album ? `Album: ${album}` : "";
+        albumEl.innerText = album ? `${album}` : "";
 
         coverEl.src = st.cover_url || "/logo.png";
 
     } catch (e) {
         console.error(e);
-        document.getElementById("song-title").innerText = "Fehler beim Laden";
+        document.getElementById("song-title").innerText = "Error loading data";
     }
 }
 
@@ -55,7 +55,7 @@ async function loadRecognizerStatus() {
         }
     } catch (e) {
         console.error(e);
-        statusEl.textContent = "Statusfehler";
+        statusEl.textContent = "Status error";
         statusEl.classList.remove("rec-status-running", "rec-status-stopped");
     }
 }
@@ -66,7 +66,7 @@ async function setRecognizerRunning(shouldRun) {
     if (!toggle || !statusEl) return;
 
     toggle.disabled = true;
-    statusEl.textContent = "Ändere Status …";
+    statusEl.textContent = "Changing status...";
 
     try {
         const url = shouldRun ? "/api/recognizer/start" : "/api/recognizer/stop";
@@ -79,6 +79,9 @@ async function setRecognizerRunning(shouldRun) {
     toggle.disabled = false;
 }
 
+let statusInterval = null;
+let recInterval = null;
+
 document.addEventListener("DOMContentLoaded", () => {
     const toggle = document.getElementById("recognizerToggle");
     if (toggle) {
@@ -87,18 +90,27 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    const btnStart = document.getElementById("btn-start-rec");
-    if (btnStart) {
-        btnStart.addEventListener("click", () => setRecognizerRunning(true));
-    }
-
-    const btnStop = document.getElementById("btn-stop-rec");
-    if (btnStop) {
-        btnStop.addEventListener("click", () => setRecognizerRunning(false));
-    }
-
     loadStatus();
     loadRecognizerStatus();
-    setInterval(loadStatus, 5000);
-    setInterval(loadRecognizerStatus, 5000);
+
+    statusInterval = setInterval(loadStatus, 15000);
+    recInterval = setInterval(loadRecognizerStatus, 15000);
+});
+
+document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+        clearInterval(statusInterval);
+        clearInterval(recInterval);
+        statusInterval = null;
+        recInterval = null;
+        console.log("Dashboard paused (tab hidden)");
+    } else {
+        statusInterval = setInterval(loadStatus, 15000);
+        recInterval = setInterval(loadRecognizerStatus, 15000);
+
+        loadStatus();
+        loadRecognizerStatus();
+
+        console.log("Dashboard resumed (tab visible)");
+    }
 });

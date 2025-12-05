@@ -1,13 +1,11 @@
-/* Grundlayout, Dark Mode */
 body {
     margin: 0;
     background: #202020;
     color: #e6e6e6;
     font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-    font-size: 18px; /* Basis etwas größer */
+    font-size: 18px;
 }
 
-/* Sidebar links – Navigation */
 .sidebar {
     position: fixed;
     left: 0;
@@ -37,12 +35,10 @@ body {
     opacity: 1;
 }
 
-/* Pixel-Font (Header-Titel) */
 .pixel-title {
     font-family: 'Press Start 2P', cursive;
 }
 
-/* Hauptbereich rechts */
 .main {
     margin-left: 210px;
     padding: 32px 40px;
@@ -50,7 +46,6 @@ body {
     box-sizing: border-box;
 }
 
-/* Header oben im Hauptbereich */
 .main-header {
     display: flex;
     justify-content: space-between;
@@ -70,7 +65,7 @@ body {
     object-fit: cover;
 }
 
-/* -------- Dashboard (Startseite) -------- */
+/* -------- Dashboard -------- */
 
 .song-section {
     height: calc(100vh - 80px);
@@ -191,7 +186,7 @@ body {
         box-shadow 0.25s ease;
 }
 
-/* „Knopf“ */
+/* Button */
 
 .toggle-slider::before {
     content: "";
@@ -208,7 +203,7 @@ body {
     transition: transform 0.25s ease;
 }
 
-/* ON-Zustand */
+/* ON-state */
 
 .toggle-switch input:checked + .toggle-slider {
     background: linear-gradient(135deg, #16a34a, #22c55e);
@@ -221,7 +216,7 @@ body {
     transform: translateX(36px);
 }
 
-/* Disabled-Optik, wenn du es mal brauchst */
+/* Disabled optic */
 
 .toggle-switch input:disabled + .toggle-slider {
     opacity: 0.6;
@@ -229,7 +224,7 @@ body {
 }
 
 
-/* -------- Settings-Seite -------- */
+/* -------- Settings-page -------- */
 
 .section-title {
     font-size: 24px;
@@ -294,7 +289,7 @@ body {
 }
 
 .gallery-item.current {
-    border-color: #4ade80; /* grün */
+    border-color: #4ade80;
 }
 
 .gallery-item img {
@@ -335,7 +330,7 @@ body {
     transform: translateY(1px);
 }
 
-/* -------- Responsive (Smartphone) -------- */
+/* -------- Responsive -------- */
 
 @media (max-width: 800px) {
     .sidebar {

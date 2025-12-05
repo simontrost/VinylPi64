@@ -22,7 +22,7 @@
 
 
     <main class="main">
-        <h1 class="section-title">Einstellungen</h1>
+        <h1 class="section-title">Settings</h1>
 
         <form id="settings-form">
 
@@ -31,27 +31,27 @@
                 <h2>Audio</h2>
 
                 <div class="form-row">
-                    <label for="audioDeviceName">Device-Name enthält</label>
+                    <label for="audioDeviceName">Device name contains</label>
                     <input type="text" id="audioDeviceName" placeholder="USB AUDIO">
                 </div>
 
                 <div class="form-row">
-                    <label for="audioSampleSeconds">Sample-Dauer (Sek.)</label>
+                    <label for="audioSampleSeconds">Sample duration (sec.)</label>
                     <input type="number" id="audioSampleSeconds" step="0.1" min="1">
                 </div>
 
                 <div class="form-row">
-                    <label for="audioSampleRate">Sample-Rate</label>
+                    <label for="audioSampleRate">Sample rate</label>
                     <input type="number" id="audioSampleRate">
                 </div>
 
                 <div class="form-row">
-                    <label for="audioChannels">Kanäle</label>
+                    <label for="audioChannels">Channels</label>
                     <input type="number" id="audioChannels" min="1" max="2">
                 </div>
 
                 <div class="form-row">
-                    <label for="audioOutputWav">Output WAV Pfad</label>
+                    <label for="audioOutputWav">Output WAV path</label>
                     <input type="text" id="audioOutputWav" placeholder="">
                 </div>
             </div>
@@ -61,77 +61,77 @@
                 <h2>Display / Image</h2>
 
                 <div class="form-row">
-                    <label for="imageCanvasSize">Canvas-Größe</label>
+                    <label for="imageCanvasSize">Canvas size</label>
                     <input type="number" id="imageCanvasSize">
                 </div>
 
                 <div class="form-row">
-                    <label for="imageTopMargin">Top-Margin</label>
+                    <label for="imageTopMargin">Top margin</label>
                     <input type="number" id="imageTopMargin">
                 </div>
 
                 <div class="form-row">
-                    <label for="imageCoverSize">Cover-Größe</label>
+                    <label for="imageCoverSize">Cover size</label>
                     <input type="number" id="imageCoverSize">
                 </div>
 
                 <div class="form-row">
-                    <label for="imageMarginImageText">Abstand Bild/Text</label>
+                    <label for="imageMarginImageText">Margin Cover/Text</label>
                     <input type="number" id="imageMarginImageText">
                 </div>
 
                 <div class="form-row">
-                    <label for="imageLineSpacingMargin">Zeilenabstand Margin</label>
+                    <label for="imageLineSpacingMargin">Line spacing</label>
                     <input type="number" id="imageLineSpacingMargin">
                 </div>
 
                 <div class="form-row">
-                    <label for="imageFontPath">Font-Pfad</label>
+                    <label for="imageFontPath">Font path</label>
                     <input type="text" id="imageFontPath">
                 </div>
 
                 <div class="form-row">
-                    <label for="imageFontSize">Font-Größe</label>
+                    <label for="imageFontSize">Font size</label>
                     <input type="number" id="imageFontSize">
                 </div>
 
                 <div class="form-row">
-                    <label for="textColor">Textfarbe</label>
+                    <label for="textColor">Text color</label>
                     <input type="color" id="textColor">
                 </div>
 
                 <div class="form-row">
-                    <label for="bgColor">Manuelle Hintergrundfarbe</label>
+                    <label for="bgColor">Manual background color</label>
                     <input type="color" id="bgColor">
                 </div>
 
                 <div class="form-row">
-                    <label for="imageUppercase">Großbuchstaben</label>
+                    <label for="imageUppercase">Uppercase</label>
                     <input type="checkbox" id="imageUppercase">
                 </div>
 
                 <div class="form-row">
-                    <label for="useDynamicBg">Dynamischer Hintergrund</label>
+                    <label for="useDynamicBg">Dynamic background</label>
                     <input type="checkbox" id="useDynamicBg">
                 </div>
 
                 <div class="form-row">
-                    <label for="useDynamicText">Dynamische Textfarbe</label>
+                    <label for="useDynamicText">Dynamic text color</label>
                     <input type="checkbox" id="useDynamicText">
                 </div>
 
                 <div class="form-row">
-                    <label for="imagePreviewScale">Preview-Scale</label>
+                    <label for="imagePreviewScale">Preview scale</label>
                     <input type="number" id="imagePreviewScale" min="1">
                 </div>
 
                 <div class="form-row">
-                    <label for="marqueeSpeed">Scroll-Geschwindigkeit</label>
+                    <label for="marqueeSpeed">Scroll speed</label>
                     <input type="number" id="marqueeSpeed" min="1" max="200">
                 </div>
 
                 <div class="form-row">
-                    <label for="imageSleepSeconds">Sleep Sekunden (Loop)</label>
+                    <label for="imageSleepSeconds">Scroll sleep seconds (loop)</label>
                     <input type="number" id="imageSleepSeconds" step="0.001">
                 </div>
             </div>
@@ -141,29 +141,29 @@
                 <h2>Fallback</h2>
 
                 <div class="form-row">
-                    <label for="fallbackImage">Fallback-Bildpfad</label>
+                    <label for="fallbackImage">Fallback image path</label>
                     <input type="text" id="fallbackImage" placeholder="assets/fallback.png">
                 </div>
 
                 <div class="form-row">
-                    <button type="button" id="openFallbackGallery">Galerie öffnen</button>
+                    <button type="button" id="openFallbackGallery">Open gallery</button>
                 </div>
 
                 <div id="fallbackGallery" class="gallery hidden">
                 </div>
 
                 <div class="form-row">
-                    <label for="fallbackEnabled">Fallback aktiv</label>
+                    <label for="fallbackEnabled">Fallback enabled</label>
                     <input type="checkbox" id="fallbackEnabled">
                 </div>
 
                 <div class="form-row">
-                    <label for="fallbackUpload">Fallback hochladen</label>
+                    <label for="fallbackUpload">Upload image</label>
                     <input type="file" id="fallbackUpload" accept="image/png,image/jpeg">
                 </div>
 
                 <div class="form-row">
-                    <label for="fallbackAllowedFailures">Allowed Failures</label>
+                    <label for="fallbackAllowedFailures">Allowed failures</label>
                     <input type="number" id="fallbackAllowedFailures" min="0">
                 </div>
             </div>
@@ -173,17 +173,17 @@
                 <h2>Pixoo & Netzwerk</h2>
 
                 <div class="form-row">
-                    <label for="divoomIp">Feste IP (optional)</label>
+                    <label for="divoomIp">Fixed IP (optional)</label>
                     <input type="text" id="divoomIp" placeholder="192.168.x.x">
                 </div>
 
                 <div class="form-row">
-                    <label for="divoomDeviceName">Device-Name</label>
+                    <label for="divoomDeviceName">Device name</label>
                     <input type="text" id="divoomDeviceName" placeholder="espressif">
                 </div>
 
                 <div class="form-row">
-                    <label for="divoomTimeout">Timeout (Sek.)</label>
+                    <label for="divoomTimeout">Timeout (sec.)</label>
                     <input type="number" id="divoomTimeout" step="0.1">
                 </div>
 
@@ -193,22 +193,22 @@
                 </div>
 
                 <div class="form-row">
-                    <label for="discoveryEnabled">Auto-Discovery aktiv</label>
+                    <label for="discoveryEnabled">Auto discovery enabled</label>
                     <input type="checkbox" id="discoveryEnabled">
                 </div>
 
                 <div class="form-row">
-                    <label for="subnetPrefix">Subnetz-Prefix</label>
+                    <label for="subnetPrefix">Subnet prefix</label>
                     <input type="text" id="subnetPrefix" placeholder="192.168.2.">
                 </div>
 
                 <div class="form-row">
-                    <label for="ipRangeStart">IP-Range Start</label>
+                    <label for="ipRangeStart">IP range start</label>
                     <input type="number" id="ipRangeStart" min="1" max="254">
                 </div>
 
                 <div class="form-row">
-                    <label for="ipRangeEnd">IP-Range Ende</label>
+                    <label for="ipRangeEnd">IP range end</label>
                     <input type="number" id="ipRangeEnd" min="1" max="254">
                 </div>
             </div>
@@ -218,7 +218,7 @@
                 <h2>Verhalten</h2>
 
                 <div class="form-row">
-                    <label for="behaviorLoopDelay">Loop-Delay (Sek.)</label>
+                    <label for="behaviorLoopDelay">Loop delay (sec.)</label>
                     <input type="number" id="behaviorLoopDelay" step="0.1">
                 </div>
             </div>
@@ -228,27 +228,27 @@
                 <h2>Debug</h2>
 
                 <div class="form-row">
-                    <label for="debugLogs">Debug-Logs aktiv</label>
+                    <label for="debugLogs">Debug logs enabled</label>
                     <input type="checkbox" id="debugLogs">
                 </div>
 
                 <div class="form-row">
-                    <label for="debugPixooFramePath">Pixoo Frame Pfad</label>
+                    <label for="debugPixooFramePath">Pixoo frame path</label>
                     <input type="text" id="debugPixooFramePath">
                 </div>
 
                 <div class="form-row">
-                    <label for="debugPreviewPath">Preview Pfad</label>
+                    <label for="debugPreviewPath">Preview path</label>
                     <input type="text" id="debugPreviewPath">
                 </div>
 
                 <div class="form-row">
-                    <label for="debugWavPath">WAV Pfad</label>
+                    <label for="debugWavPath">WAV path</label>
                     <input type="text" id="debugWavPath">
                 </div>
             </div>
 
-            <button class="btn-primary" type="submit">Speichern</button>
+            <button class="btn-primary" type="submit">Save</button>
         </form>
     </main>
 

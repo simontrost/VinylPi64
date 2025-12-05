@@ -16,40 +16,6 @@ function hexToRgb(hex) {
     ];
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-  const fallbackUploadInput = document.getElementById("fallbackUpload");
-  const fallbackPathInput = document.getElementById("fallbackImage");
-
-  if (fallbackUploadInput) {
-    fallbackUploadInput.addEventListener("change", async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-
-      const formData = new FormData();
-      formData.append("file", file);
-
-      try {
-        const res = await fetch("/api/fallback-image", {
-          method: "POST",
-          body: formData,
-        });
-
-        const data = await res.json();
-
-        if (data.ok && data.image_path) {
-          // Textfeld automatisch auf neuen Pfad setzen
-          fallbackPathInput.value = data.image_path;
-          alert("Fallback-Bild aktualisiert.");
-        } else {
-          alert("Upload fehlgeschlagen: " + (data.error || "unbekannter Fehler"));
-        }
-      } catch (err) {
-        console.error(err);
-        alert("Upload fehlgeschlagen (Netzwerkfehler).");
-      }
-    });
-  }
-});
 
 document.addEventListener("DOMContentLoaded", () => {
   const fallbackUploadInput = document.getElementById("fallbackUpload");
@@ -57,7 +23,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const openGalleryBtn = document.getElementById("openFallbackGallery");
   const galleryContainer = document.getElementById("fallbackGallery");
 
-  // Upload-Handler wie bisher …
   if (fallbackUploadInput) {
     fallbackUploadInput.addEventListener("change", async (e) => {
       const file = e.target.files[0];
@@ -74,31 +39,30 @@ document.addEventListener("DOMContentLoaded", () => {
         const data = await res.json();
         if (data.ok && data.image_path) {
           fallbackPathInput.value = data.image_path;
-          alert("Fallback-Bild aktualisiert.");
-          // Galerie neu laden
+          alert("Fallback image updated.");
           if (!galleryContainer.classList.contains("hidden")) {
             await loadFallbackGallery();
           }
         } else {
-          alert("Upload fehlgeschlagen: " + (data.error || "unbekannter Fehler"));
+          alert("Upload failed: " + (data.error || "unknown error"));
         }
       } catch (err) {
         console.error(err);
-        alert("Upload fehlgeschlagen (Netzwerkfehler).");
+        alert("Upload failed (network error).");
       }
     });
   }
 
   async function loadFallbackGallery() {
-    galleryContainer.innerHTML = "Lade Bilder …";
+    galleryContainer.innerHTML = "Loading images …";
     try {
       const res = await fetch("/api/fallback-images");
       const data = await res.json();
-      if (!data.ok) throw new Error(data.error || "Fehler");
+      if (!data.ok) throw new Error(data.error || "Error");
 
       const images = data.images || [];
       if (!images.length) {
-        galleryContainer.innerHTML = "<p>Keine hochgeladenen Fallback-Bilder.</p>";
+        galleryContainer.innerHTML = "<p>No uploaded fallback images available.</p>";
         return;
       }
 
@@ -116,7 +80,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const selectBtn = document.createElement("button");
         selectBtn.type = "button";
-        selectBtn.textContent = "Verwenden";
+        selectBtn.textContent = "Use";
         selectBtn.addEventListener("click", () => {
           fallbackPathInput.value = img.path; 
           document.querySelectorAll(".gallery-item").forEach(el => el.classList.remove("current"));
@@ -125,15 +89,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const deleteBtn = document.createElement("button");
         deleteBtn.type = "button";
-        deleteBtn.textContent = "Löschen";
+        deleteBtn.textContent = "Delete";
         deleteBtn.addEventListener("click", async () => {
-          if (!confirm(`"${img.filename}" wirklich löschen?`)) return;
+          if (!confirm(`"${img.filename}" really delete?`)) return;
           const res = await fetch(`/api/fallback-image/${encodeURIComponent(img.filename)}`, {
             method: "DELETE",
           });
           const out = await res.json();
           if (!out.ok) {
-            alert("Löschen fehlgeschlagen: " + (out.error || "unbekannter Fehler"));
+            alert("Deletion failed: " + (out.error || "unknown error"));
           } else {
             await loadFallbackGallery();
           }
@@ -147,7 +111,7 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     } catch (err) {
       console.error(err);
-      galleryContainer.innerHTML = "<p>Fehler beim Laden der Galerie.</p>";
+      galleryContainer.innerHTML = "<p>Error loading gallery.</p>";
     }
   }
 
@@ -380,7 +344,7 @@ document.getElementById("settings-form").addEventListener("submit", async (e) =>
         body: JSON.stringify(cfg),
     });
 
-    alert("Einstellungen gespeichert.");
+    alert("Saved settings.");
 });
 
 loadConfig();
