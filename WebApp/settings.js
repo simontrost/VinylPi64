@@ -16,6 +16,42 @@ function hexToRgb(hex) {
     ];
 }
 
+document.addEventListener("DOMContentLoaded", () => {
+  const fallbackUploadInput = document.getElementById("fallbackUpload");
+  const fallbackPathInput = document.getElementById("fallbackImage");
+
+  if (fallbackUploadInput) {
+    fallbackUploadInput.addEventListener("change", async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const formData = new FormData();
+      formData.append("file", file);
+
+      try {
+        const res = await fetch("/api/fallback-image", {
+          method: "POST",
+          body: formData,
+        });
+
+        const data = await res.json();
+
+        if (data.ok && data.image_path) {
+          // Textfeld automatisch auf neuen Pfad setzen
+          fallbackPathInput.value = data.image_path;
+          alert("Fallback-Bild aktualisiert.");
+        } else {
+          alert("Upload fehlgeschlagen: " + (data.error || "unbekannter Fehler"));
+        }
+      } catch (err) {
+        console.error(err);
+        alert("Upload fehlgeschlagen (Netzwerkfehler).");
+      }
+    });
+  }
+});
+
+
 async function loadConfig() {
     const r = await fetch("/api/config");
     const cfg = await r.json();
