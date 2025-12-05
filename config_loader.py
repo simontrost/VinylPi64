@@ -50,7 +50,7 @@ CONFIG_DEFAULTS = {
     "fallback": {
         "enabled": True,
         "image_path": "assets/fallback.png",
-        "allowed_failures": 2
+        "allowed_failures": 3
     },
     "behavior": {
         "loop_delay_seconds": 1

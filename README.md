@@ -37,7 +37,8 @@ If you use different hardware, you will most likely have to modify parts of the 
 - Automatic music recognition using **ShazamIO**  
 - Album cover retrieval  
 - Custom **64×64 pixel renderer**  
-  - centered album cover  
+  - centered album cover 
+  - custom pixel font 
   - dynamic/manual background and text font
   - marquee text for long titles/bands
   - fallback image
