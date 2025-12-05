@@ -12,18 +12,22 @@ CONFIG_PATH = BASE_DIR / "config.json"
 STATUS_PATH = Path("/tmp/vinylpi_status.json")
 _last_cfg_mtime = CONFIG_PATH.stat().st_mtime
 
-def _maybe_reload_config():
+def _maybe_reload_config() -> bool:
     global _last_cfg_mtime
     try:
         mtime = CONFIG_PATH.stat().st_mtime
     except FileNotFoundError:
-        return
+        return False
 
     if mtime != _last_cfg_mtime:
         reload_config()
         _last_cfg_mtime = mtime
         if CONFIG["debug"]["logs"]:
             print("Config reloaded from disk.")
+        return True
+
+    return False
+
 
 
 def _write_status(artist, title, cover_url=None, album=None):
@@ -54,7 +58,7 @@ def main_loop():
 
     while True:
         try:
-            _maybe_reload_config()
+            cfg_reloaded = _maybe_reload_config()
 
             delay = CONFIG["behavior"].get("loop_delay_seconds", 10)
             debug_log = CONFIG["debug"]["logs"]
@@ -95,7 +99,7 @@ def main_loop():
                     title.strip().casefold(),
                 )
 
-                if song_id == last_song_id and not last_display_was_fallback:
+                if song_id == last_song_id and not last_display_was_fallback and not cfg_reloaded:
                     if debug_log:
                         print("Same song as before, skipping Pixoo update.")
                 else:
@@ -104,6 +108,10 @@ def main_loop():
                             print("Same song as before after Fallback, updating Pixoo.")
                         elif last_display_was_fallback:
                             print("New song detected after Fallback, updating Pixoo.")
+                        elif cfg_reloaded and song_id == last_song_id:
+                            print("Config changed, updating Pixoo for same song.")
+                        elif cfg_reloaded:
+                            print("Config changed and new song detected, updating Pixoo.")
                         else:
                             print("New song detected, updating Pixoo.")
 
