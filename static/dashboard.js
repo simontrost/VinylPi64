@@ -1,11 +1,23 @@
 async function loadStatus() {
-    const r = await fetch("/api/status");
-    const data = await r.json();
-    if (data.error) {
-        document.getElementById("song-text").innerText = "Keine Daten";
-    } else {
-        document.getElementById("song-text").innerText =
-            `${data.artist} – ${data.title}`;
+    try {
+        const r = await fetch("/api/status");
+        const st = await r.json();
+
+        if (st.error) {
+            document.getElementById("title").innerText = "Keine Daten";
+            return;
+        }
+
+        document.getElementById("title").innerText  = st.title;
+        document.getElementById("artist").innerText = st.artist;
+        document.getElementById("album").innerText  = st.album || "";
+
+        if (st.cover_url) {
+            document.getElementById("cover").src = st.cover_url;
+        }
+
+    } catch (e) {
+        document.getElementById("title").innerText = "Fehler";
     }
 }
 

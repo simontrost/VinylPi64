@@ -1,0 +1,214 @@
+/* Dark Background */
+body {
+    margin: 0;
+    background: #202020;
+    color: #e6e6e6;
+    font-family: 'Inter', sans-serif;
+}
+
+/* Sidebar */
+.sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 240px;
+    height: 100vh;
+    background: #dcdcdc;
+    padding: 40px 20px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* Logo */
+.logo {
+    width: 90px;
+    height: 90px;
+    border-radius: 18px;
+    margin-bottom: 16px;
+    object-fit: cover;
+}
+
+/* Pixel Font Title */
+.pixel-title {
+    font-family: 'Press Start 2P', cursive;
+    font-size: 14px;
+    text-align: center;
+    margin-bottom: 40px;
+    color: black;
+}
+
+/* Sidebar Nav */
+.nav {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.nav a {
+    text-decoration: none;
+    color: black;
+    font-size: 16px;
+    font-weight: 600;
+    opacity: 0.6;
+}
+
+.nav a.active {
+    opacity: 1;
+}
+
+/* Main Content Area */
+.main {
+    margin-left: 260px;
+    padding: 40px;
+}
+
+/* Song Display */
+.song-container {
+    display: flex;
+    align-items: center;
+    gap: 40px;
+}
+
+.song-cover {
+    width: 220px;
+    height: 220px;
+    border-radius: 12px;
+    object-fit: cover;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+}
+
+.song-info {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.song-title {
+    font-size: 28px;
+    font-weight: bold;
+}
+
+.song-artist {
+    font-size: 22px;
+}
+
+.song-album {
+    font-size: 18px;
+    opacity: 0.7;
+}
+
+/* Settings layout */
+.section-title {
+    font-size: 22px;
+    margin-bottom: 10px;
+}
+
+.card {
+    background: #2b2b2b;
+    border-radius: 16px;
+    padding: 20px 24px;
+    margin-bottom: 20px;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+}
+
+.card h2 {
+    margin-top: 0;
+    margin-bottom: 12px;
+}
+
+.form-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.form-row label {
+    width: 220px;
+    font-weight: 500;
+}
+
+.form-row input[type="text"],
+.form-row input[type="number"],
+.form-row input[type="color"] {
+    padding: 6px 10px;
+    border-radius: 8px;
+    border: none;
+    background: #3a3a3a;
+    color: #f0f0f0;
+    min-width: 0;
+}
+
+.form-row input[type="color"] {
+    padding: 0;
+    width: 48px;
+    height: 32px;
+}
+
+.form-row input[type="checkbox"] {
+    transform: scale(1.2);
+}
+
+/* Save button */
+.btn-primary {
+    padding: 10px 18px;
+    border-radius: 10px;
+    border: none;
+    background: #ff8c00;
+    color: black;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.btn-primary:active {
+    transform: translateY(1px);
+}
+
+/* Mobile Version */
+@media (max-width: 700px) {
+    .sidebar {
+        position: relative;
+        width: 100%;
+        height: auto;
+        flex-direction: row;
+        justify-content: space-between;
+        padding: 12px 16px;
+    }
+
+    .main {
+        margin-left: 0;
+        margin-top: 20px;
+        padding: 20px;
+    }
+
+    .nav {
+        flex-direction: row;
+        gap: 12px;
+    }
+
+    .song-container {
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .song-cover {
+        width: 180px;
+        height: 180px;
+    }
+
+    .pixel-title {
+        margin-bottom: 0;
+        font-size: 12px;
+    }
+
+    .form-row {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .form-row label {
+        width: auto;
+    }
+}
