@@ -2,9 +2,16 @@ from flask import Flask, request, jsonify
 import json
 from pathlib import Path
 
-app = Flask(__name__, static_url_path='/static', static_folder='static')
+BASE_DIR = Path(__file__).resolve().parents[1]
+WEBAPP_DIR = BASE_DIR / "WebApp"
 
-CONFIG_PATH = Path("config.json")
+app = Flask(
+    __name__,
+    static_folder=str(WEBAPP_DIR),
+    static_url_path=""
+)
+
+CONFIG_PATH = BASE_DIR / "config.json"
 STATUS_PATH = Path("/tmp/vinylpi_status.json")
 
 
@@ -21,19 +28,19 @@ def settings_page():
 @app.get("/api/status")
 def api_status():
     if STATUS_PATH.exists():
-        return jsonify(json.loads(STATUS_PATH.read_text()))
+        return jsonify(json.loads(STATUS_PATH.read_text(encoding="utf-8")))
     return jsonify({"error": "no status"}), 404
 
 
 @app.get("/api/config")
 def api_config():
-    return jsonify(json.loads(CONFIG_PATH.read_text()))
+    return jsonify(json.loads(CONFIG_PATH.read_text(encoding="utf-8")))
 
 
 @app.post("/api/config")
 def api_config_update():
     data = request.json
-    CONFIG_PATH.write_text(json.dumps(data, indent=4))
+    CONFIG_PATH.write_text(json.dumps(data, indent=4), encoding="utf-8")
     return jsonify({"ok": True})
 
 

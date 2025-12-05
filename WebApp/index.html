@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>VinylPi Dashboard</title>
+    <link rel="stylesheet" href="/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <script src="/dashboard.js" defer></script>
+</head>
+
+<body>
+
+    <aside class="sidebar">
+        <img src="/logo.png" class="logo" alt="VinylPi Logo" />
+        <div class="pixel-title">Vinyl Pi 64</div>
+
+        <nav class="nav">
+            <a href="/" class="active">Dashboard</a>
+            <a href="/settings.html">Settings</a>
+        </nav>
+    </aside>
+
+    <main class="main">
+        <section class="song-section">
+            <div class="song-card">
+                <img id="song-cover" class="song-cover" src="/logo.png" alt="Album Cover">
+                <div id="song-artist" class="song-artist">–</div>
+                <div id="song-title" class="song-title">Wird geladen…</div>
+                <div id="song-album" class="song-album"></div>
+            </div>
+        </section>
+    </main>
+
+</body>
+</html>

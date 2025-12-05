@@ -1,0 +1,240 @@
+let CURRENT_CFG = null;
+
+function rgbToHex(arr) {
+    const [r, g, b] = arr;
+    return "#" + [r, g, b]
+        .map(x => x.toString(16).padStart(2, "0"))
+        .join("");
+}
+
+function hexToRgb(hex) {
+    hex = hex.replace("#", "");
+    return [
+        parseInt(hex.slice(0, 2), 16),
+        parseInt(hex.slice(2, 4), 16),
+        parseInt(hex.slice(4, 6), 16),
+    ];
+}
+
+async function loadConfig() {
+    const r = await fetch("/api/config");
+    const cfg = await r.json();
+    CURRENT_CFG = cfg;
+
+    const audio = cfg.audio || {};
+    const image = cfg.image || {};
+    const fallback = cfg.fallback || {};
+    const divoom = cfg.divoom || {};
+    const discovery = divoom.discovery || {};
+    const debug = cfg.debug || {};
+    const behavior = cfg.behavior || {};
+
+    // AUDIO
+    document.getElementById("audioDeviceName").value =
+        audio.device_name_contains || "";
+    document.getElementById("audioSampleSeconds").value =
+        audio.sample_seconds ?? 4;
+    document.getElementById("audioSampleRate").value =
+        audio.sample_rate ?? 44100;
+    document.getElementById("audioChannels").value =
+        audio.channels ?? 1;
+    document.getElementById("audioOutputWav").value =
+        audio.output_wav || "";
+
+    // IMAGE / DISPLAY
+    document.getElementById("imageCanvasSize").value =
+        image.canvas_size ?? 64;
+    document.getElementById("imageTopMargin").value =
+        image.top_margin ?? 1;
+    document.getElementById("imageCoverSize").value =
+        image.cover_size ?? 46;
+    document.getElementById("imageMarginImageText").value =
+        image.margin_image_text ?? 3;
+    document.getElementById("imageLineSpacingMargin").value =
+        image.line_spacing_margin ?? 3;
+    document.getElementById("imageFontPath").value =
+        image.font_path || "";
+    document.getElementById("imageFontSize").value =
+        image.font_size ?? 5;
+
+    document.getElementById("textColor").value =
+        rgbToHex(image.text_color || [255, 255, 255]);
+    document.getElementById("bgColor").value =
+        rgbToHex(image.manual_bg_color || [0, 0, 0]);
+
+    document.getElementById("imageUppercase").checked =
+        !!image.uppercase;
+    document.getElementById("useDynamicBg").checked =
+        !!image.use_dynamic_bg;
+    document.getElementById("useDynamicText").checked =
+        !!image.use_dynamic_text_color;
+
+    document.getElementById("imagePreviewScale").value =
+        image.preview_scale ?? 8;
+    document.getElementById("marqueeSpeed").value =
+        image.marquee_speed ?? 20;
+    document.getElementById("imageSleepSeconds").value =
+        image.sleep_seconds ?? 0.01;
+
+    // FALLBACK
+    document.getElementById("fallbackEnabled").checked =
+        !!fallback.enabled;
+    document.getElementById("fallbackImage").value =
+        fallback.image_path || "";
+    document.getElementById("fallbackAllowedFailures").value =
+        fallback.allowed_failures ?? 3;
+
+    // DIVOOM / PIXOO
+    document.getElementById("divoomIp").value =
+        divoom.ip || "";
+    document.getElementById("divoomDeviceName").value =
+        divoom.device_name || "";
+    document.getElementById("divoomTimeout").value =
+        divoom.timeout ?? 2.0;
+    document.getElementById("divoomAutoResetGif").checked =
+        !!divoom.auto_reset_gif_id;
+
+    document.getElementById("discoveryEnabled").checked =
+        !!discovery.enabled;
+    document.getElementById("subnetPrefix").value =
+        discovery.subnet_prefix || "";
+    document.getElementById("ipRangeStart").value =
+        discovery.ip_range_start ?? 100;
+    document.getElementById("ipRangeEnd").value =
+        discovery.ip_range_end ?? 199;
+
+    // BEHAVIOR
+    document.getElementById("behaviorLoopDelay").value =
+        behavior.loop_delay_seconds ?? 1;
+
+    // DEBUG
+    document.getElementById("debugLogs").checked =
+        !!debug.logs;
+    document.getElementById("debugPixooFramePath").value =
+        debug.pixoo_frame_path || "";
+    document.getElementById("debugPreviewPath").value =
+        debug.preview_path || "";
+    document.getElementById("debugWavPath").value =
+        debug.wav_path || "";
+}
+
+document.getElementById("settings-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (!CURRENT_CFG) return;
+
+    const cfg = CURRENT_CFG;
+
+    cfg.audio = cfg.audio || {};
+    cfg.image = cfg.image || {};
+    cfg.fallback = cfg.fallback || {};
+    cfg.divoom = cfg.divoom || {};
+    cfg.divoom.discovery = cfg.divoom.discovery || {};
+    cfg.debug = cfg.debug || {};
+    cfg.behavior = cfg.behavior || {};
+
+    const audio = cfg.audio;
+    const image = cfg.image;
+    const fallback = cfg.fallback;
+    const divoom = cfg.divoom;
+    const discovery = cfg.divoom.discovery;
+    const debug = cfg.debug;
+    const behavior = cfg.behavior;
+
+    // AUDIO
+    audio.device_name_contains =
+        document.getElementById("audioDeviceName").value;
+    audio.sample_seconds =
+        parseFloat(document.getElementById("audioSampleSeconds").value) || 4;
+    audio.sample_rate =
+        parseInt(document.getElementById("audioSampleRate").value) || 44100;
+    audio.channels =
+        parseInt(document.getElementById("audioChannels").value) || 1;
+    audio.output_wav =
+        document.getElementById("audioOutputWav").value;
+
+    // IMAGE / DISPLAY
+    image.canvas_size =
+        parseInt(document.getElementById("imageCanvasSize").value) || 64;
+    image.top_margin =
+        parseInt(document.getElementById("imageTopMargin").value) || 1;
+    image.cover_size =
+        parseInt(document.getElementById("imageCoverSize").value) || 46;
+    image.margin_image_text =
+        parseInt(document.getElementById("imageMarginImageText").value) || 3;
+    image.line_spacing_margin =
+        parseInt(document.getElementById("imageLineSpacingMargin").value) || 3;
+    image.font_path =
+        document.getElementById("imageFontPath").value;
+    image.font_size =
+        parseInt(document.getElementById("imageFontSize").value) || 5;
+
+    image.text_color =
+        hexToRgb(document.getElementById("textColor").value);
+    image.manual_bg_color =
+        hexToRgb(document.getElementById("bgColor").value);
+
+    image.uppercase =
+        document.getElementById("imageUppercase").checked;
+    image.use_dynamic_bg =
+        document.getElementById("useDynamicBg").checked;
+    image.use_dynamic_text_color =
+        document.getElementById("useDynamicText").checked;
+
+    image.preview_scale =
+        parseInt(document.getElementById("imagePreviewScale").value) || 8;
+    image.marquee_speed =
+        parseInt(document.getElementById("marqueeSpeed").value) || 20;
+    image.sleep_seconds =
+        parseFloat(document.getElementById("imageSleepSeconds").value) || 0.01;
+
+    // FALLBACK
+    fallback.enabled =
+        document.getElementById("fallbackEnabled").checked;
+    fallback.image_path =
+        document.getElementById("fallbackImage").value;
+    fallback.allowed_failures =
+        parseInt(document.getElementById("fallbackAllowedFailures").value) || 3;
+
+    // DIVOOM
+    divoom.ip =
+        document.getElementById("divoomIp").value;
+    divoom.device_name =
+        document.getElementById("divoomDeviceName").value;
+    divoom.timeout =
+        parseFloat(document.getElementById("divoomTimeout").value) || 2.0;
+    divoom.auto_reset_gif_id =
+        document.getElementById("divoomAutoResetGif").checked;
+
+    discovery.enabled =
+        document.getElementById("discoveryEnabled").checked;
+    discovery.subnet_prefix =
+        document.getElementById("subnetPrefix").value;
+    discovery.ip_range_start =
+        parseInt(document.getElementById("ipRangeStart").value) || 100;
+    discovery.ip_range_end =
+        parseInt(document.getElementById("ipRangeEnd").value) || 199;
+
+    // BEHAVIOR
+    behavior.loop_delay_seconds =
+        parseFloat(document.getElementById("behaviorLoopDelay").value) || 1;
+
+    // DEBUG
+    debug.logs =
+        document.getElementById("debugLogs").checked;
+    debug.pixoo_frame_path =
+        document.getElementById("debugPixooFramePath").value;
+    debug.preview_path =
+        document.getElementById("debugPreviewPath").value;
+    debug.wav_path =
+        document.getElementById("debugWavPath").value;
+
+    await fetch("/api/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(cfg),
+    });
+
+    alert("Einstellungen gespeichert.");
+});
+
+loadConfig();
