@@ -5,19 +5,21 @@ from audio_capture import record_sample
 from recognition import recognize_song, start_scrolling_display, show_fallback_image
 from config_loader import CONFIG
 
-STATUS_PATH = Path("/tmp/vinylpi_status.json")  # oder /var/lib/vinylpi/status.json
+STATUS_PATH = Path("/tmp/vinylpi_status.json")
 
-def _write_status(artist, title, cover_url=None):
+def _write_status(artist, title, cover_url=None, album=None):
     data = {
         "artist": artist,
         "title": title,
         "cover_url": cover_url,
+        "album": album,
     }
     try:
         STATUS_PATH.parent.mkdir(parents=True, exist_ok=True)
         STATUS_PATH.write_text(json.dumps(data), encoding="utf-8")
     except Exception as e:
         print(f"Could not write status file: {e}")
+
 
 def main_loop():
     delay = CONFIG["behavior"].get("loop_delay_seconds", 10)
@@ -55,11 +57,19 @@ def main_loop():
             else:
                 consecutive_failures = 0 
 
-                artist, title, cover_img = result
+                artist, title, cover_img, album, cover_url = result
+
+                if artist == "UNKNOWN" and title == "UNKNOWN":
+                    if debug_log:
+                        print("Shazam returned UNKNOWN/UNKNOWN, keeping last dashboard status.")
+                    time.sleep(delay)
+                    continue
+
                 song_id = (
                     artist.strip().casefold(),
                     title.strip().casefold(),
                 )
+
                 if song_id == last_song_id and not last_display_was_fallback:
                     if debug_log:
                         print("Same song as before, skipping Pixoo update.")
@@ -76,7 +86,7 @@ def main_loop():
                     last_song_id = song_id
                     last_display_was_fallback = False
 
-                    _write_status(artist, title)
+                    _write_status(artist, title, cover_url=cover_url, album=album)
 
         except Exception as e:
             print(f"Error in loop: {e}")

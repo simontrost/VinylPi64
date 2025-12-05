@@ -56,7 +56,6 @@ async def _recognize_async(wav_bytes: bytes):
 
     shazam_cfg = CONFIG.get("shazam", {})
     timeout_s = shazam_cfg.get("timeout_seconds", 15)
-
     result = await asyncio.wait_for(shazam.recognize(wav_bytes), timeout=timeout_s)
 
     track = result.get("track") or {}
@@ -65,8 +64,20 @@ async def _recognize_async(wav_bytes: bytes):
     images = track.get("images") or {}
     cover_url = images.get("coverart")
 
+    album = None
+    sections = track.get("sections") or []
+    for sec in sections:
+        if sec.get("type") == "SONG":
+            for md in sec.get("metadata", []):
+                if md.get("title") == "Album":
+                    album = md.get("text")
+                    break
+            if album:
+                break
+
     if debug_log:
         print(f"Detected: {artist} – {title}")
+        print(f"Album: {album}")
         print(f"Cover-URL: {cover_url}")
 
     if not cover_url:
@@ -75,15 +86,16 @@ async def _recognize_async(wav_bytes: bytes):
         return None
 
     cover_img = load_image(cover_url)
-    return artist, title, cover_img
+    return artist, title, cover_img, album, cover_url
 
 
-def recognize_song(wav_bytes: bytes) -> Optional[Tuple[str, str, Image.Image]]:
+def recognize_song(wav_bytes: bytes,) -> Optional[Tuple[str, str, Image.Image, str | None, str | None]]:
     try:
         return asyncio.run(_recognize_async(wav_bytes))
     except Exception as e:
         print(f"Error while detecting: {e}")
         return None
+
 
 
 def _prepare_base_canvas(cover_img: Image.Image, bg_color) -> Image.Image:
