@@ -4,31 +4,31 @@ body {
     background: #202020;
     color: #e6e6e6;
     font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 18px; /* Basis etwas größer */
 }
 
-/* Sidebar links – jetzt nur noch Navigation */
+/* Sidebar links – Navigation */
 .sidebar {
     position: fixed;
     left: 0;
     top: 0;
-    width: 180px;
+    width: 190px;
     height: 100vh;
-    background: #dcdcdc;
+    background: #141414;
     padding: 32px 20px;
     box-sizing: border-box;
 }
 
-/* Navigation in der Sidebar */
 .nav {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 18px;
 }
 
 .nav a {
     text-decoration: none;
-    color: #000;
-    font-size: 15px;
+    color: #dddddd;
+    font-size: 16px;
     font-weight: 600;
     opacity: 0.6;
 }
@@ -37,15 +37,15 @@ body {
     opacity: 1;
 }
 
-/* Pixel-Font (wird im Header benutzt) */
+/* Pixel-Font (Header-Titel) */
 .pixel-title {
     font-family: 'Press Start 2P', cursive;
 }
 
 /* Hauptbereich rechts */
 .main {
-    margin-left: 200px;
-    padding: 40px;
+    margin-left: 210px;
+    padding: 32px 40px;
     min-height: 100vh;
     box-sizing: border-box;
 }
@@ -55,18 +55,18 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 40px;
+    margin-bottom: 32px;
 }
 
 .header-title {
-    font-size: 20px;
+    font-size: 22px;
     color: #f5f5f5;
 }
 
 .header-logo {
-    width: 64px;
-    height: 64px;
-    border-radius: 20px;
+    width: 72px;
+    height: 72px;
+    border-radius: 22px;
     object-fit: cover;
 }
 
@@ -82,25 +82,25 @@ body {
 .song-card {
     background: #2b2b2b;
     border-radius: 24px;
-    padding: 32px 40px;
+    padding: 28px 32px;
     box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55);
     display: flex;
     flex-direction: column;
     align-items: center;
-    max-width: 320px;
+    max-width: 360px;
     text-align: center;
 }
 
 .song-cover {
-    width: 160px;
-    height: 160px;
-    border-radius: 16px;
+    width: 190px;
+    height: 190px;
+    border-radius: 18px;
     object-fit: cover;
-    margin-bottom: 20px;
+    margin-bottom: 18px;
 }
 
 .song-artist {
-    font-size: 16px;
+    font-size: 18px;
     opacity: 0.9;
     margin-bottom: 4px;
 }
@@ -112,11 +112,11 @@ body {
 }
 
 .song-album {
-    font-size: 14px;
-    opacity: 0.75;
+    font-size: 15px;
+    opacity: 0.8;
 }
 
-/* -------- Settings-Seite (dein aktuelles Layout) -------- */
+/* -------- Settings-Seite -------- */
 
 .section-title {
     font-size: 24px;
@@ -134,6 +134,7 @@ body {
 .card h2 {
     margin-top: 0;
     margin-bottom: 16px;
+    font-size: 20px;
 }
 
 .form-row {
@@ -146,6 +147,7 @@ body {
 .form-row label {
     width: 230px;
     font-weight: 500;
+    font-size: 16px;
 }
 
 .form-row input[type="text"],
@@ -156,6 +158,7 @@ body {
     background: #3a3a3a;
     color: #f0f0f0;
     min-width: 0;
+    font-size: 15px;
 }
 
 .form-row input[type="color"] {
@@ -180,13 +183,14 @@ body {
     color: #000;
     font-weight: 600;
     cursor: pointer;
+    font-size: 16px;
 }
 
 .btn-primary:active {
     transform: translateY(1px);
 }
 
-/* -------- Responsive -------- */
+/* -------- Responsive (Smartphone) -------- */
 
 @media (max-width: 800px) {
     .sidebar {
@@ -198,7 +202,7 @@ body {
 
     .nav {
         flex-direction: row;
-        gap: 12px;
+        gap: 16px;
         justify-content: center;
     }
 
@@ -212,14 +216,40 @@ body {
         margin-bottom: 24px;
     }
 
+    .header-title {
+        font-size: 20px;
+    }
+
+    .header-logo {
+        width: 64px;
+        height: 64px;
+    }
+
     .song-section {
         height: auto;
     }
 
     .song-card {
         width: 100%;
-        max-width: 320px;
+        max-width: 380px;
         padding: 24px 20px;
+    }
+
+    .song-cover {
+        width: min(70vw, 220px);
+        height: auto;
+    }
+
+    .song-artist {
+        font-size: 18px;
+    }
+
+    .song-title {
+        font-size: 20px;
+    }
+
+    .song-album {
+        font-size: 15px;
     }
 
     .form-row {
