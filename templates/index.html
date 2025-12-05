@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>VinylPi Dashboard</title>
+  <link rel="stylesheet" href="https://unpkg.com/@picocss/pico@2.0.6/css/pico.min.css">
+  <script src="/static/dashboard.js" defer></script>
+</head>
+
+<body class="container">
+
+  <h1>VinylPi Dashboard</h1>
+
+  <section id="song">
+    <h2>Aktueller Song</h2>
+    <p id="song-text">Wird geladen…</p>
+  </section>
+
+  <section>
+    <h2>Design Einstellungen</h2>
+
+    <label>Textfarbe:
+      <input type="color" id="textColor">
+    </label>
+
+    <label>Manuelle Hintergrundfarbe:
+      <input type="color" id="bgColor">
+    </label>
+
+    <label>
+      <input type="checkbox" id="dynBg">
+      Dynamischer Hintergrund
+    </label>
+
+    <label>
+      <input type="checkbox" id="dynText">
+      Dynamische Textfarbe
+    </label>
+
+    <button id="saveBtn">Speichern</button>
+  </section>
+
+</body>
+</html>
