@@ -4,3 +4,5 @@ soundfile
 pillow
 requests
 audioop-lts
+flask
+gunicorn
