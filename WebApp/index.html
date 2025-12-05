@@ -10,10 +10,8 @@
 
 <body>
 
+    <!-- Sidebar nur noch Navigation -->
     <aside class="sidebar">
-        <img src="/logo.png" class="logo" alt="VinylPi Logo" />
-        <div class="pixel-title">Vinyl Pi 64</div>
-
         <nav class="nav">
             <a href="/" class="active">Dashboard</a>
             <a href="/settings.html">Settings</a>
@@ -21,6 +19,14 @@
     </aside>
 
     <main class="main">
+
+        <!-- Neuer Header oben mit Logo + Pixel-Titel -->
+        <header class="main-header">
+            <div class="header-title pixel-title">Vinyl Pi 64</div>
+            <img src="/logo.png" class="header-logo" alt="VinylPi Logo">
+        </header>
+
+        <!-- Zentriertes Widget mit Cover + Artist/Titel/Album -->
         <section class="song-section">
             <div class="song-card">
                 <img id="song-cover" class="song-cover" src="/logo.png" alt="Album Cover">
@@ -29,6 +35,7 @@
                 <div id="song-album" class="song-album"></div>
             </div>
         </section>
+
     </main>
 
 </body>

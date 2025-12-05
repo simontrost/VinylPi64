@@ -20,8 +20,8 @@ async function loadStatus() {
         const artist = st.artist || "Unbekannter Artist";
         const album = st.album || "";
 
-        titleEl.innerText = title;
         artistEl.innerText = artist;
+        titleEl.innerText = title;
         albumEl.innerText = album ? `Album: ${album}` : "";
 
         if (st.cover_url) {
@@ -36,5 +36,4 @@ async function loadStatus() {
 }
 
 loadStatus();
-// Optional: regelmäßig aktualisieren
 setInterval(loadStatus, 5000);
