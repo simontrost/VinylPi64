@@ -47,7 +47,7 @@ async function loadRecognizerStatus() {
         statusEl.classList.remove("rec-status-running", "rec-status-stopped");
 
         if (running) {
-            statusEl.textContent = "Läuft";
+            statusEl.textContent = "Running";
             statusEl.classList.add("rec-status-running");
         } else {
             statusEl.textContent = "Gestoppt";
