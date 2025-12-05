@@ -1,4 +1,6 @@
 import time
+import json
+from pathlib import Path
 from audio_capture import record_sample
 from recognition import recognize_song, start_scrolling_display, show_fallback_image
 from config_loader import CONFIG
