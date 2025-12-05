@@ -161,6 +161,38 @@ body {
     font-size: 15px;
 }
 
+.gallery {
+    margin-top: 0.5rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 0.5rem;
+}
+
+.gallery.hidden {
+    display: none;
+}
+
+.gallery-item {
+    border: 1px solid #444;
+    border-radius: 6px;
+    padding: 4px;
+    text-align: center;
+    font-size: 0.7rem;
+}
+
+.gallery-item.current {
+    border-color: #4ade80; /* grün */
+}
+
+.gallery-item img {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    object-fit: cover;
+    border-radius: 4px;
+    margin-bottom: 4px;
+}
+
+
 .form-row input[type="color"] {
     padding: 0;
     width: 48px;

@@ -51,6 +51,117 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 });
 
+document.addEventListener("DOMContentLoaded", () => {
+  const fallbackUploadInput = document.getElementById("fallbackUpload");
+  const fallbackPathInput = document.getElementById("fallbackImage");
+  const openGalleryBtn = document.getElementById("openFallbackGallery");
+  const galleryContainer = document.getElementById("fallbackGallery");
+
+  // Upload-Handler wie bisher …
+  if (fallbackUploadInput) {
+    fallbackUploadInput.addEventListener("change", async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const formData = new FormData();
+      formData.append("file", file);
+
+      try {
+        const res = await fetch("/api/fallback-image", {
+          method: "POST",
+          body: formData,
+        });
+        const data = await res.json();
+        if (data.ok && data.image_path) {
+          fallbackPathInput.value = data.image_path;
+          alert("Fallback-Bild aktualisiert.");
+          // Galerie neu laden
+          if (!galleryContainer.classList.contains("hidden")) {
+            await loadFallbackGallery();
+          }
+        } else {
+          alert("Upload fehlgeschlagen: " + (data.error || "unbekannter Fehler"));
+        }
+      } catch (err) {
+        console.error(err);
+        alert("Upload fehlgeschlagen (Netzwerkfehler).");
+      }
+    });
+  }
+
+  async function loadFallbackGallery() {
+    galleryContainer.innerHTML = "Lade Bilder …";
+    try {
+      const res = await fetch("/api/fallback-images");
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "Fehler");
+
+      const images = data.images || [];
+      if (!images.length) {
+        galleryContainer.innerHTML = "<p>Keine hochgeladenen Fallback-Bilder.</p>";
+        return;
+      }
+
+      galleryContainer.innerHTML = "";
+      images.forEach(img => {
+        const item = document.createElement("div");
+        item.className = "gallery-item" + (img.is_current ? " current" : "");
+
+        const thumbnail = document.createElement("img");
+        thumbnail.src = img.url;
+        thumbnail.alt = img.filename;
+
+        const name = document.createElement("div");
+        name.textContent = img.filename;
+
+        const selectBtn = document.createElement("button");
+        selectBtn.type = "button";
+        selectBtn.textContent = "Verwenden";
+        selectBtn.addEventListener("click", () => {
+          fallbackPathInput.value = img.path; // Pfad in config
+          // optisch markieren
+          document.querySelectorAll(".gallery-item").forEach(el => el.classList.remove("current"));
+          item.classList.add("current");
+        });
+
+        const deleteBtn = document.createElement("button");
+        deleteBtn.type = "button";
+        deleteBtn.textContent = "Löschen";
+        deleteBtn.addEventListener("click", async () => {
+          if (!confirm(`"${img.filename}" wirklich löschen?`)) return;
+          const res = await fetch(`/api/fallback-image/${encodeURIComponent(img.filename)}`, {
+            method: "DELETE",
+          });
+          const out = await res.json();
+          if (!out.ok) {
+            alert("Löschen fehlgeschlagen: " + (out.error || "unbekannter Fehler"));
+          } else {
+            await loadFallbackGallery();
+          }
+        });
+
+        item.appendChild(thumbnail);
+        item.appendChild(name);
+        item.appendChild(selectBtn);
+        item.appendChild(deleteBtn);
+        galleryContainer.appendChild(item);
+      });
+    } catch (err) {
+      console.error(err);
+      galleryContainer.innerHTML = "<p>Fehler beim Laden der Galerie.</p>";
+    }
+  }
+
+  if (openGalleryBtn && galleryContainer) {
+    openGalleryBtn.addEventListener("click", async () => {
+      galleryContainer.classList.toggle("hidden");
+      if (!galleryContainer.classList.contains("hidden")) {
+        await loadFallbackGallery();
+      }
+    });
+  }
+});
+
 
 async function loadConfig() {
     const r = await fetch("/api/config");

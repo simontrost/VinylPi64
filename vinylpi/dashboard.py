@@ -1,5 +1,5 @@
 # dashboard.py
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 import json
 import time
 from pathlib import Path
@@ -17,11 +17,61 @@ app = Flask(
 CONFIG_PATH = BASE_DIR / "config.json"
 STATUS_PATH = Path("/tmp/vinylpi_status.json")
 
-# 👉 NEU: Upload-Verzeichnis (z.B. im assets-Ordner)
 UPLOAD_DIR = BASE_DIR / "assets" / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-
 ALLOWED_EXT = {"png", "jpg", "jpeg"}
+
+@app.get("/api/fallback-images")
+def api_list_fallback_images():
+    current_path = None
+    try:
+        if CONFIG_PATH.exists():
+            cfg = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
+            current_path = (cfg.get("fallback") or {}).get("image_path")
+    except Exception:
+        pass
+
+    files = []
+    for p in sorted(UPLOAD_DIR.glob("*"), key=lambda x: x.stat().st_mtime, reverse=True):
+        if not p.is_file():
+            continue
+        rel_path = str(p.relative_to(BASE_DIR))          
+        url = f"/uploads/{p.name}"                       
+        files.append({
+            "filename": p.name,
+            "path": rel_path,
+            "url": url,
+            "is_current": (rel_path == current_path),
+        })
+
+    return jsonify({"ok": True, "images": files})
+
+@app.get("/uploads/<path:filename>")
+def serve_upload(filename):
+    return send_from_directory(UPLOAD_DIR, filename)
+
+
+@app.delete("/api/fallback-image/<path:filename>")
+def api_delete_fallback_image(filename):
+    p = UPLOAD_DIR / filename
+    if not p.exists():
+        return jsonify({"ok": False, "error": "file not found"}), 404
+
+    try:
+        cfg = {}
+        if CONFIG_PATH.exists():
+            cfg = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
+
+        fb = cfg.setdefault("fallback", {})
+        if fb.get("image_path") and fb["image_path"].endswith(filename):
+            fb["image_path"] = ""   # oder "assets/fallback.png" o.ä.
+            CONFIG_PATH.write_text(json.dumps(cfg, indent=4), encoding="utf-8")
+    except Exception as e:
+        print(f"Warning: could not update config after delete: {e}")
+
+    p.unlink()
+    return jsonify({"ok": True})
+
 
 def _update_config_fallback_path(rel_path: str):
     """Schreibt den neuen Fallback-Pfad in die config.json."""
