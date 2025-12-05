@@ -26,3 +26,6 @@ def api_config_update():
     data = request.json
     CONFIG_PATH.write_text(json.dumps(data, indent=4))
     return jsonify({"ok": True})
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=8080)
