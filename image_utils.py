@@ -77,6 +77,13 @@ def _get_font_for_config() -> tuple[ImageFont.FreeTypeFont, int]:
 
     return best_font, best_h
 
+def dynamic_text_color(bg_rgb: tuple[int, int, int]) -> tuple[int, int, int]:
+    img_cfg = CONFIG["image"]
+    lum_threhsold = img_cfg.get("lum_threshold", 128)
+    lum = relative_luminance(bg_rgb)
+    return (0, 0, 0) if lum > lum_threhsold else (255, 255, 255)
+
+
 def dynamic_bg_color(cover_img: Image.Image, num_colors: int = 8) -> tuple[int, int, int]:
     small = cover_img.resize((64, 64), Image.Resampling.BILINEAR)
 
@@ -149,14 +156,22 @@ def build_static_frame(
     TOP_MARGIN = img_cfg["top_margin"]
     GAP_BETWEEN_COVER_AND_BAND = img_cfg["margin_image_text"]
     GAP_BETWEEN_LINES = img_cfg["line_spacing_margin"]
-    TEXT_COLOR = tuple(img_cfg["text_color"])
     USE_DYNAMIC_BG = img_cfg.get("use_dynamic_bg", True)
+
+    USE_DYNAMIC_BG = img_cfg.get("use_dynamic_bg", True)
+    USE_DYNAMIC_TEXT = img_cfg.get("use_dynamic_text_color", False)
 
     if bg_color is None:
         if USE_DYNAMIC_BG:
             bg_color = dynamic_bg_color(cover_img)
         else:
             bg_color = tuple(img_cfg["manual_bg_color"])
+
+    if USE_DYNAMIC_TEXT:
+        TEXT_COLOR = dynamic_text_color(bg_color)
+    else:
+        TEXT_COLOR = tuple(img_cfg["text_color"])
+
 
     canvas = Image.new("RGB", (CANVAS_SIZE, CANVAS_SIZE), bg_color)
 

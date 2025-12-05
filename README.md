@@ -38,8 +38,8 @@ If you use different hardware, you will most likely have to modify parts of the 
 - Album cover retrieval  
 - Custom **64×64 pixel renderer**  
   - centered album cover  
-  - dynamic background, customizeable font
-  - marquee text for long titles
+  - dynamic/manual background and text font
+  - marquee text for long titles/bands
   - fallback image
 - Send results to pixel diplay
 ---

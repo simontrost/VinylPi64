@@ -6,7 +6,13 @@ from typing import Optional, Tuple
 from shazamio import Shazam
 
 from config_loader import CONFIG
-from image_utils import load_image, dynamic_bg_color, _get_font_for_config, text_size
+from image_utils import (
+    load_image,
+    dynamic_bg_color,
+    _get_font_for_config,
+    text_size,
+    dynamic_text_color,
+)
 from divoom_api import PixooClient, PixooError
 from PIL import Image, ImageDraw
 
@@ -103,6 +109,11 @@ def _prepare_base_canvas(cover_img: Image.Image, bg_color) -> Image.Image:
 
 def _prepare_scroll_resources(cover_img: Image.Image, artist: str, title: str):
     img_cfg = CONFIG["image"]
+    CANVAS_SIZE = img_cfg["canvas_size"]
+    GAP_BETWEEN_LINES = img_cfg["line_spacing_margin"]
+    GAP_BETWEEN_COVER_AND_BAND = img_cfg["margin_image_text"]
+    TOP_MARGIN = img_cfg["top_margin"]
+    COVER_SIZE = img_cfg["cover_size"]
 
     if img_cfg.get("uppercase", False):
         artist = artist.upper()
@@ -120,12 +131,11 @@ def _prepare_scroll_resources(cover_img: Image.Image, artist: str, title: str):
     w1, _ = text_size(artist, font)
     w2, _ = text_size(title, font)
 
-    CANVAS_SIZE = img_cfg["canvas_size"]
-    GAP_BETWEEN_LINES = img_cfg["line_spacing_margin"]
-    GAP_BETWEEN_COVER_AND_BAND = img_cfg["margin_image_text"]
-    TOP_MARGIN = img_cfg["top_margin"]
-    TEXT_COLOR = tuple(img_cfg["text_color"])
-    COVER_SIZE = img_cfg["cover_size"]
+    if img_cfg.get("use_dynamic_text_color", False):
+        TEXT_COLOR = dynamic_text_color(bg_color)
+    else:
+        TEXT_COLOR = tuple(img_cfg["text_color"])
+
 
     y_band = TOP_MARGIN + COVER_SIZE + GAP_BETWEEN_COVER_AND_BAND
     y_title = y_band + glyph_h + GAP_BETWEEN_LINES

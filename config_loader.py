@@ -18,14 +18,15 @@ CONFIG_DEFAULTS = {
         "cover_size": 46,
         "margin_image_text": 3,
         "line_spacing_margin": 3,
-        "font_path": "assets/Pixel5.ttf",
+        "font_path": "assets/rasbpixel.ttf",
         "font_size": 5,
         "use_dynamic_bg": True,
         "manual_bg_color": [0, 0, 0],
+        "use_dynamic_text_color": True,
         "text_color": [255, 255, 255],
         "uppercase": True,
         "preview_scale": 8,
-        "marquee_speed": 15,
+        "marquee_speed": 20,
         "sleep_seconds": 0.01
     },
     "divoom": {
