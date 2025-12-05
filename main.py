@@ -3,6 +3,20 @@ from audio_capture import record_sample
 from recognition import recognize_song, start_scrolling_display, show_fallback_image
 from config_loader import CONFIG
 
+STATUS_PATH = Path("/tmp/vinylpi_status.json")  # oder /var/lib/vinylpi/status.json
+
+def _write_status(artist, title, cover_url=None):
+    data = {
+        "artist": artist,
+        "title": title,
+        "cover_url": cover_url,
+    }
+    try:
+        STATUS_PATH.parent.mkdir(parents=True, exist_ok=True)
+        STATUS_PATH.write_text(json.dumps(data), encoding="utf-8")
+    except Exception as e:
+        print(f"Could not write status file: {e}")
+
 def main_loop():
     delay = CONFIG["behavior"].get("loop_delay_seconds", 10)
     debug_log = CONFIG["debug"]["logs"]
@@ -59,6 +73,8 @@ def main_loop():
                     start_scrolling_display(cover_img, artist, title)
                     last_song_id = song_id
                     last_display_was_fallback = False
+
+                    _write_status(artist, title)
 
         except Exception as e:
             print(f"Error in loop: {e}")
