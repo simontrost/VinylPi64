@@ -156,11 +156,18 @@ def _scroll_loop(cover_img: Image.Image, artist: str, title: str):
 
     res = _prepare_scroll_resources(cover_img, artist, title)
 
-    speed_px_per_s = img_cfg.get("marquee_speed", 30)
-    sleep_seconds = 0.03
+    speed_px_per_s = img_cfg.get("marquee_speed", 18)
+    sleep_seconds = img_cfg.get("sleep_seconds", 0.01)
 
     tick_float = 0.0
     last_time = time.time()
+
+    w1 = res["w1"]
+    w2 = res["w2"]
+    canvas_size = res["CANVAS_SIZE"]
+
+    both_scroll = (w1 > canvas_size) and (w2 > canvas_size)
+    sync_range = max(w1, w2) + canvas_size if both_scroll else None
 
     while not _scroll_stop_event.is_set():
         now = time.time()
@@ -174,18 +181,22 @@ def _scroll_loop(cover_img: Image.Image, artist: str, title: str):
         draw = ImageDraw.Draw(frame)
 
         def compute_x(w_text: int, tick_val: int) -> int:
-            if w_text <= res["CANVAS_SIZE"]:
-                return (res["CANVAS_SIZE"] - w_text) // 2
+            if w_text <= canvas_size:
+                return (canvas_size - w_text) // 2
+
+            if both_scroll:
+                scroll_range = sync_range
             else:
-                scroll_range = w_text + res["CANVAS_SIZE"]
-                offset = tick_val % scroll_range
-                return res["CANVAS_SIZE"] - offset
+                scroll_range = w_text + canvas_size
 
-        x_band = compute_x(res["w1"], tick)
-        x_title = compute_x(res["w2"], tick)
+            offset = tick_val % scroll_range
+            return canvas_size - offset
 
-        draw.text((x_band, res["y_band"]), res["artist"], font=res["font"], fill=res["TEXT_COLOR"])
-        draw.text((x_title, res["y_title"]), res["title"], font=res["font"], fill=res["TEXT_COLOR"])
+        x_band = compute_x(w1, tick)
+        x_title = compute_x(w2, tick)
+
+        draw.text((x_band,  res["y_band"]),  res["artist"], font=res["font"], fill=res["TEXT_COLOR"])
+        draw.text((x_title, res["y_title"]), res["title"],  font=res["font"], fill=res["TEXT_COLOR"])
 
         if not first_frame_saved:
             pixoo_frame_path = debug_cfg.get("pixoo_frame_path", "")
@@ -199,7 +210,10 @@ def _scroll_loop(cover_img: Image.Image, artist: str, title: str):
             if preview_path:
                 scale = img_cfg["preview_scale"]
                 size = img_cfg["canvas_size"]
-                preview = frame.resize((size * scale, size * scale), Image.Resampling.NEAREST)
+                preview = frame.resize(
+                    (size * scale, size * scale),
+                    Image.Resampling.NEAREST,
+                )
                 preview.save(preview_path)
                 if debug_log:
                     print(f"Finished: {preview_path} created.")

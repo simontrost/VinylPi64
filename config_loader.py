@@ -25,7 +25,8 @@ CONFIG_DEFAULTS = {
         "text_color": [255, 255, 255],
         "uppercase": True,
         "preview_scale": 8,
-        "marquee_speed": 15
+        "marquee_speed": 15,
+        "sleep_seconds": 0.01
     },
     "divoom": {
         "ip": "",
