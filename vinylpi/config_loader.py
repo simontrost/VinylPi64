@@ -79,3 +79,14 @@ def load_config(path: str = "config.json") -> dict:
     return cfg
 
 CONFIG = load_config()
+
+def reload_config() -> dict:
+    """
+    Liest config.json neu ein und aktualisiert CONFIG *in place*,
+    damit alle Module, die CONFIG importiert haben, die Änderungen sehen.
+    """
+    global CONFIG
+    new_cfg = load_config()
+    CONFIG.clear()
+    CONFIG.update(new_cfg)
+    return CONFIG

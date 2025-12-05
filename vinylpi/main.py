@@ -3,9 +3,28 @@ import json
 from pathlib import Path
 from audio_capture import record_sample
 from recognition import recognize_song, start_scrolling_display, show_fallback_image
-from config_loader import CONFIG
+from config_loader import CONFIG, reload_config
 
 STATUS_PATH = Path("/tmp/vinylpi_status.json")
+BASE_DIR = Path(__file__).resolve().parents[1]
+CONFIG_PATH = BASE_DIR / "config.json"
+
+STATUS_PATH = Path("/tmp/vinylpi_status.json")
+_last_cfg_mtime = CONFIG_PATH.stat().st_mtime
+
+def _maybe_reload_config():
+    global _last_cfg_mtime
+    try:
+        mtime = CONFIG_PATH.stat().st_mtime
+    except FileNotFoundError:
+        return
+
+    if mtime != _last_cfg_mtime:
+        reload_config()
+        _last_cfg_mtime = mtime
+        if CONFIG["debug"]["logs"]:
+            print("Config reloaded from disk.")
+
 
 def _write_status(artist, title, cover_url=None, album=None):
     data = {
@@ -35,6 +54,12 @@ def main_loop():
 
     while True:
         try:
+            _maybe_reload_config()
+
+            delay = CONFIG["behavior"].get("loop_delay_seconds", 10)
+            debug_log = CONFIG["debug"]["logs"]
+            fallback = CONFIG["fallback"]
+
             if debug_log:
                 print("Recording sample...")
 
