@@ -80,9 +80,17 @@ def main_loop():
                 if debug_log:
                     print(f"No song detected for (#{consecutive_failures} times in a row).")
 
-                if consecutive_failures >= fallback["allowed_failures"] and not last_display_was_fallback:
+                allowed = fallback["allowed_failures"]
+
+                if consecutive_failures >= allowed and (not last_display_was_fallback or cfg_reloaded):
+                    if debug_log:
+                        if cfg_reloaded and last_display_was_fallback:
+                            print("Config changed while in fallback, updating fallback image.")
+                        elif not last_display_was_fallback:
+                            print("Switching to fallback image.")
                     show_fallback_image()
                     last_display_was_fallback = True
+
             else:
                 consecutive_failures = 0 
 
