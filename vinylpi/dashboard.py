@@ -17,7 +17,7 @@ app = Flask(
 CONFIG_PATH = BASE_DIR / "config.json"
 STATUS_PATH = Path("/tmp/vinylpi_status.json")
 
-UPLOAD_DIR = BASE_DIR / "assets" / "uploads"
+UPLOAD_DIR = BASE_DIR / "assets" / "fallback"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 ALLOWED_EXT = {"png", "jpg", "jpeg"}
 
@@ -64,7 +64,7 @@ def api_delete_fallback_image(filename):
 
         fb = cfg.setdefault("fallback", {})
         if fb.get("image_path") and fb["image_path"].endswith(filename):
-            fb["image_path"] = ""   # oder "assets/fallback.png" o.ä.
+            fb["image_path"] = ""  
             CONFIG_PATH.write_text(json.dumps(cfg, indent=4), encoding="utf-8")
     except Exception as e:
         print(f"Warning: could not update config after delete: {e}")
@@ -74,14 +74,13 @@ def api_delete_fallback_image(filename):
 
 
 def _update_config_fallback_path(rel_path: str):
-    """Schreibt den neuen Fallback-Pfad in die config.json."""
     try:
         cfg = {}
         if CONFIG_PATH.exists():
             cfg = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
 
         cfg.setdefault("fallback", {})
-        cfg["fallback"]["image_path"] = rel_path  # z.B. "assets/uploads/fallback_123.png"
+        cfg["fallback"]["image_path"] = rel_path 
 
         CONFIG_PATH.write_text(json.dumps(cfg, indent=4), encoding="utf-8")
         return True
@@ -107,7 +106,6 @@ def api_fallback_image_upload():
     dst_path = UPLOAD_DIR / filename
     file.save(dst_path)
 
-    # Pfad relativ zum Projekt (damit dein Python-Code ihn wie bisher benutzen kann)
     rel_path = str(dst_path.relative_to(BASE_DIR))
 
     if not _update_config_fallback_path(rel_path):

@@ -118,8 +118,7 @@ document.addEventListener("DOMContentLoaded", () => {
         selectBtn.type = "button";
         selectBtn.textContent = "Verwenden";
         selectBtn.addEventListener("click", () => {
-          fallbackPathInput.value = img.path; // Pfad in config
-          // optisch markieren
+          fallbackPathInput.value = img.path; 
           document.querySelectorAll(".gallery-item").forEach(el => el.classList.remove("current"));
           item.classList.add("current");
         });

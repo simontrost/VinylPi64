@@ -3,7 +3,7 @@ from collections import Counter
 import colorsys
 
 import requests
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 from config_loader import CONFIG
 
@@ -18,7 +18,10 @@ def load_image(path_or_url: str) -> Image.Image:
     else:
         img = Image.open(path_or_url)
 
+    img = ImageOps.exif_transpose(img)
+
     return img.convert("RGB")
+
 
 
 def relative_luminance(rgb):

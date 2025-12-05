@@ -49,7 +49,7 @@ CONFIG_DEFAULTS = {
     },
     "fallback": {
         "enabled": True,
-        "image_path": "assets/fallback.png",
+        "image_path": "assets/fallback/fallback.png",
         "allowed_failures": 3
     },
     "behavior": {
