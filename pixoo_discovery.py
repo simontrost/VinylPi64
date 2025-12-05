@@ -16,9 +16,10 @@ def _probe_ip(ip: str, timeout: float) -> bool:
         resp.raise_for_status()
 
         server_header = resp.headers.get("Server", "").lower()
-        if divoom_cfg["device_name"] in server_header and debug_log:
-            print(f"Pixoo ({divoom_cfg["device_name"]}) found by server-header at {ip}")
-            return True
+        device_name = divoom_cfg["device_name"]
+        if device_name in server_header and debug_log:
+            print(f"Pixoo ({device_name}) found by server-header at {ip}")
+
 
         data = resp.json()
     except Exception:

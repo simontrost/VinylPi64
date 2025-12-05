@@ -4,12 +4,11 @@ import time
 from typing import Optional, Tuple
 
 from shazamio import Shazam
-from PIL import Image
 
 from config_loader import CONFIG
-from image_utils import load_image, build_static_frame, dynamic_bg_color
+from image_utils import load_image, dynamic_bg_color, _get_font_for_config, text_size
 from divoom_api import PixooClient, PixooError
-
+from PIL import Image, ImageDraw
 
 _scroll_thread: Optional[threading.Thread] = None
 _scroll_stop_event = threading.Event()
@@ -80,14 +79,34 @@ def recognize_song(wav_bytes: bytes) -> Optional[Tuple[str, str, Image.Image]]:
         print(f"Error while detecting: {e}")
         return None
 
-def _scroll_loop(cover_img: Image.Image, artist: str, title: str):
-    debug_log = CONFIG["debug"]["logs"]
-    debug_cfg = CONFIG["debug"]
+
+def _prepare_base_canvas(cover_img: Image.Image, bg_color) -> Image.Image:
+    img_cfg = CONFIG["image"]
+    CANVAS_SIZE = img_cfg["canvas_size"]
+    COVER_SIZE = img_cfg["cover_size"]
+    TOP_MARGIN = img_cfg["top_margin"]
+
+    canvas = Image.new("RGB", (CANVAS_SIZE, CANVAS_SIZE), bg_color)
+
+    w, h = cover_img.size
+    side = min(w, h)
+    left = (w - side) // 2
+    top = (h - side) // 2
+    cover_square = cover_img.crop((left, top, left + side, top + side))
+    cover_resized = cover_square.resize((COVER_SIZE, COVER_SIZE), Image.Resampling.BILINEAR)
+
+    x_cover = (CANVAS_SIZE - COVER_SIZE) // 2
+    y_cover = TOP_MARGIN
+    canvas.paste(cover_resized, (x_cover, y_cover))
+
+    return canvas
+
+def _prepare_scroll_resources(cover_img: Image.Image, artist: str, title: str):
     img_cfg = CONFIG["image"]
 
-    pixoo = _get_pixoo()
-    tick = 0
-    first_frame_saved = False
+    if img_cfg.get("uppercase", False):
+        artist = artist.upper()
+        title = title.upper()
 
     use_dynamic_bg = img_cfg.get("use_dynamic_bg", True)
     if use_dynamic_bg:
@@ -95,17 +114,78 @@ def _scroll_loop(cover_img: Image.Image, artist: str, title: str):
     else:
         bg_color = tuple(img_cfg["manual_bg_color"])
 
-    marquee_speed = img_cfg.get("marquee_speed", 15)
-    sleep_seconds = 0.05
+    base_canvas = _prepare_base_canvas(cover_img, bg_color)
+
+    font, glyph_h = _get_font_for_config()
+    w1, _ = text_size(artist, font)
+    w2, _ = text_size(title, font)
+
+    CANVAS_SIZE = img_cfg["canvas_size"]
+    GAP_BETWEEN_LINES = img_cfg["line_spacing_margin"]
+    GAP_BETWEEN_COVER_AND_BAND = img_cfg["margin_image_text"]
+    TOP_MARGIN = img_cfg["top_margin"]
+    TEXT_COLOR = tuple(img_cfg["text_color"])
+    COVER_SIZE = img_cfg["cover_size"]
+
+    y_band = TOP_MARGIN + COVER_SIZE + GAP_BETWEEN_COVER_AND_BAND
+    y_title = y_band + glyph_h + GAP_BETWEEN_LINES
+
+    return {
+        "artist": artist,
+        "title": title,
+        "bg_color": bg_color,
+        "base_canvas": base_canvas,
+        "font": font,
+        "glyph_h": glyph_h,
+        "w1": w1,
+        "w2": w2,
+        "y_band": y_band,
+        "y_title": y_title,
+        "TEXT_COLOR": TEXT_COLOR,
+        "CANVAS_SIZE": CANVAS_SIZE,
+    }
+
+
+def _scroll_loop(cover_img: Image.Image, artist: str, title: str):
+    debug_log = CONFIG["debug"]["logs"]
+    debug_cfg = CONFIG["debug"]
+    img_cfg = CONFIG["image"]
+
+    pixoo = _get_pixoo()
+    first_frame_saved = False
+
+    res = _prepare_scroll_resources(cover_img, artist, title)
+
+    speed_px_per_s = img_cfg.get("marquee_speed", 30)
+    sleep_seconds = 0.03
+
+    tick_float = 0.0
+    last_time = time.time()
 
     while not _scroll_stop_event.is_set():
-        frame = build_static_frame(
-            cover_img,
-            artist,
-            title,
-            tick=tick,
-            bg_color=bg_color,
-        )
+        now = time.time()
+        dt = now - last_time
+        last_time = now
+
+        tick_float += speed_px_per_s * dt
+        tick = int(tick_float)
+
+        frame = res["base_canvas"].copy()
+        draw = ImageDraw.Draw(frame)
+
+        def compute_x(w_text: int, tick_val: int) -> int:
+            if w_text <= res["CANVAS_SIZE"]:
+                return (res["CANVAS_SIZE"] - w_text) // 2
+            else:
+                scroll_range = w_text + res["CANVAS_SIZE"]
+                offset = tick_val % scroll_range
+                return res["CANVAS_SIZE"] - offset
+
+        x_band = compute_x(res["w1"], tick)
+        x_title = compute_x(res["w2"], tick)
+
+        draw.text((x_band, res["y_band"]), res["artist"], font=res["font"], fill=res["TEXT_COLOR"])
+        draw.text((x_title, res["y_title"]), res["title"], font=res["font"], fill=res["TEXT_COLOR"])
 
         if not first_frame_saved:
             pixoo_frame_path = debug_cfg.get("pixoo_frame_path", "")
@@ -119,10 +199,7 @@ def _scroll_loop(cover_img: Image.Image, artist: str, title: str):
             if preview_path:
                 scale = img_cfg["preview_scale"]
                 size = img_cfg["canvas_size"]
-                preview = frame.resize(
-                    (size * scale, size * scale),
-                    Image.Resampling.NEAREST,
-                )
+                preview = frame.resize((size * scale, size * scale), Image.Resampling.NEAREST)
                 preview.save(preview_path)
                 if debug_log:
                     print(f"Finished: {preview_path} created.")
@@ -134,8 +211,6 @@ def _scroll_loop(cover_img: Image.Image, artist: str, title: str):
         except PixooError as e:
             print(f"Pixoo not available or API-error: {e}")
             break
-
-        tick += marquee_speed
 
         if _scroll_stop_event.wait(sleep_seconds):
             break

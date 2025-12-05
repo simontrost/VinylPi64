@@ -176,7 +176,6 @@ def build_static_frame(
     if img_cfg.get("uppercase", False):
         artist = artist.upper()
         title = title.upper()
-
     w1, _ = text_size(artist, font)
     w2, _ = text_size(title, font)
 
@@ -185,13 +184,21 @@ def build_static_frame(
     y_band = TOP_MARGIN + COVER_SIZE + GAP_BETWEEN_COVER_AND_BAND
     y_title = y_band + glyph_h + GAP_BETWEEN_LINES
 
+    both_scroll = (w1 > CANVAS_SIZE) and (w2 > CANVAS_SIZE)
+    if both_scroll:
+        sync_range = max(w1, w2) + CANVAS_SIZE
+
     def compute_x(w_text: int, tick_val: int) -> int:
         if w_text <= CANVAS_SIZE:
             return (CANVAS_SIZE - w_text) // 2
+
+        if both_scroll:
+            scroll_range = sync_range
         else:
             scroll_range = w_text + CANVAS_SIZE
-            offset = tick_val % scroll_range
-            return CANVAS_SIZE - offset
+
+        offset = tick_val % scroll_range
+        return CANVAS_SIZE - offset
 
     x_band = compute_x(w1, tick)
     x_title = compute_x(w2, tick)
