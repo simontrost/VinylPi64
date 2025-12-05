@@ -118,36 +118,114 @@ body {
 
 .control-section {
     margin-top: 1.5rem;
-    padding: 1rem;
+    padding: 1rem 1.25rem;
     background: #111;
     border-radius: 12px;
     border: 1px solid #333;
 }
 
-.status-badge {
-    display: inline-block;
-    padding: 0.3rem 0.6rem;
-    border-radius: 999px;
-    font-size: 0.8rem;
-    margin-bottom: 0.5rem;
-    background: #333;
-}
-
-.status-running {
-    background: #14532d;
-}
-
-.status-stopped {
-    background: #4b1d1d;
-}
-
-.button-row {
+.control-header {
     display: flex;
-    gap: 0.5rem;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
 }
 
-.button-row button {
-    flex: 1;
+.rec-status-text {
+    font-size: 0.8rem;
+    padding: 0.25rem 0.6rem;
+    border-radius: 999px;
+    background: #333;
+    color: #ccc;
+}
+
+.rec-status-running {
+    background: #14532d;
+    color: #bbf7d0;
+}
+
+.rec-status-stopped {
+    background: #4b1d1d;
+    color: #fecaca;
+}
+
+/* Toggle-Row */
+
+.toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.toggle-label {
+    font-size: 0.9rem;
+    color: #ddd;
+}
+
+/* Switch */
+
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 70px;
+    height: 32px;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: absolute;
+    inset: 0;
+    background: #3a3a3a;
+    border-radius: 999px;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+    cursor: pointer;
+    transition:
+        background 0.25s ease,
+        box-shadow 0.25s ease;
+}
+
+/* „Knopf“ */
+
+.toggle-slider::before {
+    content: "";
+    position: absolute;
+    height: 26px;
+    width: 26px;
+    left: 3px;
+    top: 3px;
+    border-radius: 50%;
+    background: #f9fafb;
+    box-shadow:
+        0 3px 6px rgba(0, 0, 0, 0.4),
+        0 0 0 1px rgba(0, 0, 0, 0.3);
+    transition: transform 0.25s ease;
+}
+
+/* ON-Zustand */
+
+.toggle-switch input:checked + .toggle-slider {
+    background: linear-gradient(135deg, #16a34a, #22c55e);
+    box-shadow:
+        0 0 0 1px rgba(34, 197, 94, 0.5),
+        0 5px 12px rgba(22, 163, 74, 0.45);
+}
+
+.toggle-switch input:checked + .toggle-slider::before {
+    transform: translateX(36px);
+}
+
+/* Disabled-Optik, wenn du es mal brauchst */
+
+.toggle-switch input:disabled + .toggle-slider {
+    opacity: 0.6;
+    cursor: default;
 }
 
 

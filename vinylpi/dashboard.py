@@ -44,7 +44,7 @@ def _start_recognizer():
         if _is_recognizer_running():
             return False  
 
-        cmd = [sys.executable, "-u", str(BASE_DIR / "main.py")]
+        cmd = [sys.executable, "-u", str(BASE_DIR / "vinylpi" / "main.py")]
         _recognizer_proc = subprocess.Popen(
             cmd,
             cwd=BASE_DIR

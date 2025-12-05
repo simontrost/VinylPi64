@@ -24,65 +24,81 @@ async function loadStatus() {
         titleEl.innerText = title;
         albumEl.innerText = album ? `Album: ${album}` : "";
 
-        if (st.cover_url) {
-            coverEl.src = st.cover_url;
-        } else {
-            coverEl.src = "/logo.png";
-        }
+        coverEl.src = st.cover_url || "/logo.png";
 
     } catch (e) {
+        console.error(e);
         document.getElementById("song-title").innerText = "Fehler beim Laden";
     }
 }
 
 async function loadRecognizerStatus() {
-    const statusEl = document.getElementById("rec-status");
-    const btnStart = document.getElementById("btn-start-rec");
-    const btnStop = document.getElementById("btn-stop-rec");
-
-    if (!statusEl || !btnStart || !btnStop) return;
+    const statusEl = document.getElementById("rec-status-text");
+    const toggle = document.getElementById("recognizerToggle");
+    if (!statusEl || !toggle) return;
 
     try {
         const r = await fetch("/api/recognizer/status");
         const data = await r.json();
 
-        if (data.running) {
+        const running = !!data.running;
+        toggle.checked = running;
+
+        statusEl.classList.remove("rec-status-running", "rec-status-stopped");
+
+        if (running) {
             statusEl.textContent = "Läuft";
-            statusEl.classList.add("status-running");
-            statusEl.classList.remove("status-stopped");
-            btnStart.disabled = true;
-            btnStop.disabled = false;
+            statusEl.classList.add("rec-status-running");
         } else {
             statusEl.textContent = "Gestoppt";
-            statusEl.classList.add("status-stopped");
-            statusEl.classList.remove("status-running");
-            btnStart.disabled = false;
-            btnStop.disabled = true;
+            statusEl.classList.add("rec-status-stopped");
         }
     } catch (e) {
         console.error(e);
         statusEl.textContent = "Statusfehler";
-        btnStart.disabled = false;
-        btnStop.disabled = false;
+        statusEl.classList.remove("rec-status-running", "rec-status-stopped");
     }
 }
 
-async function startRecognizer() {
-    await fetch("/api/recognizer/start", { method: "POST" });
+async function setRecognizerRunning(shouldRun) {
+    const toggle = document.getElementById("recognizerToggle");
+    const statusEl = document.getElementById("rec-status-text");
+    if (!toggle || !statusEl) return;
+
+    toggle.disabled = true;
+    statusEl.textContent = "Ändere Status …";
+
+    try {
+        const url = shouldRun ? "/api/recognizer/start" : "/api/recognizer/stop";
+        await fetch(url, { method: "POST" });
+    } catch (e) {
+        console.error(e);
+    }
+
     await loadRecognizerStatus();
+    toggle.disabled = false;
 }
 
-async function stopRecognizer() {
-    await fetch("/api/recognizer/stop", { method: "POST" });
-    await loadRecognizerStatus();
-}
+document.addEventListener("DOMContentLoaded", () => {
+    const toggle = document.getElementById("recognizerToggle");
+    if (toggle) {
+        toggle.addEventListener("change", (e) => {
+            setRecognizerRunning(e.target.checked);
+        });
+    }
 
-document.getElementById("btn-start-rec")?.addEventListener("click", startRecognizer);
-document.getElementById("btn-stop-rec")?.addEventListener("click", stopRecognizer);
+    const btnStart = document.getElementById("btn-start-rec");
+    if (btnStart) {
+        btnStart.addEventListener("click", () => setRecognizerRunning(true));
+    }
 
-loadStatus();
-setInterval(loadStatus, 5000);
+    const btnStop = document.getElementById("btn-stop-rec");
+    if (btnStop) {
+        btnStop.addEventListener("click", () => setRecognizerRunning(false));
+    }
 
-loadRecognizerStatus();
-setInterval(loadRecognizerStatus, 5000);
-
+    loadStatus();
+    loadRecognizerStatus();
+    setInterval(loadStatus, 5000);
+    setInterval(loadRecognizerStatus, 5000);
+});

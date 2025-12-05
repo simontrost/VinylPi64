@@ -36,12 +36,18 @@
         </section>
 
         <section class="control-section">
+        <div class="control-header">
             <h2>Musikerkennung</h2>
-            <div id="rec-status" class="status-badge">Status wird geladen…</div>
-            <div class="button-row">
-                <button id="btn-start-rec" type="button">Starten</button>
-                <button id="btn-stop-rec" type="button">Stoppen</button>
-            </div>
+            <div id="rec-status-text" class="rec-status-text">Status wird geladen…</div>
+        </div>
+
+        <div class="toggle-row">
+            <span class="toggle-label">Erkennung</span>
+            <label class="toggle-switch">
+            <input type="checkbox" id="recognizerToggle">
+            <span class="toggle-slider"></span>
+            </label>
+        </div>
         </section>
 
     </main>
