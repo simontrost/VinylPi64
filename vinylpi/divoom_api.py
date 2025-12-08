@@ -140,10 +140,8 @@ class PixooClient:
         raw_rgb = self._image_to_rgb_bytes(frame)
         pic_data_b64 = base64.b64encode(raw_rgb).decode("ascii")
 
-        if self.auto_reset_gif_id:
-            self.reset_pic_id()
+        pic_id = 0
 
-        pic_id = self.get_next_pic_id()
         speed = self.gif_speed_ms if speed_ms is None else int(speed_ms)
 
         payload = {
