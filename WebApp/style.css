@@ -248,8 +248,8 @@ body {
 .form-row {
     display: flex;
     align-items: center;
-    gap: 12px;
-    margin-bottom: 12px;
+    gap: 16px;
+    margin-bottom: 14px;
 }
 
 .form-row label {
@@ -260,13 +260,17 @@ body {
 
 .form-row input[type="text"],
 .form-row input[type="number"] {
-    padding: 6px 10px;
-    border-radius: 8px;
-    border: none;
-    background: #3a3a3a;
-    color: #f0f0f0;
+    height: 44px;
+    padding: 0 14px;
+    border-radius: 10px;
+    border: 1px solid #3d3d3d;
+    background: radial-gradient(circle at top left, #3b3b3b, #292929);
+    color: #f5f5f5;
     min-width: 0;
-    font-size: 15px;
+    font-size: 16px;
+    outline: none;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5) inset;
+    transition: border 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
 }
 
 .gallery {
@@ -301,34 +305,136 @@ body {
 }
 
 
+.form-row input[type="text"]:focus,
+.form-row input[type="number"]:focus {
+    border-color: #ffb347;
+    box-shadow: 0 0 0 1px rgba(255, 166, 51, 0.8) inset,
+                0 0 0 1px rgba(0, 0, 0, 0.8);
+    background: radial-gradient(circle at top left, #444, #303030);
+}
+
 .form-row input[type="color"] {
+    width: 56px;
+    height: 40px;
+    border-radius: 10px;
+    border: 1px solid #3d3d3d;
+    background: #2b2b2b;
     padding: 0;
-    width: 48px;
-    height: 32px;
-    border-radius: 8px;
-    border: none;
-    background: #3a3a3a;
+    cursor: pointer;
 }
 
 .form-row input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    margin: 0;
+    accent-color: #ff8c00;
+    cursor: pointer;
+}
+
+.form-row input[type="number"]::-webkit-inner-spin-button,
+.form-row input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: inner-spin-button;
+    margin: 0;
     transform: scale(1.2);
 }
 
-/* Save button */
-.btn-primary {
-    padding: 10px 18px;
+.form-row input[type="number"] {
+    -moz-appearance: textfield;
+}
+
+
+/* Modernes File-Input (z.B. "Upload image") */
+.form-row input[type="file"] {
+    font-size: 15px;
+    color: #dddddd;
+    background: transparent;
+    border: none;
+}
+
+/* Der eigentliche Button „Datei auswählen“ */
+.form-row input[type="file"]::file-selector-button {
+    padding: 8px 14px;
+    margin-right: 10px;
     border-radius: 10px;
     border: none;
-    background: #ff8c00;
-    color: #000;
+    background: #3b3b3b;
+    color: #f5f5f5;
+    font-weight: 500;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+}
+
+.form-row input[type="file"]::file-selector-button:hover {
+    background: #474747;
+}
+
+.form-row input[type="file"]::file-selector-button:active {
+    transform: translateY(1px);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+}
+
+
+/*Primary Button*/
+.btn-primary {
+    padding: 12px 22px;
+    border-radius: 999px;
+    border: none;
+    background: linear-gradient(135deg, #ffb347, #ff8c00);
+    color: #121212;
     font-weight: 600;
     cursor: pointer;
     font-size: 16px;
+    letter-spacing: 0.02em;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.55);
+    transition: transform 0.1s ease, box-shadow 0.15s ease, filter 0.15s ease;
+}
+
+.btn-primary:hover {
+    filter: brightness(1.05);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.65);
 }
 
 .btn-primary:active {
     transform: translateY(1px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.7);
 }
+
+/* Secondary Button*/
+.card button {
+    padding: 8px 14px;
+    border-radius: 999px;
+    border: none;
+    background: #3a3a3a;
+    color: #f0f0f0;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    margin-right: 6px;
+    margin-top: 6px;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
+    transition: background 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+}
+
+.card button:hover {
+    background: #454545;
+}
+
+.card button:active {
+    transform: translateY(1px);
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.7);
+}
+
+.card button.danger {
+    background: #a13131;
+}
+
+.card button.danger:hover {
+    background: #b53a3a;
+}
+
+
 
 /* -------- Responsive -------- */
 
@@ -390,11 +496,6 @@ body {
 
     .song-album {
         font-size: 15px;
-    }
-
-    .form-row {
-        flex-direction: column;
-        align-items: flex-start;
     }
 
     .form-row label {
