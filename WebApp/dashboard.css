@@ -154,10 +154,11 @@
     cursor: default;
 }
 
-/* Responsive */
 @media (max-width: 800px) {
     .song-section {
-        height: auto;
+        height: auto;       /* kann auch weg, schadet aber nicht */
+        margin-top: 8px;    /* optional: etwas weniger Top-Abstand */
+        margin-bottom: 40px;/* deutlich weniger Abstand nach unten */
     }
 
     .song-card {

@@ -1,10 +1,10 @@
 import time
 import json
 from pathlib import Path
-from audio_capture import record_sample
-from recognition import recognize_song, start_scrolling_display, show_fallback_image
-from config_loader import CONFIG, reload_config
-from statistics import _load_stats, _save_stats, _update_stats, _increment_album_session
+from .audio_capture import record_sample
+from .recognition import recognize_song, start_scrolling_display, show_fallback_image
+from .config_loader import CONFIG, reload_config
+from .statistics import _load_stats, _save_stats, _update_stats, _increment_album_session
 
 STATUS_PATH = Path("/tmp/vinylpi_status.json")
 BASE_DIR = Path(__file__).resolve().parents[1]

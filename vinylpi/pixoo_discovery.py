@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Optional
 import requests
-from config_loader import CONFIG
+from .config_loader import CONFIG
 
 
 def _probe_ip(ip: str, timeout: float) -> bool:

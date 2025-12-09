@@ -5,7 +5,7 @@ import colorsys
 import requests
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
-from config_loader import CONFIG
+from .config_loader import CONFIG
 
 def load_image(path_or_url: str) -> Image.Image:
     if not path_or_url:
