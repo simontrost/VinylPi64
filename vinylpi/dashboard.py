@@ -3,7 +3,7 @@ import json
 import time
 from pathlib import Path
 from werkzeug.utils import secure_filename
-from config_loader import CONFIG_DEFAULTS
+from .config_loader import CONFIG_DEFAULTS
 
 import subprocess
 import threading

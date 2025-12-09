@@ -2,7 +2,7 @@ import sounddevice as sd
 import soundfile as sf
 import io
 
-from config_loader import CONFIG
+from .config_loader import CONFIG
 
 def auto_detect_usb_device():
     needle = CONFIG["audio"]["device_name_contains"].upper()

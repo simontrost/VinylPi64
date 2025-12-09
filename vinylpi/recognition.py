@@ -5,8 +5,8 @@ from typing import Optional, Tuple
 
 from shazamio import Shazam
 
-from config_loader import CONFIG
-from image_utils import (
+from .config_loader import CONFIG
+from .image_utils import (
     load_image,
     dynamic_bg_color,
     _get_font_for_config,
