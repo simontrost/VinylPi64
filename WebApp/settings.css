@@ -1,0 +1,149 @@
+/* -------- Settings-page -------- */
+
+.section-title {
+    font-size: 24px;
+    margin-bottom: 20px;
+}
+
+.form-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 14px;
+}
+
+.form-row label {
+    width: 230px;
+    font-weight: 500;
+    font-size: 16px;
+}
+
+.form-row input[type="text"],
+.form-row input[type="number"] {
+    height: 44px;
+    padding: 0 14px;
+    border-radius: 10px;
+    border: 1px solid #3d3d3d;
+    background: radial-gradient(circle at top left, #3b3b3b, #292929);
+    color: #f5f5f5;
+    min-width: 0;
+    font-size: 16px;
+    outline: none;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5) inset;
+    transition: border 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.form-row input[type="text"]:focus,
+.form-row input[type="number"]:focus {
+    border-color: #ffb347;
+    box-shadow: 0 0 0 1px rgba(255, 166, 51, 0.8) inset,
+                0 0 0 1px rgba(0, 0, 0, 0.8);
+    background: radial-gradient(circle at top left, #444, #303030);
+}
+
+.form-row input[type="color"] {
+    width: 56px;
+    height: 40px;
+    border-radius: 10px;
+    border: 1px solid #3d3d3d;
+    background: #2b2b2b;
+    padding: 0;
+    cursor: pointer;
+}
+
+.form-row input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    margin: 0;
+    accent-color: #ff8c00;
+    cursor: pointer;
+}
+
+.form-row input[type="number"]::-webkit-inner-spin-button,
+.form-row input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: inner-spin-button;
+    margin: 0;
+    transform: scale(1.2);
+}
+
+.form-row input[type="number"] {
+    -moz-appearance: textfield;
+}
+
+/* File input */
+.form-row input[type="file"] {
+    font-size: 15px;
+    color: #dddddd;
+    background: transparent;
+    border: none;
+}
+
+.form-row input[type="file"]::file-selector-button {
+    padding: 8px 14px;
+    margin-right: 10px;
+    border-radius: 10px;
+    border: none;
+    background: #3b3b3b;
+    color: #f5f5f5;
+    font-weight: 500;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+}
+
+.form-row input[type="file"]::file-selector-button:hover {
+    background: #474747;
+}
+
+.form-row input[type="file"]::file-selector-button:active {
+    transform: translateY(1px);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+}
+
+/* Gallery */
+.gallery {
+    margin-top: 0.5rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 0.5rem;
+}
+
+.gallery.hidden {
+    display: none;
+}
+
+.gallery-item {
+    border: 1px solid #444;
+    border-radius: 6px;
+    padding: 4px;
+    text-align: center;
+    font-size: 0.7rem;
+}
+
+.gallery-item.current {
+    border-color: #4ade80;
+}
+
+.gallery-item img {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    object-fit: cover;
+    border-radius: 4px;
+    margin-bottom: 4px;
+}
+
+/* (Save / Reset) */
+.settings-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 20px;
+}
+
+/* Responsive */
+@media (max-width: 800px) {
+    .form-row label {
+        width: auto;
+    }
+}

@@ -4,7 +4,7 @@ from pathlib import Path
 from audio_capture import record_sample
 from recognition import recognize_song, start_scrolling_display, show_fallback_image
 from config_loader import CONFIG, reload_config
-from statistics import _load_stats, _save_stats, _update_stats
+from statistics import _load_stats, _save_stats, _update_stats, _increment_album_session
 
 STATUS_PATH = Path("/tmp/vinylpi_status.json")
 BASE_DIR = Path(__file__).resolve().parents[1]
@@ -57,6 +57,17 @@ def main_loop():
     last_song_id = None              
     last_display_was_fallback = False
     consecutive_failures = 0        
+
+    current_album = None
+    current_album_session_counted = False
+    current_album_unique_tracks = set()
+
+    candidate_album = None
+    candidate_streak = 0
+
+    MIN_TRACKS_FOR_ALBUM_SESSION = 2
+
+    MIN_CONSECUTIVE_FOR_SWITCH = 2
 
     while True:
         try:
@@ -136,6 +147,50 @@ def main_loop():
 
                     if not is_same_song:
                         _update_stats(artist, title, album)
+
+                        album_key = (album or "").strip()
+                        if album_key:
+                            if current_album is None:
+                                current_album = album_key
+                                current_album_unique_tracks = {title}
+                                current_album_session_counted = False
+                                candidate_album = None
+                                candidate_streak = 0
+
+                            else:
+                                if album_key == current_album:
+                                    current_album_unique_tracks.add(title)
+                                    candidate_album = None
+                                    candidate_streak = 0
+
+                                else:
+                                    if candidate_album == album_key:
+                                        candidate_streak += 1
+                                    else:
+                                        candidate_album = album_key
+                                        candidate_streak = 1
+
+                                    if candidate_streak >= MIN_CONSECUTIVE_FOR_SWITCH:
+                                        if (
+                                            not current_album_session_counted
+                                            and len(current_album_unique_tracks) >= MIN_TRACKS_FOR_ALBUM_SESSION
+                                        ):
+                                            _increment_album_session(current_album)
+
+                                        current_album = album_key
+                                        current_album_unique_tracks = {title}
+                                        current_album_session_counted = False
+                                        candidate_album = None
+                                        candidate_streak = 0
+
+                            if (
+                                current_album == album_key
+                                and not current_album_session_counted
+                                and len(current_album_unique_tracks) >= MIN_TRACKS_FOR_ALBUM_SESSION
+                            ):
+                                _increment_album_session(current_album)
+                                current_album_session_counted = True
+
 
 
         except Exception as e:
