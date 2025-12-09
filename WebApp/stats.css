@@ -97,8 +97,24 @@
     opacity: 0.8;
 }
 
-@media (max-width: 1000px) {
+@media (max-width: 800px) {
     .stats-grid {
         grid-template-columns: 1fr;
+        max-width: 420px;
+        margin: 0 auto;
     }
+
+    .stats-card {
+        padding: 16px 18px;
+        border-radius: 18px;
+    }
+}
+
+.stats-main {
+    font-size: 0.95rem;
+    white-space: normal;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
 }
