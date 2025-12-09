@@ -156,9 +156,9 @@
 
 @media (max-width: 800px) {
     .song-section {
-        height: auto;       /* kann auch weg, schadet aber nicht */
-        margin-top: 8px;    /* optional: etwas weniger Top-Abstand */
-        margin-bottom: 40px;/* deutlich weniger Abstand nach unten */
+        height: auto;
+        margin-top: 8px;
+        margin-bottom: 40px;
     }
 
     .song-card {

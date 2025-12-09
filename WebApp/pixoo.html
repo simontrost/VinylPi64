@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>Pixoo – VinylPi64</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="base.css">
+    <link rel="stylesheet" href="pixoo.css">
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <script src="pixoo.js" defer></script>
+</head>
+
+<body>
+    <aside class="sidebar">
+        <nav class="nav">
+            <a href="index.html">Dashboard</a>
+            <a href="settings.html">Settings</a>
+            <a href="pixoo.html" class="active">Pixoo</a>
+            <a href="stats.html">Statistics</a>
+            <a href="about.html">About</a>
+        </nav>
+    </aside>
+
+    <main class="main">
+        <header class="main-header">
+            <div class="header-title pixel-title">Pixoo Controls</div>
+            <img src="logo.png" class="header-logo" alt="VinylPi Logo">
+        </header>
+
+        <section class="pixoo-section">
+
+            <!-- Status / Info -->
+            <div class="card">
+                <h2>Device status</h2>
+                <p id="pixoo-status-text" class="pixoo-status-text">
+                    Loading Pixoo status...
+                </p>
+                <p class="pixoo-status-sub" id="pixoo-status-sub"></p>
+            </div>
+
+            <!-- Brightness -->
+            <div class="card">
+                <h2>Brightness</h2>
+                <div class="pixoo-row">
+                    <label for="pixooBrightness">Brightness</label>
+                    <div class="pixoo-slider-wrap">
+                        <input type="range" id="pixooBrightness" min="0" max="100" step="1">
+                        <span id="pixooBrightnessValue" class="pixoo-slider-value">–%</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Channel selection -->
+            <div class="card">
+                <h2>Channel</h2>
+                <p class="pixoo-help">
+                    Switch between Pixoo channels.  
+                    <br>Note: VinylPi uses the HTTP GIF / Custom channel to display frames.
+                </p>
+
+                <div class="pixoo-channel-grid">
+                    <button class="pixoo-channel-btn" data-channel="0">Clock</button>
+                    <button class="pixoo-channel-btn" data-channel="1">Cloud</button>
+                    <button class="pixoo-channel-btn" data-channel="2">Visualizer</button>
+                    <button class="pixoo-channel-btn" data-channel="3">VinylPi / Custom</button>
+                    <button class="pixoo-channel-btn" data-channel="4">Weather</button>
+                </div>
+            </div>
+
+            <!-- Power / Reboot -->
+            <div class="card">
+                <h2>Power</h2>
+                <p class="pixoo-help">
+                    You can reboot the Pixoo if it is stuck or not responding.
+                </p>
+                <button id="pixooRebootBtn" class="btn-danger">
+                    Reboot Pixoo
+                </button>
+                <span id="pixooRebootStatus" class="pixoo-reboot-status"></span>
+            </div>
+        </section>
+    </main>
+</body>
+</html>

@@ -51,22 +51,22 @@ If you use different hardware, you will most likely have to modify parts of the 
 ### Preview
 
 <p align="left">
-  <img src="assets/preview.png" width="600" alt="Preview results">
+  <img src="assets/readme/preview.png" width="600" alt="Preview results">
 </p>
 
 ### Setup
 
 <p align="left">
-  <img src="assets/example.jpg" height="600" alt="Preview results">
+  <img src="assets/readme/example.jpg" height="600" alt="Preview results">
 </p>
 
 ### WebApp Desktop
 
-| <img src="assets/webapp_dashboard_desktop.png" width="600" /> | <img src="assets/webapp_settings_desktop.png" width="600" /> |
+| <img src="assets/readme/webapp_dashboard_desktop.png" width="600" /> | <img src="assets/readme/webapp_settings_desktop.png" width="600" /> |
 
 ### WebApp Mobile
 
-| <img src="assets/webapp_dashboard_mobile.jpeg" height="600" /> | <img src="assets/webapp_settings_mobile.jpeg" height="600" /> |
+| <img src="assets/readme/webapp_dashboard_mobile.jpeg" height="600" /> | <img src="assets/readme/webapp_settings_mobile.jpeg" height="600" /> |
 
 ## Installation
 

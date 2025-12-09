@@ -4,6 +4,7 @@ import time
 from pathlib import Path
 from werkzeug.utils import secure_filename
 from .config_loader import CONFIG_DEFAULTS
+from .divoom_api import PixooClient, PixooError
 
 import subprocess
 import threading
@@ -289,7 +290,81 @@ def api_config_reset():
         return jsonify({"ok": False, "error": str(e)}), 500
 
 
+@app.get("/api/pixoo/state")
+def api_pixoo_state():
+    """
+    Liefert Basiszustand des Pixoo: erreichbar?, Helligkeit, Channel.
+    """
+    try:
+        client = PixooClient()
+        conf = client.get_all_conf()
+
+        # Die exakten Keys hängen von der Firmware ab, aber
+        # Brightness gibt es sicher, Channel sehr wahrscheinlich als SelectIndex.
+        brightness = conf.get("Brightness")
+        channel = conf.get("SelectIndex")
+
+        return jsonify({
+            "ok": True,
+            "reachable": True,
+            "brightness": brightness,
+            "channel": channel,
+            "raw": conf,
+        })
+    except PixooError as e:
+        return jsonify({
+            "ok": False,
+            "reachable": False,
+            "error": str(e),
+        }), 500
+    except Exception as e:
+        return jsonify({
+            "ok": False,
+            "reachable": False,
+            "error": f"Unexpected error: {e}",
+        }), 500
+
+
+@app.post("/api/pixoo/brightness")
+def api_pixoo_brightness():
+    data = request.json or {}
+    value = data.get("brightness")
+    if value is None:
+        return jsonify({"ok": False, "error": "missing brightness"}), 400
+
+    try:
+        client = PixooClient()
+        client.set_brightness(int(value))
+        return jsonify({"ok": True})
+    except PixooError as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.post("/api/pixoo/reboot")
+def api_pixoo_reboot():
+    try:
+        client = PixooClient()
+        client.reboot()
+        return jsonify({"ok": True})
+    except PixooError as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.post("/api/pixoo/channel")
+def api_pixoo_channel():
+    data = request.json or {}
+    ch = data.get("channel")
+    if ch is None:
+        return jsonify({"ok": False, "error": "missing channel"}), 400
+
+    try:
+        client = PixooClient()
+        client.set_channel(int(ch))
+        return jsonify({"ok": True})
+    except PixooError as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
 
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080)
+

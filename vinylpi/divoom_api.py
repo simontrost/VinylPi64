@@ -166,3 +166,33 @@ class PixooClient:
         if img.size != (resize_to, resize_to):
             img = img.resize((resize_to, resize_to), Image.Resampling.BILINEAR)
         self.send_frame(img)
+
+
+    def get_all_conf(self) -> dict:
+        return self._post({"Command": "Channel/GetAllConf"})
+
+    def set_brightness(self, value: int) -> None:
+        value = max(0, min(100, int(value)))
+        self._post({
+            "Command": "Device/SetBrightness",
+            "Brightness": value,
+        })
+
+    def reboot(self) -> None:
+        self._post({"Command": "System/ResetDevice"})
+
+    def set_channel(self, index: int) -> None:
+        """
+        Switch Pixoo channel.
+
+        Typical indices (kannst du bei Bedarf anpassen):
+          0 = Uhr / Clock
+          1 = Cloud-Channel
+          2 = Visualizer
+          3 = Custom / HTTP GIF (VinylPi)
+          4 = Wetter, etc. (je nach Firmware)
+        """
+        self._post({
+            "Command": "Channel/SetChannel",
+            "SelectIndex": int(index),
+        })
