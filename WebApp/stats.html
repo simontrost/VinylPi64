@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>VinylPi Statistics</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <script src="stats.js" defer></script>
+</head>
+
+<body>
+    <aside class="sidebar">
+        <nav class="nav">
+            <a href="/">Dashboard</a>
+            <a href="settings.html">Settings</a>
+            <a href="stats.html" class="active">Statistics</a>
+            <a href="about.html">About</a>
+        </nav>
+    </aside>
+
+    <main class="main">
+        <header class="main-header">
+            <div class="header-title pixel-title">Statistics</div>
+            <img src="logo.png" class="header-logo" alt="VinylPi Logo">
+        </header>
+
+        <section class="stats-section">
+            <div class="stats-intro-card">
+                <h1>Your VinylPi statistics</h1>
+                <p class="stats-subtitle">
+                    Based on the recognized songs vinylpi saves your most listened songs,
+                    artists and albums.
+                </p>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stats-card">
+                    <h2>Top Songs</h2>
+                    <ul id="stats-songs" class="stats-list">
+                    </ul>
+                </div>
+
+                <div class="stats-card">
+                    <h2>Top Artists</h2>
+                    <ul id="stats-artists" class="stats-list">
+                    </ul>
+                </div>
+
+                <div class="stats-card">
+                    <h2>Top Albumbs</h2>
+                    <ul id="stats-albums" class="stats-list">
+                    </ul>
+                </div>
+            </div>
+        </section>
+    </main>
+</body>
+</html>

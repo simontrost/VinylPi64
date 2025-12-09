@@ -345,6 +345,26 @@ document.getElementById("settings-form").addEventListener("submit", async (e) =>
     });
 
     alert("Saved settings.");
+    
 });
 
 loadConfig();
+
+const resetBtn = document.getElementById("reset-defaults");
+if (resetBtn) {
+    resetBtn.addEventListener("click", async () => {
+        if (!confirm("Reset all settings to defaults?")) return;
+
+        const res = await fetch("/api/config/reset", {
+            method: "POST",
+        });
+
+        const data = await res.json().catch(() => ({}));
+        if (data.ok) {
+            await loadConfig();
+            alert("Settings reset to defaults.");
+        } else {
+            alert("Reset failed.");
+        }
+    });
+}

@@ -3,6 +3,7 @@ import json
 import time
 from pathlib import Path
 from werkzeug.utils import secure_filename
+from config_loader import CONFIG_DEFAULT
 
 import subprocess
 import threading
@@ -23,6 +24,7 @@ STATUS_PATH = Path("/tmp/vinylpi_status.json")
 UPLOAD_DIR = BASE_DIR / "assets" / "fallback"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 ALLOWED_EXT = {"png", "jpg", "jpeg"}
+STATS_PATH = BASE_DIR / "stats.json"
 
 _recognizer_proc = None
 _rec_lock = threading.Lock()
@@ -188,6 +190,15 @@ def index():
 def settings_page():
     return app.send_static_file("settings.html")
 
+@app.route("/stats.html")
+def stats_page():
+    return app.send_static_file("stats.html")
+
+
+@app.route("/about.html")
+def about_page():
+    return app.send_static_file("about.html")
+
 
 @app.get("/api/status")
 def api_status():
@@ -223,6 +234,59 @@ def api_recognizer_start():
 def api_recognizer_stop():
     stopped = _stop_recognizer()
     return jsonify({"ok": True, "stopped": stopped, "running": _is_recognizer_running()})
+
+@app.get("/api/stats")
+def api_stats():
+    if not STATS_PATH.exists():
+        return jsonify({
+            "top_songs": [],
+            "top_artists": [],
+            "top_albums": [],
+        })
+
+    try:
+        stats = json.loads(STATS_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        return jsonify({
+            "top_songs": [],
+            "top_artists": [],
+            "top_albums": [],
+        })
+
+    songs = list((stats.get("songs") or {}).values())
+    artists_map = stats.get("artists") or {}
+    albums_map = stats.get("albums") or {}
+
+    songs_sorted = sorted(songs, key=lambda s: s.get("count", 0), reverse=True)[:10]
+    artists_sorted = sorted(
+        [{"name": k, "count": v} for k, v in artists_map.items()],
+        key=lambda a: a["count"],
+        reverse=True
+    )[:10]
+    albums_sorted = sorted(
+        [{"name": k, "count": v} for k, v in albums_map.items()],
+        key=lambda a: a["count"],
+        reverse=True
+    )[:10]
+
+    return jsonify({
+        "top_songs": songs_sorted,
+        "top_artists": artists_sorted,
+        "top_albums": albums_sorted,
+    })
+
+@app.post("/api/config")
+def api_config_update():
+    data = request.json
+    CONFIG_PATH.write_text(json.dumps(data, indent=4), encoding="utf-8")
+    return jsonify({"ok": True})
+
+
+@app.post("/api/config/reset")
+def api_config_reset():
+    CONFIG_PATH.write_text(json.dumps(CONFIG_DEFAULTS, indent=4), encoding="utf-8")
+    return jsonify({"ok": True})
+
 
 
 if __name__ == "__main__":

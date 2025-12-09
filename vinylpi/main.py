@@ -4,10 +4,12 @@ from pathlib import Path
 from audio_capture import record_sample
 from recognition import recognize_song, start_scrolling_display, show_fallback_image
 from config_loader import CONFIG, reload_config
+from statistics import _load_stats, _save_stats, _update_stats
 
 STATUS_PATH = Path("/tmp/vinylpi_status.json")
 BASE_DIR = Path(__file__).resolve().parents[1]
 CONFIG_PATH = BASE_DIR / "config.json"
+STATS_PATH = BASE_DIR / "stats.json"
 
 STATUS_PATH = Path("/tmp/vinylpi_status.json")
 _last_cfg_mtime = CONFIG_PATH.stat().st_mtime
@@ -107,18 +109,21 @@ def main_loop():
                     title.strip().casefold(),
                 )
 
-                if song_id == last_song_id and not last_display_was_fallback and not cfg_reloaded:
+                is_same_song = (song_id == last_song_id)
+                should_skip_pixoo = is_same_song and not last_display_was_fallback and not cfg_reloaded
+
+                if should_skip_pixoo:
                     if debug_log:
                         print("Same song as before, skipping Pixoo update.")
                 else:
                     if debug_log:
-                        if last_display_was_fallback and song_id == last_song_id:
+                        if last_display_was_fallback and is_same_song:
                             print("Same song as before after Fallback, updating Pixoo.")
-                        elif last_display_was_fallback:
+                        elif last_display_was_fallback and not is_same_song:
                             print("New song detected after Fallback, updating Pixoo.")
-                        elif cfg_reloaded and song_id == last_song_id:
+                        elif cfg_reloaded and is_same_song:
                             print("Config changed, updating Pixoo for same song.")
-                        elif cfg_reloaded:
+                        elif cfg_reloaded and not is_same_song:
                             print("Config changed and new song detected, updating Pixoo.")
                         else:
                             print("New song detected, updating Pixoo.")
@@ -128,6 +133,10 @@ def main_loop():
                     last_display_was_fallback = False
 
                     _write_status(artist, title, cover_url=cover_url, album=album)
+
+                    if not is_same_song:
+                        _update_stats(artist, title, album)
+
 
         except Exception as e:
             print(f"Error in loop: {e}")

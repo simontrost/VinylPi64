@@ -16,12 +16,18 @@
         <nav class="nav">
             <a href="index.html">Dashboard</a>
             <a href="settings.html" class="active">Settings</a>
+            <a href="stats.html">Statistics</a>
+            <a href="about.html">About</a>
         </nav>
     </aside>
 
 
     <main class="main">
-        <h1 class="section-title">Settings</h1>
+        
+        <header class="main-header">
+            <div class="header-title pixel-title">Settings</div>
+            <img src="logo.png" class="header-logo" alt="VinylPi Logo">
+        </header>
 
         <form id="settings-form">
 
@@ -247,7 +253,11 @@
                 </div>
             </div>
 
+          <div class="settings-actions">
             <button class="btn-primary" type="submit">Save</button>
+            <button class="btn-danger" type="button" id="reset-defaults">Reset to defaults</button>
+        </div>
+
         </form>
     </main>
 
