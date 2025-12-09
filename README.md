@@ -143,14 +143,16 @@ Wants=network-online.target
 [Service]
 User=pi
 WorkingDirectory=/home/pi/VinylPi64
-ExecStart=/home/pi/VinylPi64/venv/bin/gunicorn --bind 0.0.0.0:5000 vinylpi.dashboard:app
+#ExecStart=/home/pi/VinylPi64/venv/bin/gunicorn --bind 0.0.0.0:5000 vinylpi.dashboard:app
+ExecStart=/home/simon/VinylPi64/venv/bin/python3 -m vinylpi.dashboard
 Restart=on-failure
 
 [Install]
 WantedBy=multi-user.target
 ```
 
-Save and exit
+Save and exit. You can decide if you really nead a gunicorn server, for my purpose it's not really needed.  
+If you do want to use gunicorn, make sure you install it via `pip install gunicorn`
 
 ### 2. Activate
 ```bash

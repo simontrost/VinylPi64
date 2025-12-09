@@ -5,4 +5,4 @@ pillow
 requests
 audioop-lts
 flask
-gunicorn
+#gunicorn
