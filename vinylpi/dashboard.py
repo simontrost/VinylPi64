@@ -56,7 +56,7 @@ def _start_recognizer():
         if _is_recognizer_running():
             return False
 
-        cmd = [sys.executable, "-u", str(BASE_DIR / "vinylpi" / "main.py")]
+        cmd = [sys.executable, "-u", "-m", "vinylpi.main"]
         debug_log = _get_debug_logs_flag()
 
         if debug_log:
