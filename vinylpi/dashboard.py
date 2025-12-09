@@ -278,8 +278,16 @@ def api_stats():
 
 @app.post("/api/config/reset")
 def api_config_reset():
-    CONFIG_PATH.write_text(json.dumps(CONFIG_DEFAULTS, indent=4), encoding="utf-8")
-    return jsonify({"ok": True})
+    try:
+        CONFIG_PATH.write_text(
+            json.dumps(CONFIG_DEFAULTS, indent=4),
+            encoding="utf-8",
+        )
+        return jsonify({"ok": True})
+    except Exception as e:
+        print(f"Error resetting config to defaults: {e}")
+        return jsonify({"ok": False, "error": str(e)}), 500
+
 
 
 
