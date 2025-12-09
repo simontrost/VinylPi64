@@ -275,12 +275,6 @@ def api_stats():
         "top_albums": albums_sorted,
     })
 
-@app.post("/api/config")
-def api_config_update():
-    data = request.json
-    CONFIG_PATH.write_text(json.dumps(data, indent=4), encoding="utf-8")
-    return jsonify({"ok": True})
-
 
 @app.post("/api/config/reset")
 def api_config_reset():
