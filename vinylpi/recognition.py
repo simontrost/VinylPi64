@@ -191,6 +191,8 @@ def _scroll_loop(cover_img: Image.Image, artist: str, title: str):
     both_scroll = (w1 > canvas_size) and (w2 > canvas_size)
     sync_range = max(w1, w2) + canvas_size if both_scroll else None
 
+    center_spacing_corr = 1
+
     while not _scroll_stop_event.is_set():
         now = time.time()
         dt = now - last_time
@@ -204,7 +206,11 @@ def _scroll_loop(cover_img: Image.Image, artist: str, title: str):
 
         def compute_x(w_text: int, tick_val: int) -> int:
             if w_text <= canvas_size:
-                return (canvas_size - w_text) // 2
+                if w_text < canvas_size and center_spacing_corr > 0:
+                    effective_w = max(0, w_text - center_spacing_corr)
+                else:
+                    effective_w = w_text
+                return (canvas_size - effective_w) // 2
 
             if both_scroll:
                 scroll_range = sync_range
