@@ -146,6 +146,10 @@
     fill: #1a1a1a;
 }
 
+.stats-share-button.is-loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
 
 @media (max-width: 800px) {
     .stats-grid {

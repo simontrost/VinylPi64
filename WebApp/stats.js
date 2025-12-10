@@ -147,9 +147,12 @@ async function shareWrappedImage() {
     const btn = document.getElementById("share-image-btn");
     if (!btn) return;
 
+    const originalHTML = btn.innerHTML;
+    const originalAria = btn.getAttribute("aria-label") || "";
+
     btn.disabled = true;
-    const originalText = btn.textContent;
-    btn.textContent = "…";
+    btn.classList.add("is-loading");
+    btn.setAttribute("aria-label", "Generating share image…");
 
     try {
         const res = await fetch("/api/stats/share-image");
@@ -159,7 +162,9 @@ async function shareWrappedImage() {
 
         const blob = await res.blob();
 
-        if (navigator.canShare && navigator.canShare({ files: [new File([blob], "vinylpi_stats.png", { type: "image/png" })] })) {
+        if (navigator.canShare && navigator.canShare({
+            files: [new File([blob], "vinylpi_stats.png", { type: "image/png" })]
+        })) {
             const file = new File([blob], "vinylpi_stats.png", { type: "image/png" });
             await navigator.share({
                 files: [file],
@@ -178,10 +183,12 @@ async function shareWrappedImage() {
         }
     } catch (err) {
         console.error("Error sharing stats image:", err);
-        alert("Could not generate share image ");
+        alert("Could not generate share image");
     } finally {
         btn.disabled = false;
-        btn.textContent = originalText;
+        btn.classList.remove("is-loading");
+        btn.innerHTML = originalHTML;
+        btn.setAttribute("aria-label", originalAria || "Share stats image");
     }
 }
 
@@ -193,4 +200,3 @@ document.addEventListener("DOMContentLoaded", () => {
         shareBtn.addEventListener("click", shareWrappedImage);
     }
 });
-

@@ -368,12 +368,60 @@ def api_pixoo_channel():
         return jsonify({"ok": False, "error": str(e)}), 500
 
 
+@app.get("/api/stats")
+def api_stats():
+    if not STATS_PATH.exists():
+        return jsonify({
+            "top_songs": [],
+            "top_artists": [],
+            "top_albums": [],
+        })
+
+    try:
+        stats = json.loads(STATS_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        return jsonify({
+            "top_songs": [],
+            "top_artists": [],
+            "top_albums": [],
+        })
+
+    songs = list((stats.get("songs") or {}).values())
+    artists_map = stats.get("artists") or {}
+    albums_map = stats.get("albums") or {}
+
+    songs_sorted = sorted(songs, key=lambda s: s.get("count", 0), reverse=True)[:10]
+    artists_sorted = sorted(
+        [{"name": k, "count": v} for k, v in artists_map.items()],
+        key=lambda a: a["count"],
+        reverse=True
+    )[:10]
+    albums_sorted = sorted(
+        [{"name": k, "count": v} for k, v in albums_map.items()],
+        key=lambda a: a["count"],
+        reverse=True
+    )[:10]
+
+    return jsonify({
+        "top_songs": songs_sorted,
+        "top_artists": artists_sorted,
+        "top_albums": albums_sorted,
+    })
+
+
 @app.get("/api/stats/share-image")
 def api_stats_share_image():
-    stats = _load_stats()
-    songs_dict = stats.get("songs", {})
-    artists_dict = stats.get("artists", {})
-    albums_dict = stats.get("albums", {})
+    if STATS_PATH.exists():
+        try:
+            stats = json.loads(STATS_PATH.read_text(encoding="utf-8"))
+        except Exception:
+            stats = {}
+    else:
+        stats = {}
+
+    songs_dict = stats.get("songs") or {}
+    artists_dict = stats.get("artists") or {}
+    albums_dict = stats.get("albums") or {}
 
     if not songs_dict and not artists_dict and not albums_dict:
         img = Image.new("RGB", (1080, 1920), (24, 24, 24))
@@ -414,7 +462,7 @@ def api_stats_share_image():
 
     def load_font(size: int):
         try:
-            font_path = BASE_DIR / "assets" / "fonts"/ "rasbpixel.ttf"
+            font_path = BASE_DIR / "assets" / "Inter-SemiBold.ttf"
             return ImageFont.truetype(str(font_path), size)
         except Exception:
             return ImageFont.load_default()
@@ -424,19 +472,20 @@ def api_stats_share_image():
     item_font = load_font(40)
     small_font = load_font(30)
 
+    # Header
     year = time.localtime().tm_year
     header = f"VinylPi64 Wrapped {year}"
     tw, th = draw.textsize(header, font=title_font)
     draw.text(((width - tw) // 2, 80), header, font=title_font, fill=fg)
 
+    # Optional: Logo
     logo_path = BASE_DIR / "assets" / "vinylpi_logo.png"
     if logo_path.exists():
         try:
             logo = Image.open(logo_path).convert("RGBA")
             max_w = 420
             scale = min(max_w / logo.width, 1.0)
-            new_size = (int(logo.width * scale), int(logo.height * scale))
-            logo = logo.resize(new_size, Image.Resampling.LANCZOS)
+            logo = logo.resize((int(logo.width * scale), int(logo.height * scale)), Image.Resampling.LANCZOS)
             lx = (width - logo.width) // 2
             ly = 200
             img.paste(logo, (lx, ly), logo)
