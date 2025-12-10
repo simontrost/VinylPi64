@@ -239,46 +239,6 @@ def api_recognizer_stop():
     stopped = _stop_recognizer()
     return jsonify({"ok": True, "stopped": stopped, "running": _is_recognizer_running()})
 
-@app.get("/api/stats")
-def api_stats():
-    if not STATS_PATH.exists():
-        return jsonify({
-            "top_songs": [],
-            "top_artists": [],
-            "top_albums": [],
-        })
-
-    try:
-        stats = json.loads(STATS_PATH.read_text(encoding="utf-8"))
-    except Exception:
-        return jsonify({
-            "top_songs": [],
-            "top_artists": [],
-            "top_albums": [],
-        })
-
-    songs = list((stats.get("songs") or {}).values())
-    artists_map = stats.get("artists") or {}
-    albums_map = stats.get("albums") or {}
-
-    songs_sorted = sorted(songs, key=lambda s: s.get("count", 0), reverse=True)[:10]
-    artists_sorted = sorted(
-        [{"name": k, "count": v} for k, v in artists_map.items()],
-        key=lambda a: a["count"],
-        reverse=True
-    )[:10]
-    albums_sorted = sorted(
-        [{"name": k, "count": v} for k, v in albums_map.items()],
-        key=lambda a: a["count"],
-        reverse=True
-    )[:10]
-
-    return jsonify({
-        "top_songs": songs_sorted,
-        "top_artists": artists_sorted,
-        "top_albums": albums_sorted,
-    })
-
 
 @app.post("/api/config/reset")
 def api_config_reset():
