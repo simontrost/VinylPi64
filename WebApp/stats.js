@@ -143,4 +143,54 @@ async function loadStats() {
     }
 }
 
-document.addEventListener("DOMContentLoaded", loadStats);
+async function shareWrappedImage() {
+    const btn = document.getElementById("share-image-btn");
+    if (!btn) return;
+
+    btn.disabled = true;
+    const originalText = btn.textContent;
+    btn.textContent = "…";
+
+    try {
+        const res = await fetch("/api/stats/share-image");
+        if (!res.ok) {
+            throw new Error("HTTP " + res.status);
+        }
+
+        const blob = await res.blob();
+
+        if (navigator.canShare && navigator.canShare({ files: [new File([blob], "vinylpi_stats.png", { type: "image/png" })] })) {
+            const file = new File([blob], "vinylpi_stats.png", { type: "image/png" });
+            await navigator.share({
+                files: [file],
+                title: "My VinylPi64 stats",
+                text: "Shared via VinylPi64",
+            });
+        } else {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "vinylpi_stats.png";
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+        }
+    } catch (err) {
+        console.error("Error sharing stats image:", err);
+        alert("Could not generate share image ");
+    } finally {
+        btn.disabled = false;
+        btn.textContent = originalText;
+    }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    loadStats();
+
+    const shareBtn = document.getElementById("share-image-btn");
+    if (shareBtn) {
+        shareBtn.addEventListener("click", shareWrappedImage);
+    }
+});
+
