@@ -60,13 +60,14 @@ If you use different hardware, you will most likely have to modify parts of the 
   <img src="assets/readme/example.jpg" height="600" alt="Preview results">
 </p>
 
-### WebApp Desktop
-
-| <img src="assets/readme/webapp_dashboard_desktop.png" width="600" /> | <img src="assets/readme/webapp_settings_desktop.png" width="600" /> |
-
 ### WebApp Mobile
 
 | <img src="assets/readme/webapp_dashboard_mobile.jpeg" height="600" /> | <img src="assets/readme/webapp_settings_mobile.jpeg" height="600" /> |
+
+### WebApp Desktop
+
+| <img src="assets/readme/webapp_statistics_desktop.png" width="600" /> | <img src="assets/readme/webapp_pixoo_desktop.png" width="600" /> |
+
 
 ## Installation
 
