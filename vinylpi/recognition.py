@@ -13,7 +13,7 @@ from .image_utils import (
     text_size,
     dynamic_text_color,
 )
-from divoom_api import PixooClient, PixooError
+from .divoom_api import PixooClient, PixooError
 from PIL import Image, ImageDraw
 
 _scroll_thread: Optional[threading.Thread] = None
