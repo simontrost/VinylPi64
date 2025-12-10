@@ -97,6 +97,26 @@
     opacity: 0.8;
 }
 
+.stats-toggle-wrapper {
+    margin-top: 0.35rem;
+    text-align: center;
+}
+
+.stats-toggle {
+    background: #2b2b2b;
+    color: #e6e6e6;
+    border: 1px solid #555;
+    border-radius: 999px;
+    padding: 4px 12px;
+    font-size: 0.75rem;
+    cursor: pointer;
+}
+
+.stats-toggle:hover {
+    background: #3a3a3a;
+}
+
+
 @media (max-width: 800px) {
     .stats-grid {
         grid-template-columns: 1fr;

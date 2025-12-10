@@ -4,9 +4,14 @@ async function loadStats() {
     const albumsList = document.getElementById("stats-albums");
 
     const setEmpty = () => {
+        songsList.innerHTML = "";
+        artistsList.innerHTML = "";
+        albumsList.innerHTML = "";
+
         const msg = document.createElement("li");
         msg.className = "stats-empty";
         msg.textContent = "No data yet, play a record!🎶";
+
         songsList.appendChild(msg.cloneNode(true));
         artistsList.appendChild(msg.cloneNode(true));
         albumsList.appendChild(msg.cloneNode(true));
@@ -66,27 +71,71 @@ async function loadStats() {
             return li;
         };
 
-        songsList.innerHTML = "";
-        (top_songs || []).forEach((song, idx) => {
-            const title = `${song.artist} – ${song.title}`;
-            const subtitle = song.album ? song.album : "";
+        const MAX_VISIBLE = 5;
+
+        const setupExpandableList = (listElement, items, renderItem) => {
+            listElement.innerHTML = "";
+            if (!items || items.length === 0) {
+                return;
+            }
+
+            let expanded = false;
+
+            const render = () => {
+                listElement.innerHTML = "";
+
+                const visibleCount = expanded
+                    ? items.length
+                    : Math.min(items.length, MAX_VISIBLE);
+
+                for (let i = 0; i < visibleCount; i++) {
+                    listElement.appendChild(renderItem(items[i], i));
+                }
+
+                if (items.length > MAX_VISIBLE) {
+                    const toggleLi = document.createElement("li");
+                    toggleLi.className = "stats-toggle-wrapper";
+
+                    const btn = document.createElement("button");
+                    btn.type = "button";
+                    btn.className = "stats-toggle";
+                    btn.textContent = expanded ? "Less" : "More";
+
+                    btn.addEventListener("click", () => {
+                        expanded = !expanded;
+                        render();
+                    });
+
+                    toggleLi.appendChild(btn);
+                    listElement.appendChild(toggleLi);
+                }
+            };
+
+            render();
+        };
+
+        // Songs
+        setupExpandableList(songsList, top_songs || [], (song, idx) => {
+            const title = song.title;
+            const subtitle = song.artist || "";
             const countText = `${song.count} plays`;
-            songsList.appendChild(createItem(idx + 1, title, subtitle, countText));
+            return createItem(idx + 1, title, subtitle, countText);
         });
 
-        artistsList.innerHTML = "";
-        (top_artists || []).forEach((artist, idx) => {
+        // Artists
+        setupExpandableList(artistsList, top_artists || [], (artist, idx) => {
             const title = artist.name;
             const countText = `${artist.count} plays`;
-            artistsList.appendChild(createItem(idx + 1, title, "", countText));
+            return createItem(idx + 1, title, "", countText);
         });
 
-        albumsList.innerHTML = "";
-        (top_albums || []).forEach((album, idx) => {
+        // Albums
+        setupExpandableList(albumsList, top_albums || [], (album, idx) => {
             const title = album.name;
             const countText = `${album.count} plays`;
-            albumsList.appendChild(createItem(idx + 1, title, "", countText));
+            return createItem(idx + 1, title, "", countText);
         });
+
 
     } catch (err) {
         console.error("Error loading stats:", err);
