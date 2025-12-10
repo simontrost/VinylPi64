@@ -206,9 +206,16 @@ def build_static_frame(
     if both_scroll:
         sync_range = max(w1, w2) + CANVAS_SIZE
 
+    CENTER_SPACING_CORR = 1
+
     def compute_x(w_text: int, tick_val: int) -> int:
         if w_text <= CANVAS_SIZE:
-            return (CANVAS_SIZE - w_text) // 2
+            if w_text < CANVAS_SIZE and CENTER_SPACING_CORR > 0:
+                effective_w = max(0, w_text - CENTER_SPACING_CORR)
+            else:
+                effective_w = w_text
+
+            return (CANVAS_SIZE - effective_w) // 2
 
         if both_scroll:
             scroll_range = sync_range
@@ -217,6 +224,7 @@ def build_static_frame(
 
         offset = tick_val % scroll_range
         return CANVAS_SIZE - offset
+
 
     x_band = compute_x(w1, tick)
     x_title = compute_x(w2, tick)
