@@ -13,9 +13,9 @@ def _load_stats() -> dict:
             pass
 
     return {
-        "songs": {},    # "Artist – Title" -> {artist, title, album, count}
-        "artists": {},  # artist -> count
-        "albums": {},   # album -> session-count
+        "songs": {},
+        "artists": {},
+        "albums": {},
     }
 
 

@@ -132,26 +132,6 @@
     gap: 0.3rem;
 }
 
-.stats-share-button {
-    width: 44px;
-    height: 44px;
-    padding: 0;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.stats-share-icon {
-    width: 20px;
-    height: 20px;
-    fill: #1a1a1a;
-}
-
-.stats-share-button.is-loading {
-    opacity: 0.6;
-    pointer-events: none;
-}
 
 @media (max-width: 800px) {
     .stats-grid {
@@ -169,12 +149,6 @@
         flex-direction: column;
         align-items: flex-start;
     }
-
-    .stats-share-button {
-        align-self: flex-end;
-        margin-top: 0.5rem;
-    }
-
 }
 
 .stats-main {

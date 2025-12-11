@@ -255,15 +255,10 @@ def api_config_reset():
 
 @app.get("/api/pixoo/state")
 def api_pixoo_state():
-    """
-    Liefert Basiszustand des Pixoo: erreichbar?, Helligkeit, Channel.
-    """
     try:
         client = PixooClient()
         conf = client.get_all_conf()
 
-        # Die exakten Keys hängen von der Firmware ab, aber
-        # Brightness gibt es sicher, Channel sehr wahrscheinlich als SelectIndex.
         brightness = conf.get("Brightness")
         channel = conf.get("SelectIndex")
 
@@ -367,135 +362,6 @@ def api_stats():
         "top_artists": artists_sorted,
         "top_albums": albums_sorted,
     })
-
-
-@app.get("/api/stats/share-image")
-def api_stats_share_image():
-    if STATS_PATH.exists():
-        try:
-            stats = json.loads(STATS_PATH.read_text(encoding="utf-8"))
-        except Exception:
-            stats = {}
-    else:
-        stats = {}
-
-    songs_dict = stats.get("songs") or {}
-    artists_dict = stats.get("artists") or {}
-    albums_dict = stats.get("albums") or {}
-
-    if not songs_dict and not artists_dict and not albums_dict:
-        img = Image.new("RGB", (1080, 1920), (24, 24, 24))
-        draw = ImageDraw.Draw(img)
-        msg = "No stats yet.\nPlay a record on VinylPi64!"
-        draw.multiline_text((80, 880), msg, fill=(240, 240, 240), spacing=10)
-        buf = BytesIO()
-        img.save(buf, format="PNG")
-        buf.seek(0)
-        return send_file(buf, mimetype="image/png", download_name="vinylpi_stats.png")
-
-    top_songs = sorted(
-        songs_dict.values(),
-        key=lambda s: s.get("count", 0),
-        reverse=True,
-    )[:5]
-
-    top_artists = sorted(
-        artists_dict.items(),
-        key=lambda kv: kv[1],
-        reverse=True,
-    )[:5]
-
-    top_albums = sorted(
-        albums_dict.items(),
-        key=lambda kv: kv[1],
-        reverse=True,
-    )[:5]
-
-    width, height = 1080, 1920
-    bg_color = (18, 18, 18)
-    accent = (255, 214, 10)
-    fg = (240, 240, 240)
-    fg_sub = (180, 180, 180)
-
-    img = Image.new("RGB", (width, height), bg_color)
-    draw = ImageDraw.Draw(img)
-
-    def load_font(size: int):
-        try:
-            font_path = BASE_DIR / "assets" / "Inter-SemiBold.ttf"
-            return ImageFont.truetype(str(font_path), size)
-        except Exception:
-            return ImageFont.load_default()
-
-    title_font = load_font(72)
-    section_font = load_font(46)
-    item_font = load_font(40)
-    small_font = load_font(30)
-
-    # Header
-    year = time.localtime().tm_year
-    header = f"VinylPi64 Wrapped {year}"
-    tw, th = draw.textsize(header, font=title_font)
-    draw.text(((width - tw) // 2, 80), header, font=title_font, fill=fg)
-
-    # Optional: Logo
-    logo_path = BASE_DIR / "assets" / "vinylpi_logo.png"
-    if logo_path.exists():
-        try:
-            logo = Image.open(logo_path).convert("RGBA")
-            max_w = 420
-            scale = min(max_w / logo.width, 1.0)
-            logo = logo.resize((int(logo.width * scale), int(logo.height * scale)), Image.Resampling.LANCZOS)
-            lx = (width - logo.width) // 2
-            ly = 200
-            img.paste(logo, (lx, ly), logo)
-        except Exception:
-            pass
-
-    col_margin_x = 120
-    col_gap = 40
-    col_width = (width - 2 * col_margin_x - col_gap) // 2
-
-    left_x = col_margin_x
-    right_x = col_margin_x + col_width + col_gap
-    y_start = 650
-
-    draw.text((left_x, y_start), "Top Songs", font=section_font, fill=accent)
-    y = y_start + 70
-    for i, song in enumerate(top_songs, start=1):
-        title = song.get("title") or "Unknown"
-        artist = song.get("artist") or ""
-        count = song.get("count", 0)
-
-        line = f"{i}. {title}"
-        draw.text((left_x, y), line, font=item_font, fill=fg)
-        sub = f"{artist} · {count} plays" if artist else f"{count} plays"
-        draw.text((left_x + 40, y + 40), sub, font=small_font, fill=fg_sub)
-        y += 90
-
-    draw.text((right_x, y_start), "Top Artists", font=section_font, fill=accent)
-    y2 = y_start + 70
-    for i, (name, count) in enumerate(top_artists, start=1):
-        line = f"{i}. {name}"
-        draw.text((right_x, y2), line, font=item_font, fill=fg)
-        draw.text((right_x + 40, y2 + 40), f"{count} plays", font=small_font, fill=fg_sub)
-        y2 += 90
-
-    if top_albums:
-        best_album, album_plays = top_albums[0]
-        footer_y = height - 200
-        draw.text((left_x, footer_y), "Top Album", font=section_font, fill=accent)
-        draw.text((left_x, footer_y + 60), best_album, font=item_font, fill=fg)
-        draw.text((left_x, footer_y + 110), f"{album_plays} plays", font=small_font, fill=fg_sub)
-
-    footer_text = "Generated with VinylPi64"
-    ftw, fth = draw.textsize(footer_text, font=small_font)
-    draw.text((width - ftw - 60, height - fth - 60), footer_text, font=small_font, fill=fg_sub)
-
-    buf = BytesIO()
-    img.save(buf, format="PNG")
-    buf.seek(0)
-    return send_file(buf, mimetype="image/png", download_name="vinylpi_stats.png")
 
 
 if __name__ == "__main__":
