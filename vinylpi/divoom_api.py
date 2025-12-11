@@ -179,7 +179,7 @@ class PixooClient:
         })
 
     def reboot(self) -> None:
-        self._post({"Command": "System/ResetDevice"})
+        self._post({"Command": "Device/SysReboot"})
 
     def set_channel(self, index: int) -> None:
         """
