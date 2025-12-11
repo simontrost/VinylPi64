@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="de">
+
 <head>
     <meta charset="UTF-8">
     <title>Pixoo – VinylPi64</title>
@@ -38,6 +39,19 @@
                 <p class="pixoo-status-sub" id="pixoo-status-sub"></p>
             </div>
 
+            <!-- Device discovery -->
+            <div class="card">
+                <h2>Device discovery</h2>
+                <p class="pixoo-help">
+                    Discover your Pixoo via the Divoom cloud and store its IP / IDs
+                    into the VinylPi config.
+                </p>
+                <button id="pixooDiscoverBtn" class="btn-primary">
+                    Find device & save to config
+                </button>
+                <span id="pixooDiscoverStatus" class="pixoo-reboot-status"></span>
+            </div>
+
             <!-- Brightness -->
             <div class="card">
                 <h2>Brightness</h2>
@@ -50,11 +64,40 @@
                 </div>
             </div>
 
+            <!-- Community / Liked GIFs -->
+            <div class="card">
+                <h2>Community GIFs</h2>
+                <p class="pixoo-help">
+                    Load your liked Divoom community GIFs and play one on the Pixoo.
+                </p>
+
+                <div class="pixoo-row">
+                    <button id="pixooFetchLikesBtn" class="btn-primary">
+                        Load liked GIFs
+                    </button>
+                    <span id="pixooLikesStatus" class="pixoo-reboot-status"></span>
+                </div>
+
+                <div class="pixoo-row">
+                    <label for="pixooLikesSelect">Liked GIFs</label>
+                    <div class="pixoo-slider-wrap">
+                        <select id="pixooLikesSelect" class="pixoo-select">
+                            <option value="">– No GIFs loaded –</option>
+                        </select>
+                        <button id="pixooPlayLikeBtn" class="btn-primary">
+                            Play on Pixoo
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+
+
             <!-- Channel selection -->
             <div class="card">
                 <h2>Channel</h2>
                 <p class="pixoo-help">
-                    Switch between Pixoo channels.  
+                    Switch between Pixoo channels.
                     <br>Note: VinylPi uses the HTTP GIF / Custom channel to display frames.
                 </p>
 
@@ -62,8 +105,8 @@
                     <button class="pixoo-channel-btn" data-channel="0">Clock</button>
                     <button class="pixoo-channel-btn" data-channel="1">Cloud</button>
                     <button class="pixoo-channel-btn" data-channel="2">Visualizer</button>
-                    <button class="pixoo-channel-btn" data-channel="3">VinylPi / Custom</button>
-                    <button class="pixoo-channel-btn" data-channel="4">Weather</button>
+                    <button class="pixoo-channel-btn" data-channel="3">Custom</button>
+                    <button class="pixoo-channel-btn" data-channel="4">BlackScreen</button>
                 </div>
             </div>
 
@@ -81,4 +124,5 @@
         </section>
     </main>
 </body>
+
 </html>

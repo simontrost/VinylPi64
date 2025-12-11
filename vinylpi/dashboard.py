@@ -4,10 +4,9 @@ from io import BytesIO
 import time
 from pathlib import Path
 from werkzeug.utils import secure_filename
-from .config_loader import CONFIG_DEFAULTS
+from .config_loader import CONFIG_DEFAULTS, CONFIG_PATH, reload_config
 from .divoom_api import PixooClient, PixooError
 from .statistics import _load_stats
-from PIL import Image, ImageDraw, ImageFont
 
 import subprocess
 import threading
@@ -91,6 +90,15 @@ def _stop_recognizer():
         finally:
             _recognizer_proc = None
         return True
+
+
+def _get_pixoo_client():
+    try:
+        return PixooClient()
+    except PixooError as e:
+        print(f"Pixoo error while creating client: {e}")
+        return None
+
 
 @app.get("/api/fallback-images")
 def api_list_fallback_images():
@@ -253,49 +261,53 @@ def api_config_reset():
         return jsonify({"ok": False, "error": str(e)}), 500
 
 
-@app.get("/api/pixoo/state")
-def api_pixoo_state():
-    try:
-        client = PixooClient()
-        conf = client.get_all_conf()
-
-        brightness = conf.get("Brightness")
-        channel = conf.get("SelectIndex")
-
+@app.get("/api/pixoo/status")
+def api_pixoo_status():
+    client = _get_pixoo_client()
+    if not client:
         return jsonify({
-            "ok": True,
-            "reachable": True,
-            "brightness": brightness,
-            "channel": channel,
-            "raw": conf,
+            "ok": False,
+            "online": False,
+            "error": "Pixoo not reachable",
         })
+
+    try:
+        conf = client.get_all_conf()
     except PixooError as e:
         return jsonify({
             "ok": False,
-            "reachable": False,
+            "online": False,
             "error": str(e),
-        }), 500
-    except Exception as e:
-        return jsonify({
-            "ok": False,
-            "reachable": False,
-            "error": f"Unexpected error: {e}",
-        }), 500
+        })
+
+    return jsonify({
+        "ok": True,
+        "online": True,
+        "brightness": conf.get("Brightness"),
+        "channel": conf.get("SelectIndex"),
+        "device_name": conf.get("DeviceName") or "Pixoo",
+        "raw": conf,
+    })
 
 
 @app.post("/api/pixoo/brightness")
 def api_pixoo_brightness():
-    data = request.json or {}
+    data = request.get_json() or {}
     value = data.get("brightness")
+
     if value is None:
         return jsonify({"ok": False, "error": "missing brightness"}), 400
 
+    client = _get_pixoo_client()
+    if not client:
+        return jsonify({"ok": False, "error": "Pixoo not reachable"}), 500
+
     try:
-        client = PixooClient()
         client.set_brightness(int(value))
-        return jsonify({"ok": True})
     except PixooError as e:
         return jsonify({"ok": False, "error": str(e)}), 500
+
+    return jsonify({"ok": True})
 
 
 @app.post("/api/pixoo/reboot")
@@ -310,17 +322,23 @@ def api_pixoo_reboot():
 
 @app.post("/api/pixoo/channel")
 def api_pixoo_channel():
-    data = request.json or {}
+    data = request.get_json() or {}
     ch = data.get("channel")
+
     if ch is None:
         return jsonify({"ok": False, "error": "missing channel"}), 400
 
+    client = _get_pixoo_client()
+    if not client:
+        return jsonify({"ok": False, "error": "Pixoo not reachable"}), 500
+
     try:
-        client = PixooClient()
         client.set_channel(int(ch))
-        return jsonify({"ok": True})
     except PixooError as e:
         return jsonify({"ok": False, "error": str(e)}), 500
+
+    return jsonify({"ok": True})
+
 
 
 @app.get("/api/stats")
@@ -361,6 +379,82 @@ def api_stats():
         "top_songs": songs_sorted,
         "top_artists": artists_sorted,
         "top_albums": albums_sorted,
+    })
+
+@app.get("/api/pixoo/liked-gifs")
+def api_pixoo_liked_gifs():
+    client = _get_pixoo_client()
+    if not client:
+        return jsonify({"ok": False, "error": "Pixoo not reachable"}), 500
+
+    try:
+        gifs = client.get_liked_gifs(page=1)
+    except PixooError as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+    return jsonify({"ok": True, "gifs": gifs})
+
+
+@app.post("/api/pixoo/play-remote")
+def api_pixoo_play_remote():
+    data = request.get_json() or {}
+    file_id = data.get("file_id")
+
+    if not file_id:
+        return jsonify({"ok": False, "error": "missing file_id"}), 400
+
+    client = _get_pixoo_client()
+    if not client:
+        return jsonify({"ok": False, "error": "Pixoo not reachable"}), 500
+
+    try:
+        client.play_remote_gif(file_id)
+    except PixooError as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+    return jsonify({"ok": True})
+
+@app.post("/api/pixoo/discover-and-save")
+def api_pixoo_discover_and_save():
+    try:
+        client = PixooClient()
+        dev = client.discover_cloud_device()
+    except PixooError as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+    try:
+        if CONFIG_PATH.exists():
+            raw = CONFIG_PATH.read_text(encoding="utf-8")
+            cfg = json.loads(raw)
+        else:
+            cfg = json.loads(json.dumps(CONFIG_DEFAULTS))
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"Failed to read config: {e}"}), 500
+
+    divoom_cfg = cfg.get("divoom") or {}
+    if dev.get("device_private_ip"):
+        divoom_cfg["ip"] = dev["device_private_ip"]
+    if dev.get("device_id") is not None:
+        divoom_cfg["device_id"] = dev["device_id"]
+    if dev.get("device_mac"):
+        divoom_cfg["device_mac"] = dev["device_mac"]
+
+    cfg["divoom"] = divoom_cfg
+
+    try:
+        CONFIG_PATH.write_text(json.dumps(cfg, indent=4), encoding="utf-8")
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"Failed to write config: {e}"}), 500
+
+    try:
+        reload_config()
+    except Exception:
+        pass
+
+    return jsonify({
+        "ok": True,
+        "device": dev,
+        "divoom": divoom_cfg,
     })
 
 

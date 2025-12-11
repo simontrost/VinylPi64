@@ -11,6 +11,9 @@ from pathlib import Path
 from .config_loader import CONFIG, CONFIG_PATH
 from .pixoo_discovery import discover_pixoo_ip, _probe_ip
 
+CLOUD_BASE_URL = "https://app.divoom-gz.com"
+
+
 class PixooError(Exception):
     pass
 
@@ -76,6 +79,53 @@ class PixooClient:
         if debug_log:
             print(f"PixooClient using IP: {self.ip}")
 
+
+    def _cloud_post(self, path: str, payload: dict) -> dict:
+        url = f"{CLOUD_BASE_URL}{path}"
+        try:
+            resp = requests.post(url, json=payload, timeout=self.timeout)
+            resp.raise_for_status()
+        except requests.RequestException as e:
+            raise PixooError(f"HTTP error on Divoom cloud API: {e}") from e
+
+        try:
+            data = resp.json()
+        except json.JSONDecodeError:
+            raise PixooError("Invalid JSON from Divoom cloud API")
+
+        if isinstance(data, dict) and data.get("ReturnCode", 0) != 0:
+            msg = data.get("ReturnMessage", "unknown error")
+            raise PixooError(f"Divoom cloud API error: {msg}")
+
+        return data
+
+    def get_liked_gifs(self, page: int = 1) -> list[dict]:
+        divoom_cfg = CONFIG.get("divoom", {})
+        device_id = divoom_cfg.get("device_id")
+        device_mac = divoom_cfg.get("device_mac")
+
+        if not device_id or not device_mac:
+            raise PixooError(
+                "Missing divoom.device_id/device_mac in config.json "
+                "(required for community GIFs)."
+            )
+
+        payload = {
+            "DeviceId": device_id,
+            "DeviceMac": device_mac,
+            "Page": int(page),
+        }
+
+        data = self._cloud_post("/Device/GetImgLikeList", payload)
+        img_list = data.get("ImgList") or []
+
+        result = []
+        for item in img_list:
+            result.append({
+                "file_name": item.get("FileName", ""),
+                "file_id": item.get("FileId", ""),
+            })
+        return result
 
 
     def _post(self, payload: dict) -> dict:
@@ -160,12 +210,47 @@ class PixooClient:
 
         self._post(payload)
 
+    def discover_cloud_device(self) -> dict:
+        url = f"{CLOUD_BASE_URL}/Device/ReturnSameLANDevice"
+        try:
+            resp = requests.get(url, timeout=self.timeout)
+            resp.raise_for_status()
+        except requests.RequestException as e:
+            raise PixooError(f"Error calling Divoom discovery API: {e}") from e
+
+        try:
+            data = resp.json()
+        except json.JSONDecodeError as e:
+            raise PixooError("Invalid JSON from Divoom discovery API") from e
+
+        devices = data.get("DeviceList") or []
+        if not devices:
+            raise PixooError("No Divoom devices found in ReturnSameLANDevice response")
+
+        dev = devices[0] 
+
+        return {
+            "device_name": dev.get("DeviceName"),
+            "device_id": dev.get("DeviceId") or dev.get("DeviceID"),
+            "device_mac": dev.get("DeviceMac") or dev.get("MacAddress"),
+            "device_private_ip": dev.get("DevicePrivateIP"),
+        }
+
 
     def show_image_file(self, path: str, *, resize_to: int = 64) -> None:
         img = Image.open(path).convert("RGB")
         if img.size != (resize_to, resize_to):
             img = img.resize((resize_to, resize_to), Image.Resampling.BILINEAR)
         self.send_frame(img)
+
+    def play_remote_gif(self, file_id: str) -> None:
+        if not file_id:
+            raise PixooError("file_id must not be empty")
+
+        self._post({
+            "Command": "Draw/SendRemote",
+            "FileId": file_id,
+        })
 
 
     def get_all_conf(self) -> dict:
@@ -174,7 +259,7 @@ class PixooClient:
     def set_brightness(self, value: int) -> None:
         value = max(0, min(100, int(value)))
         self._post({
-            "Command": "Device/SetBrightness",
+            "Command": "Channel/SetBrightness",
             "Brightness": value,
         })
 
@@ -183,16 +268,13 @@ class PixooClient:
 
     def set_channel(self, index: int) -> None:
         """
-        Switch Pixoo channel.
-
-        Typical indices (kannst du bei Bedarf anpassen):
-          0 = Uhr / Clock
-          1 = Cloud-Channel
-          2 = Visualizer
-          3 = Custom / HTTP GIF (VinylPi)
-          4 = Wetter, etc. (je nach Firmware)
+        0:Faces;
+        1:Cloud Channdle;
+        2:Visualizer;
+        3:Custom;
+        4:black screen
         """
         self._post({
-            "Command": "Channel/SetChannel",
+            "Command": "Channel/SetIndex",
             "SelectIndex": int(index),
         })

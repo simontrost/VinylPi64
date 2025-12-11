@@ -15,9 +15,17 @@
         "font_path": "assets/fonts/rasbpixel.ttf",
         "font_size": 5,
         "use_dynamic_bg": true,
-        "manual_bg_color": [0, 0, 0],
+        "manual_bg_color": [
+            0,
+            0,
+            0
+        ],
         "use_dynamic_text_color": true,
-        "text_color": [255, 255, 255],
+        "text_color": [
+            255,
+            255,
+            255
+        ],
         "uppercase": true,
         "preview_scale": 8,
         "marquee_speed": 20,
@@ -25,9 +33,11 @@
     },
     "divoom": {
         "ip": "",
-        "device_name": "espressif",
+        "device_name": "",
         "timeout": 2.0,
         "auto_reset_gif_id": false,
+        "device_id": ,
+        "device_mac": "",
         "discovery": {
             "enabled": true,
             "subnet_prefix": "192.168.2.",

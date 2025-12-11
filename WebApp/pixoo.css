@@ -103,6 +103,50 @@
     opacity: 0.85;
 }
 
+/* Force red gradient for reboot button inside cards */
+.card .btn-danger {
+    background: linear-gradient(180deg, #ff5555, #cc0000);
+    color: #ffffff;
+}
+
+.card .pixoo-channel-btn {
+    padding: 8px 14px;
+    border-radius: 999px;
+    border: none;
+    background: #3a3a3a;
+    color: #f0f0f0;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
+    transition: background 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+}
+
+.card .pixoo-channel-btn:hover {
+    background: #454545;
+}
+
+.card .pixoo-channel-btn:active {
+    transform: translateY(1px);
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.7);
+}
+
+.card .pixoo-channel-btn.active {
+    background: linear-gradient(180deg, #ffae36, #ff8c00);
+    color: #000;
+}
+
+.pixoo-select {
+    width: 100%;
+    padding: 6px 8px;
+    border-radius: 8px;
+    border: 1px solid #444;
+    background: #222;
+    color: #f0f0f0;
+    font-size: 0.9rem;
+}
+
+
 /* Responsive */
 
 @media (max-width: 800px) {

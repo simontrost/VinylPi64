@@ -34,6 +34,8 @@ CONFIG_DEFAULTS = {
         "device_name": "",
         "timeout": 2.0,
         "auto_reset_gif_id": False,
+        "device_id": "",
+        "device_mac": "",
         "discovery": {
             "enabled": True,
             "subnet_prefix": "192.168.2.",
