@@ -8,11 +8,10 @@ import requests
 from PIL import Image
 from pathlib import Path
 
-from .config_loader import CONFIG, CONFIG_PATH
-from .pixoo_discovery import discover_pixoo_ip, _probe_ip
+from vinylpi.config.config_loader import CONFIG
+from vinylpi.integrations.pixoo_discovery import discover_pixoo_ip, _probe_ip
 
-CLOUD_BASE_URL = "https://app.divoom-gz.com"
-
+from vinylpi.paths import CLOUD_BASE_URL, CONFIG_PATH
 
 class PixooError(Exception):
     pass

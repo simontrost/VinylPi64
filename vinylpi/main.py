@@ -1,17 +1,12 @@
 import time
 import json
 from pathlib import Path
-from .audio_capture import record_sample
-from .recognition import recognize_song, start_scrolling_display, show_fallback_image
-from .config_loader import CONFIG, reload_config
-from .statistics import _update_stats, _increment_album_session
+from vinylpi.core.audio_capture import record_sample
+from vinylpi.core.recognition import recognize_song, start_scrolling_display, show_fallback_image
+from vinylpi.config.config_loader import CONFIG, reload_config
+from vinylpi.core.statistics import _update_stats, _increment_album_session
+from vinylpi.paths import STATUS_PATH, CONFIG_PATH
 
-STATUS_PATH = Path("/tmp/vinylpi_status.json")
-BASE_DIR = Path(__file__).resolve().parents[1]
-CONFIG_PATH = BASE_DIR / "config.json"
-STATS_PATH = BASE_DIR / "stats.json"
-
-STATUS_PATH = Path("/tmp/vinylpi_status.json")
 _last_cfg_mtime = CONFIG_PATH.stat().st_mtime
 
 def _maybe_reload_config() -> bool:

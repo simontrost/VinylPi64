@@ -310,6 +310,10 @@ document.getElementById("settings-form").addEventListener("submit", async (e) =>
         document.getElementById("divoomIp").value;
     divoom.device_name =
         document.getElementById("divoomDeviceName").value;
+    divoom.device_id =
+        parseInt(document.getElementById("divoomDeviceID").value) || 0;
+    divoom.device_mac =
+        document.getElementById("divoomDeviceMAC").value;
     divoom.timeout =
         parseFloat(document.getElementById("divoomTimeout").value) || 2.0;
     divoom.auto_reset_gif_id =
@@ -327,6 +331,8 @@ document.getElementById("settings-form").addEventListener("submit", async (e) =>
     // BEHAVIOR
     behavior.loop_delay_seconds =
         parseFloat(document.getElementById("behaviorLoopDelay").value) || 1;
+    behavior.auto_sleep =
+        parseInt(document.getElementById("behaviorAutoSleep").value) || 50;
 
     // DEBUG
     debug.logs =

@@ -1,9 +1,7 @@
 import json
 from pathlib import Path
 
-BASE_DIR = Path(__file__).resolve().parents[1]
-STATS_PATH = BASE_DIR / "stats.json"
-
+from vinylpi.paths import STATS_PATH, BASE_DIR
 
 def _load_stats() -> dict:
     if STATS_PATH.exists():

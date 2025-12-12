@@ -1,8 +1,7 @@
 import json
 from copy import deepcopy
 from pathlib import Path
-
-CONFIG_PATH = Path("config.json")
+from vinylpi.paths import CONFIG_PATH
 
 CONFIG_DEFAULTS = {
     "audio": {
@@ -32,10 +31,10 @@ CONFIG_DEFAULTS = {
     "divoom": {
         "ip": "",
         "device_name": "",
-        "timeout": 2.0,
-        "auto_reset_gif_id": False,
         "device_id": 0,
         "device_mac": "",
+        "timeout": 2.0,
+        "auto_reset_gif_id": False,
         "discovery": {
             "enabled": True,
             "subnet_prefix": "192.168.2.",
@@ -56,7 +55,7 @@ CONFIG_DEFAULTS = {
     },
     "behavior": {
         "loop_delay_seconds": 1,
-        "auto_sleep": 3
+        "auto_sleep": 30
     },
 }
 
@@ -69,23 +68,28 @@ def deep_update(base: dict, updates: dict) -> dict:
             base[k] = v
     return base
 
+def load_config(path: Path | str | None = None) -> dict:
+    path = Path(path) if path is not None else CONFIG_PATH
 
-def load_config(path: str = "config.json") -> dict:
     cfg = deepcopy(CONFIG_DEFAULTS)
+
     try:
-        with open(path, "r", encoding="utf-8") as f:
-            user_cfg = json.load(f)
-        deep_update(cfg, user_cfg)
+        user_cfg = json.loads(path.read_text(encoding="utf-8"))
+        if isinstance(user_cfg, dict):
+            deep_update(cfg, user_cfg)
         print(f"Config found at: {path}")
     except FileNotFoundError:
-        print("No config was found, using defaults. Try creating a file with the name config.json")
+        print(f"No config was found at {path}, using defaults.")
+    except Exception as e:
+        print(f"Config is invalid at {path} (using defaults): {e}")
+
     return cfg
 
 CONFIG = load_config()
 
-def reload_config() -> dict:
+def reload_config(path: Path | str | None = None) -> dict:
     global CONFIG
-    new_cfg = load_config()
+    new_cfg = load_config(path)
     CONFIG.clear()
     CONFIG.update(new_cfg)
     return CONFIG

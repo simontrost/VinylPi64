@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Optional
 import requests
-from .config_loader import CONFIG
+from vinylpi.config.config_loader import CONFIG
 
 
 def _probe_ip(ip: str, timeout: float) -> bool:
@@ -28,12 +28,14 @@ def _probe_ip(ip: str, timeout: float) -> bool:
     if not isinstance(data, dict):
         return False
 
-    if "DeviceName" in data and debug_log:
-        print(f"Pixoo found (DeviceName match) at {ip}: {data['DeviceName']}")
+    if "DeviceName" in data:
+        if debug_log:
+            print(f"Pixoo found (DeviceName match) at {ip}: {data['DeviceName']}")
         return True
 
-    if "error_code" in data or "Brightness" in data and debug_log:
-        print(f"Pixoo-like response from {ip}: {data}")
+    if "error_code" in data or "Brightness" in data:
+        if debug_log:
+            print(f"Pixoo-like response from {ip}: {data}")
         return True
 
     return False

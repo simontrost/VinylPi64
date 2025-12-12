@@ -5,15 +5,15 @@ from typing import Optional, Tuple
 
 from shazamio import Shazam
 
-from .config_loader import CONFIG
-from .image_utils import (
+from vinylpi.config.config_loader import CONFIG
+from vinylpi.core.image_utils import (
     load_image,
     dynamic_bg_color,
     _get_font_for_config,
     text_size,
     dynamic_text_color,
 )
-from .divoom_api import PixooClient, PixooError
+from vinylpi.integrations.divoom_api import PixooClient, PixooError
 from PIL import Image, ImageDraw
 
 _scroll_thread: Optional[threading.Thread] = None

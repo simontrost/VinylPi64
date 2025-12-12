@@ -145,9 +145,4 @@ async function loadStats() {
 
 document.addEventListener("DOMContentLoaded", () => {
     loadStats();
-
-    const shareBtn = document.getElementById("share-image-btn");
-    if (shareBtn) {
-        shareBtn.addEventListener("click", shareWrappedImage);
-    }
 });

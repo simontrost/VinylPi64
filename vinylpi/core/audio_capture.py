@@ -2,7 +2,7 @@ import sounddevice as sd
 import soundfile as sf
 import io
 
-from .config_loader import CONFIG
+from vinylpi.config.config_loader import CONFIG
 
 def auto_detect_usb_device():
     needle = CONFIG["audio"]["device_name_contains"].upper()
@@ -12,8 +12,9 @@ def auto_detect_usb_device():
     for idx, dev in enumerate(devices):
         name = dev.get("name", "")
         max_in = dev.get("max_input_channels", 0)
-        if max_in > 0 and needle in name.upper() and debug_log:
-            print(f"Auto-Detected Turntable Device: #{idx} -> {name}")
+        if max_in > 0 and needle in name.upper():
+            if debug_log:
+                print(f"Auto-Detected Turntable Device: #{idx} -> {name}")
             return idx
 
     print("No appropriate audio device was found. Try using 'arecord -l'\n Set the name in the config.json file.")
