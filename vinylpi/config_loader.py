@@ -34,7 +34,7 @@ CONFIG_DEFAULTS = {
         "device_name": "",
         "timeout": 2.0,
         "auto_reset_gif_id": False,
-        "device_id": "",
+        "device_id": 0,
         "device_mac": "",
         "discovery": {
             "enabled": True,
@@ -55,7 +55,8 @@ CONFIG_DEFAULTS = {
         "allowed_failures": 3
     },
     "behavior": {
-        "loop_delay_seconds": 1
+        "loop_delay_seconds": 1,
+        "auto_sleep": 3
     },
 }
 

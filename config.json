@@ -36,7 +36,7 @@
         "device_name": "",
         "timeout": 2.0,
         "auto_reset_gif_id": false,
-        "device_id": ,
+        "device_id": 0,
         "device_mac": "",
         "discovery": {
             "enabled": true,
@@ -57,6 +57,7 @@
         "allowed_failures": 3
     },
     "behavior": {
-        "loop_delay_seconds": 1
+        "loop_delay_seconds": 1,
+        "auto_sleep": 50
     }
 }

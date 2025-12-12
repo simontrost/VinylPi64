@@ -2,8 +2,8 @@ body {
     margin: 0;
     background: #202020;
     color: #e6e6e6;
-    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-    font-size: 18px;
+    font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 18px
 }
 
 .sidebar {
@@ -14,170 +14,164 @@ body {
     height: 100vh;
     background: #141414;
     padding: 32px 20px;
-    box-sizing: border-box;
+    box-sizing: border-box
 }
 
 .nav {
     display: flex;
     flex-direction: column;
-    gap: 18px;
+    gap: 18px
 }
 
 .nav a {
     text-decoration: none;
-    color: #dddddd;
+    color: #ddd;
     font-size: 16px;
     font-weight: 600;
-    opacity: 0.6;
+    opacity: .6
 }
 
 .nav a.active {
-    opacity: 1;
+    opacity: 1
 }
 
 .pixel-title {
-    font-family: 'Press Start 2P', cursive;
+    font-family: 'Press Start 2P', cursive
 }
 
 .main {
     margin-left: 210px;
     padding: 32px 40px;
     min-height: 100vh;
-    box-sizing: border-box;
+    box-sizing: border-box
 }
 
 .main-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 32px;
+    margin-bottom: 32px
 }
 
 .header-title {
     font-size: 22px;
-    color: #f5f5f5;
+    color: #f5f5f5
 }
 
 .header-logo {
     width: 72px;
     height: 72px;
     border-radius: 22px;
-    object-fit: cover;
+    object-fit: cover
 }
 
-/* --- Shared card layout (Settings, About, Stats) --- */
 .card {
     background: #2b2b2b;
     border-radius: 20px;
     padding: 20px 24px;
     margin-bottom: 24px;
-    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, .4)
 }
 
 .card h2 {
     margin-top: 0;
     margin-bottom: 16px;
-    font-size: 20px;
+    font-size: 20px
 }
 
-/* --- Shared primary/danger buttons --- */
-
-.btn-primary,
-.btn-danger {
+.btn-danger,
+.btn-primary {
     padding: 10px 22px;
     border-radius: 14px;
     border: none;
     font-size: 16px;
     cursor: pointer;
     font-weight: 600;
-    transition: all 0.15s ease;
+    transition: all .15s ease
 }
 
 .btn-primary {
     background: linear-gradient(180deg, #ffae36, #ff8c00);
-    color: #000;
+    color: #000
 }
 
 .btn-primary:hover {
-    background: linear-gradient(180deg, #ffb947, #ffa033);
+    background: linear-gradient(180deg, #ffb947, #ffa033)
 }
 
 .btn-danger {
-    background: linear-gradient(180deg, #ff5555, #cc0000);
-    color: white;
+    background: linear-gradient(180deg, #f55, #c00);
+    color: #fff
 }
 
 .btn-danger:hover {
-    background: linear-gradient(180deg, #ff6666, #dd1111);
+    background: linear-gradient(180deg, #f66, #d11)
 }
 
-/* Buttons in Cards */
 .card button {
     padding: 8px 14px;
     border-radius: 999px;
     border: none;
     background: #3a3a3a;
-    color: #f0f0f0;
+    color: #f99414;
     font-size: 14px;
     font-weight: 500;
     cursor: pointer;
     margin-right: 6px;
     margin-top: 6px;
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
-    transition: background 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, .5);
+    transition: background .15s ease, transform .1s ease, box-shadow .15s ease
 }
 
 .card button:hover {
-    background: #454545;
+    background: #454545
 }
 
 .card button:active {
     transform: translateY(1px);
-    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.7);
+    box-shadow: 0 3px 10px rgba(0, 0, 0, .7)
 }
 
-/* --- About shared link style --- */
 .about-link {
-    color: #ffb347;
+    color: #f99414;
     text-decoration: none;
-    font-weight: 500;
+    font-weight: 500
 }
 
 .about-link:hover {
-    text-decoration: underline;
+    text-decoration: underline
 }
 
-/* --- Responsive --- */
-@media (max-width: 800px) {
+@media (max-width:800px) {
     .sidebar {
         position: relative;
         width: 100%;
         height: auto;
-        padding: 12px 16px;
+        padding: 12px 16px
     }
 
     .nav {
         flex-direction: row;
         gap: 16px;
-        justify-content: center;
+        justify-content: center
     }
 
     .main {
         margin-left: 0;
         margin-top: 12px;
-        padding: 16px;
+        padding: 16px
     }
 
     .main-header {
-        margin-bottom: 24px;
+        margin-bottom: 24px
     }
 
     .header-title {
-        font-size: 20px;
+        font-size: 20px
     }
 
     .header-logo {
         width: 64px;
-        height: 64px;
+        height: 64px
     }
 }

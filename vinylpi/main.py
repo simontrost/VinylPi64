@@ -179,11 +179,12 @@ def _update_album_session_on_switch(
         candidate_streak,
     )
 
+
 def main_loop():
     delay = CONFIG["behavior"].get("loop_delay_seconds", 10)
     debug_log = CONFIG["debug"]["logs"]
     fallback = CONFIG["fallback"]
-
+    auto_sleep = CONFIG["behavior"].get("auto_sleep", 50)
     if debug_log:
         print(f"\nStarting to loop VinylPi64 (every {delay}s)\n")
 
@@ -247,6 +248,10 @@ def main_loop():
                             print("Switching to fallback image.")
                     show_fallback_image()
                     last_display_was_fallback = True
+
+                if auto_sleep > 0 and consecutive_failures >= auto_sleep:
+                    print("No song detected for a while, entering sleep mode.")
+                    break
 
                 time.sleep(delay)
                 continue
