@@ -311,53 +311,53 @@ def main_loop():
                 last_display_was_fallback = False
                 _write_status(artist, title, cover_url=cover_url, album=album)
 
-                (
-                    stats_current_song_id,
-                    stats_candidate_song_id,
-                    stats_candidate_streak,
-                    did_confirm_switch,
-                ) = _update_song_stats_on_switch(
-                    song_id=song_id,
-                    artist=artist,
-                    title=title,
-                    album=album,
-                    stats_current_song_id=stats_current_song_id,
-                    stats_candidate_song_id=stats_candidate_song_id,
-                    stats_candidate_streak=stats_candidate_streak,
-                    min_consecutive_for_switch=MIN_CONSECUTIVE_FOR_SWITCH,
-                )
+            (
+                stats_current_song_id,
+                stats_candidate_song_id,
+                stats_candidate_streak,
+                did_confirm_switch,
+            ) = _update_song_stats_on_switch(
+                song_id=song_id,
+                artist=artist,
+                title=title,
+                album=album,
+                stats_current_song_id=stats_current_song_id,
+                stats_candidate_song_id=stats_candidate_song_id,
+                stats_candidate_streak=stats_candidate_streak,
+                min_consecutive_for_switch=MIN_CONSECUTIVE_FOR_SWITCH,
+            )
 
-                if did_confirm_switch:
-                    res = add_listen_time_minutes_for_confirmed_song(artist, title, album)
-                    if debug_log:
-                        if res.get("ok"):
-                            print(
-                                f"Added listen time: +{res['minutes']} min "
-                                f"(cached={res['cached']}), total={res['total_minutes']} min"
-                            )
-                        else:
-                            print(f"Listen time not added: {res.get('error')}")
-                else:
-                    if debug_log and stats_current_song_id is None:
-                        print(f"Song not confirmed yet (streak={stats_candidate_streak}/{MIN_CONSECUTIVE_FOR_SWITCH})")
+            if did_confirm_switch:
+                res = add_listen_time_minutes_for_confirmed_song(artist, title, album)
+                if debug_log:
+                    if res.get("ok"):
+                        print(
+                            f"Added listen time: +{res['minutes']} min "
+                            f"(cached={res['cached']}), total={res['total_minutes']} min"
+                        )
+                    else:
+                        print(f"Listen time not added: {res.get('error')}")
+            else:
+                if debug_log and stats_current_song_id is None:
+                    print(f"Song not confirmed yet (streak={stats_candidate_streak}/{MIN_CONSECUTIVE_FOR_SWITCH})")
 
-                (
-                    current_album,
-                    current_album_unique_tracks,
-                    current_album_session_counted,
-                    candidate_album,
-                    candidate_streak,
-                ) = _update_album_session_on_switch(
-                    album=album,
-                    title=title,
-                    current_album=current_album,
-                    current_album_unique_tracks=current_album_unique_tracks,
-                    current_album_session_counted=current_album_session_counted,
-                    candidate_album=candidate_album,
-                    candidate_streak=candidate_streak,
-                    min_tracks_for_album_session=MIN_TRACKS_FOR_ALBUM_SESSION,
-                    min_consecutive_for_switch=MIN_CONSECUTIVE_FOR_SWITCH,
-                )
+            (
+                current_album,
+                current_album_unique_tracks,
+                current_album_session_counted,
+                candidate_album,
+                candidate_streak,
+            ) = _update_album_session_on_switch(
+                album=album,
+                title=title,
+                current_album=current_album,
+                current_album_unique_tracks=current_album_unique_tracks,
+                current_album_session_counted=current_album_session_counted,
+                candidate_album=candidate_album,
+                candidate_streak=candidate_streak,
+                min_tracks_for_album_session=MIN_TRACKS_FOR_ALBUM_SESSION,
+                min_consecutive_for_switch=MIN_CONSECUTIVE_FOR_SWITCH,
+            )
 
         except Exception as e:
             print(f"Error in loop: {e}")
