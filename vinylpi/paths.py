@@ -17,3 +17,5 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 ALLOWED_EXT = {"png", "jpg", "jpeg"}
 
 CLOUD_BASE_URL = "https://app.divoom-gz.com"
+MB_URL = "https://musicbrainz.org/ws/2/recording"
+MB_UA  = "VinylPi64/1.0 (https://github.com/simontrost/VinylPi64)"

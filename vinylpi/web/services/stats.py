@@ -26,4 +26,12 @@ def get_top_stats(limit: int = 10):
         reverse=True
     )[:limit]
 
-    return {"top_songs": songs_sorted, "top_artists": artists_sorted, "top_albums": albums_sorted}
+    total_seconds = float(((stats.get("listening") or {}).get("total_seconds") or 0.0))
+    total_minutes = int(round(total_seconds / 60.0))
+
+    return {
+        "top_songs": songs_sorted,
+        "top_artists": artists_sorted,
+        "top_albums": albums_sorted,
+        "total_minutes_listened": total_minutes,
+    }

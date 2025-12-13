@@ -4,7 +4,7 @@ from pathlib import Path
 from vinylpi.core.audio_capture import record_sample
 from vinylpi.core.recognition import recognize_song, start_scrolling_display, show_fallback_image
 from vinylpi.config.config_loader import CONFIG, reload_config
-from vinylpi.core.statistics import _update_stats, _increment_album_session
+from vinylpi.core.statistics import _update_stats, _increment_album_session, add_listen_time_minutes_for_confirmed_song
 from vinylpi.paths import STATUS_PATH, CONFIG_PATH
 
 _last_cfg_mtime = CONFIG_PATH.stat().st_mtime
@@ -74,35 +74,59 @@ def _update_song_stats_on_switch(
     stats_candidate_streak: int,
     min_consecutive_for_switch: int,
 ):
-    # first confirmed song after start
-    if stats_current_song_id is None:
-        stats_current_song_id = song_id
-        stats_candidate_song_id = None
-        stats_candidate_streak = 0
-        _update_stats(artist, title, album)
-        return stats_current_song_id, stats_candidate_song_id, stats_candidate_streak
+    did_confirm_switch = False
 
-    # back to confirmed Song
+    if stats_current_song_id is None:
+        if stats_candidate_song_id == song_id:
+            stats_candidate_streak += 1
+        else:
+            stats_candidate_song_id = song_id
+            stats_candidate_streak = 1
+
+        if stats_candidate_streak >= min_consecutive_for_switch:
+            stats_current_song_id = song_id
+            stats_candidate_song_id = None
+            stats_candidate_streak = 0
+            _update_stats(artist, title, album)
+            did_confirm_switch = True
+
+        return (
+            stats_current_song_id,
+            stats_candidate_song_id,
+            stats_candidate_streak,
+            did_confirm_switch,
+        )
+
     if song_id == stats_current_song_id:
         stats_candidate_song_id = None
         stats_candidate_streak = 0
-        return stats_current_song_id, stats_candidate_song_id, stats_candidate_streak
+        return (
+            stats_current_song_id,
+            stats_candidate_song_id,
+            stats_candidate_streak,
+            False,
+        )
 
-    # potentially new song
     if stats_candidate_song_id == song_id:
         stats_candidate_streak += 1
     else:
         stats_candidate_song_id = song_id
         stats_candidate_streak = 1
 
-    # Switch only after min_consecutive_for_switch identical matches
     if stats_candidate_streak >= min_consecutive_for_switch:
         stats_current_song_id = song_id
         stats_candidate_song_id = None
         stats_candidate_streak = 0
         _update_stats(artist, title, album)
+        did_confirm_switch = True
 
-    return stats_current_song_id, stats_candidate_song_id, stats_candidate_streak
+    return (
+        stats_current_song_id,
+        stats_candidate_song_id,
+        stats_candidate_streak,
+        did_confirm_switch,
+    )
+
 
 
 def _update_album_session_on_switch(
@@ -289,11 +313,12 @@ def main_loop():
 
             # touch Stats & Album only when song changed
             if not is_same_song:
-                # Song-/Artist-Stats
+                
                 (
                     stats_current_song_id,
                     stats_candidate_song_id,
                     stats_candidate_streak,
+                    did_confirm_switch,
                 ) = _update_song_stats_on_switch(
                     song_id=song_id,
                     artist=artist,
@@ -304,6 +329,21 @@ def main_loop():
                     stats_candidate_streak=stats_candidate_streak,
                     min_consecutive_for_switch=MIN_CONSECUTIVE_FOR_SWITCH,
                 )
+
+                if did_confirm_switch:
+                    res = add_listen_time_minutes_for_confirmed_song(artist, title, album)
+                    if debug_log:
+                        if res.get("ok"):
+                            print(
+                                f"Added listen time: +{res['minutes']} min "
+                                f"(cached={res['cached']}), total={res['total_minutes']} min"
+                            )
+                        else:
+                            print(f"Listen time not added: {res.get('error')}")
+                else:
+                    if debug_log:
+                        print("Listen time not added: song not confirmed yet (need 2x in a row).")
+
 
                 # Album-Session
                 (
@@ -328,7 +368,6 @@ def main_loop():
             print(f"Error in loop: {e}")
 
         time.sleep(delay)
-
 
 
 if __name__ == "__main__":

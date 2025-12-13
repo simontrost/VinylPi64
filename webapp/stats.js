@@ -1,4 +1,5 @@
 async function loadStats() {
+    const minutesEl = document.getElementById("stats-minutes");
     const songsList = document.getElementById("stats-songs");
     const artistsList = document.getElementById("stats-artists");
     const albumsList = document.getElementById("stats-albums");
@@ -7,7 +8,7 @@ async function loadStats() {
         songsList.innerHTML = "";
         artistsList.innerHTML = "";
         albumsList.innerHTML = "";
-
+        if (minutesEl) minutesEl.textContent = "0";
         const msg = document.createElement("li");
         msg.className = "stats-empty";
         msg.textContent = "No data yet, play a record!🎶";
@@ -25,8 +26,13 @@ async function loadStats() {
         }
 
         const data = await res.json();
+        const { top_songs, top_artists, top_albums, total_minutes_listened } = data;
 
-        const { top_songs, top_artists, top_albums } = data;
+        if (minutesEl) {
+        const mins = Number.isFinite(total_minutes_listened) ? total_minutes_listened : 0;
+        minutesEl.textContent = String(mins);
+        }
+
 
         if ((!top_songs || top_songs.length === 0) &&
             (!top_artists || top_artists.length === 0) &&
