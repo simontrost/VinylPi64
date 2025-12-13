@@ -68,32 +68,22 @@ def _mb_fetch_track_length_ms(artist: str, title: str, album: str | None = None)
         return None
 
     query = f'recording:"{t}" AND artist:"{a}"'
-    if album:
-        query += f' AND release:"{album.strip()}"'
-
-    query += " AND status:official"
 
     params = {
         "query": query,
         "fmt": "json",
-        "limit": 10,
+        "limit": 25,
         "inc": "releases",
     }
 
-    r = requests.get(
-        MB_URL,
-        params=params,
-        headers={"User-Agent": MB_UA},
-        timeout=10,
-    )
+    r = requests.get(MB_URL, params=params, headers={"User-Agent": MB_UA}, timeout=10)
     r.raise_for_status()
-    data = r.json()
-
-    recs = data.get("recordings") or []
+    recs = (r.json().get("recordings") or [])
     if not recs:
         return None
 
     album_cf = (album or "").strip().casefold()
+    title_cf = t.casefold()
 
     best_len = None
     best_score = -10_000
@@ -105,12 +95,23 @@ def _mb_fetch_track_length_ms(artist: str, title: str, album: str | None = None)
 
         score = 0
 
-        if (rec.get("title") or "").strip().casefold() == t.casefold():
+        if (rec.get("title") or "").strip().casefold() == title_cf:
             score += 50
+
+        dis = (rec.get("disambiguation") or "").casefold()
+        if "live" in dis:
+            score -= 80
 
         releases = rec.get("releases") or []
         if releases:
             score += 10
+
+            if any((rel.get("status") or "").casefold() == "official" for rel in releases):
+                score += 20
+
+            if any((rel.get("status") or "").casefold() == "bootleg" for rel in releases):
+                score -= 80
+
             if album_cf:
                 for rel in releases:
                     rel_title = (rel.get("title") or "").strip().casefold()
@@ -128,6 +129,7 @@ def _mb_fetch_track_length_ms(artist: str, title: str, album: str | None = None)
             best_len = int(length)
 
     return best_len
+
 
 
 def add_listen_time_minutes_for_confirmed_song(
