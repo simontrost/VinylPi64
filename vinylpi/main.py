@@ -341,11 +341,9 @@ def main_loop():
                         else:
                             print(f"Listen time not added: {res.get('error')}")
                 else:
-                    if debug_log:
-                        print("Listen time not added: song not confirmed yet (need 2x in a row).")
+                    if debug_log and stats_current_song_id is None:
+                        print(f"Song not confirmed yet (streak={stats_candidate_streak}/{MIN_CONSECUTIVE_FOR_SWITCH})")
 
-
-                # Album-Session
                 (
                     current_album,
                     current_album_unique_tracks,
