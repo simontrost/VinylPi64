@@ -311,9 +311,6 @@ def main_loop():
                 last_display_was_fallback = False
                 _write_status(artist, title, cover_url=cover_url, album=album)
 
-            # touch Stats & Album only when song changed
-            if not is_same_song:
-                
                 (
                     stats_current_song_id,
                     stats_candidate_song_id,
