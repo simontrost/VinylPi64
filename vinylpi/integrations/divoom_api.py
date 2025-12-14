@@ -8,7 +8,7 @@ import requests
 from PIL import Image
 from pathlib import Path
 
-from vinylpi.config.config_loader import CONFIG
+from vinylpi.web.services.config import read_config
 from vinylpi.integrations.pixoo_discovery import discover_pixoo_ip, _probe_ip
 
 from vinylpi.paths import CLOUD_BASE_URL, CONFIG_PATH
@@ -19,6 +19,7 @@ class PixooError(Exception):
 
 class PixooClient:
     def __init__(self, ip: Optional[str] = None, timeout: Optional[float] = None):
+        CONFIG = read_config()
         divoom_cfg = CONFIG.get("divoom", {})
         debug_log = CONFIG["debug"]["logs"]
 
@@ -99,6 +100,7 @@ class PixooClient:
         return data
 
     def get_liked_gifs(self, page: int = 1) -> list[dict]:
+        CONFIG = read_config()
         divoom_cfg = CONFIG.get("divoom", {})
         device_id = divoom_cfg.get("device_id")
         device_mac = divoom_cfg.get("device_mac")

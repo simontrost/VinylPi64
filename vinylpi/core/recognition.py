@@ -5,7 +5,8 @@ from typing import Optional, Tuple
 
 from shazamio import Shazam
 
-from vinylpi.config.config_loader import CONFIG
+from vinylpi.web.services.config import read_config
+
 from vinylpi.core.image_utils import (
     load_image,
     dynamic_bg_color,
@@ -48,6 +49,7 @@ def _stop_scroll_thread():
     _scroll_stop_event = threading.Event()
 
 async def _recognize_async(wav_bytes: bytes):
+    CONFIG = read_config()
     debug_log = CONFIG["debug"]["logs"]
     if debug_log:
         print("Starting Shazam-recognition ...")
@@ -99,6 +101,7 @@ def recognize_song(wav_bytes: bytes,) -> Optional[Tuple[str, str, Image.Image, s
 
 
 def _prepare_base_canvas(cover_img: Image.Image, bg_color) -> Image.Image:
+    CONFIG = read_config()
     img_cfg = CONFIG["image"]
     CANVAS_SIZE = img_cfg["canvas_size"]
     COVER_SIZE = img_cfg["cover_size"]
@@ -120,6 +123,7 @@ def _prepare_base_canvas(cover_img: Image.Image, bg_color) -> Image.Image:
     return canvas
 
 def _prepare_scroll_resources(cover_img: Image.Image, artist: str, title: str):
+    CONFIG = read_config()
     img_cfg = CONFIG["image"]
     CANVAS_SIZE = img_cfg["canvas_size"]
     GAP_BETWEEN_LINES = img_cfg["line_spacing_margin"]
@@ -169,6 +173,7 @@ def _prepare_scroll_resources(cover_img: Image.Image, artist: str, title: str):
 
 
 def _scroll_loop(cover_img: Image.Image, artist: str, title: str):
+    CONFIG = read_config()
     debug_log = CONFIG["debug"]["logs"]
     debug_cfg = CONFIG["debug"]
     img_cfg = CONFIG["image"]
@@ -273,6 +278,7 @@ def start_scrolling_display(cover_img: Image.Image, artist: str, title: str):
 
 
 def show_fallback_image():
+    CONFIG = read_config()
     debug_log = CONFIG["debug"]["logs"]
     fallback_cfg = CONFIG.get("fallback", {})
     if not fallback_cfg.get("enabled", False):

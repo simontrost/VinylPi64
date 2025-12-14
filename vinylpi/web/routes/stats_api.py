@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify
-from ..services.stats import get_top_stats
+from vinylpi.web.services.stats import get_top_stats
 
 stats_bp = Blueprint("stats_api", __name__)
 

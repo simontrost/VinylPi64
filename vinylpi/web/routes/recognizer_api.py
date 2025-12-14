@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify
-from ..services.recognizer import is_running, start, stop
-from ..services.config import read_config
+from vinylpi.web.services.recognizer import is_running, start, stop
+from vinylpi.web.services.config import read_config
 
 recognizer_bp = Blueprint("recognizer_api", __name__)
 
