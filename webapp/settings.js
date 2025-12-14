@@ -199,6 +199,10 @@ async function loadConfig() {
         divoom.ip || "";
     document.getElementById("divoomDeviceName").value =
         divoom.device_name || "";
+    document.getElementByID("divoomDeviceID").value = 
+        divoom.device_id || "";
+    document.getElementById("divoomDeviceMAC").value = 
+        divoom.device_mac || "";
     document.getElementById("divoomTimeout").value =
         divoom.timeout ?? 2.0;
     document.getElementById("divoomAutoResetGif").checked =
