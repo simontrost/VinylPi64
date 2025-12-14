@@ -199,7 +199,7 @@ async function loadConfig() {
         divoom.ip || "";
     document.getElementById("divoomDeviceName").value =
         divoom.device_name || "";
-    document.getElementByID("divoomDeviceID").value = 
+    document.getElementById("divoomDeviceID").value = 
         divoom.device_id || "";
     document.getElementById("divoomDeviceMAC").value = 
         divoom.device_mac || "";
