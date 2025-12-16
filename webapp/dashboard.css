@@ -52,29 +52,28 @@
 .hidden { display: none; }
 
 .lyrics-section{
-  display: block;
-  width: 100%;
+  width: var(--content-w);
   max-width: var(--content-max);
   margin: 10px auto 0 auto;
+  display: block;
 }
 
 .lyrics-card{
   width: 100%;
-  max-width: var(--content-max);
   box-sizing: border-box;
-  background: #181818;
-  border-radius: 16px;
-  padding: 14px;
-  box-shadow: 0 4px 14px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.03);
 }
 
 .lyrics-card:not(.expanded){
   max-width: 360px;
+  margin: 0 auto;
 }
 
 .lyrics-card.expanded{
   max-width: var(--content-max);
+  width: 100%;
+  margin: 0 auto;
 }
+
 
 .lyrics-box{
   background: #101010;
@@ -92,11 +91,9 @@
 }
 
 .lyrics-footer{
-  margin-top: 12px;
-  display: flex;
-  gap: 10px;
-  width: 100%;
+  justify-content: space-between;
 }
+
 
 #btn-lyrics, #btn-lyrics-toggle{
   flex: 1;
