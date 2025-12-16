@@ -15,40 +15,45 @@ def _tokens(s: str) -> set[str]:
 
 
 def search_genius(artist: str, title: str) -> str | None:
-    query = quote_plus(f"{artist} {title}")
-    url = f"https://genius.com/search?q={query}"
+    q = f"{artist} {title}"
+    api = f"https://genius.com/api/search/multi?q={quote_plus(q)}"
 
-    r = requests.get(url, headers=HEADERS, timeout=10, allow_redirects=True)
+    r = requests.get(api, headers=HEADERS, timeout=10)
     r.raise_for_status()
+    data = r.json()
 
-    if "/search" not in r.url or "q=" not in r.url:
-        return None
-
-    soup = BeautifulSoup(r.text, "html.parser")
-
-    candidates = [a.get("href") for a in soup.select('a[href^="https://genius.com/"][href$="-lyrics"]')]
-    candidates = [c for c in candidates if c]  # None raus
-
-    if not candidates:
-        return None
-
-    want = _tokens(artist) | _tokens(title)
+    want_artist = _tokens(artist)
+    want_title  = _tokens(title)
 
     best_url = None
-    best_score = -1
-    for href in candidates:
-        slug = href.rsplit("/", 1)[-1].replace("-", " ")
-        have = _tokens(slug)
-        score = len(want & have)
+    best_score = -10_000
 
-        if score > best_score:
-            best_score = score
-            best_url = href
+    for sec in data.get("response", {}).get("sections", []):
+        if sec.get("type") not in {"song", "top_hit"}:
+            continue
 
-    if best_score <= 0:
+        for hit in sec.get("hits", []):
+            res = hit.get("result") or {}
+            url = res.get("url")
+            if not url or not url.startswith("https://genius.com/") or not url.endswith("-lyrics"):
+                continue
+
+            have_title = _tokens(res.get("title", ""))
+            have_artist = _tokens((res.get("primary_artist") or {}).get("name", ""))
+
+            overlap = len(want_title & have_title) + len(want_artist & have_artist)
+            extras  = len((have_title | have_artist) - (want_title | want_artist))
+            score = overlap * 3 - extras 
+
+            if score > best_score:
+                best_score = score
+                best_url = url
+
+    if best_score < 3:
         return None
 
     return best_url
+
 
 
 def fetch_lyrics(genius_url: str) -> str | None:
