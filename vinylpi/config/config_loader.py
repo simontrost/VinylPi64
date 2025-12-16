@@ -16,7 +16,7 @@ CONFIG_DEFAULTS = {
         "cover_size": 46,
         "margin_image_text": 3,
         "line_spacing_margin": 3,
-        "font_path": "assets/fonts/rasbpixel.ttf",
+        "font_path": "assets/fonts/vinylpixel.ttf",
         "font_size": 5,
         "use_dynamic_bg": True,
         "manual_bg_color": [0, 0, 0],

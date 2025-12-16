@@ -43,7 +43,12 @@ If you use different hardware, you will most likely have to modify parts of the 
   - marquee text for long titles/bands
   - fallback image
 - Send results to pixel diplay
-- local WebApp with dashboard and settings
+- local WebApp:
+  - dashboard with current song, lyrics and switch (on/off)
+  - settings: configure vinylpi
+  - pixoo: configure your divoom pixoo
+  - statistics: keeps track of your listened minutes, songs, artists and albums
+  - about: support me :)
 ---
 
 ## Example Output
@@ -62,11 +67,11 @@ If you use different hardware, you will most likely have to modify parts of the 
 
 ### WebApp Mobile
 
-| <img src="assets/readme/webapp_dashboard_mobile.jpeg" height="600" /> | <img src="assets/readme/webapp_settings_mobile.jpeg" height="600" /> |
+| <img src="assets/readme/webapp_dashboard_mobile.PNG" height="600" /> | <img src="assets/readme/webapp_pixoo_mobile.PNG" height="600" /> |
 
 ### WebApp Desktop
 
-| <img src="assets/readme/webapp_statistics_desktop.png" width="600" /> | <img src="assets/readme/webapp_pixoo_desktop.png" width="600" /> |
+| <img src="assets/readme/webapp_statistics_desktop.png" width="600" /> | <img src="assets/readme/webapp_settings_desktop.png" width="600" /> |
 
 
 ## Installation
@@ -109,22 +114,17 @@ eg:  `0 USB AUDIO CODEC: Audio (hw:0,0), ALSA (2 in, 2 out)`
 hint: you might also want to get ffmpeg `sudo apt install ffmpeg`
 
 ### 5. Configuration:
+If you don't want to use the web interface, you will have toi edit the config manually
 ```bash
 nano config.json
 ```
-Configure:
-- the Pixoo IP (or enable subnet discovery)
-- the audio device name
-- fallback image path
-- preview paths
-- debug logs, etc
 
 ### 6. Execute
 with active env:
 ```bash
 python vinylpi/dashboard.py
 ```
-hint: you can start the actual music detection from the webapp: `http://vinylpi.local:5000/`or via `python vinylpi/main.py`
+hint: you can start the actual music detection from the webapp: `http://vinylpi.local:8080/`or via `python vinylpi/main.py`
 
 ## Autostart on boot
 
@@ -145,7 +145,7 @@ Wants=network-online.target
 User=pi
 WorkingDirectory=/home/pi/VinylPi64
 #ExecStart=/home/pi/VinylPi64/venv/bin/gunicorn --bind 0.0.0.0:5000 vinylpi.dashboard:app
-ExecStart=/home/simon/VinylPi64/venv/bin/python3 -m vinylpi.dashboard
+ExecStart=/home/simon/VinylPi64/venv/bin/python3 -m vinylpi.web.dashboard
 Restart=on-failure
 
 [Install]
