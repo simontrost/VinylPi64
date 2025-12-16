@@ -1,8 +1,8 @@
 from flask import Blueprint, jsonify, request
 from vinylpi.integrations.divoom_api import PixooError
-from ..services import pixoo
-from ..services.config import read_config, write_config
-from vinylpi.config.config_loader import CONFIG_DEFAULTS, reload_config
+from vinylpi.web.services import pixoo
+from vinylpi.web.services.config import read_config, write_config
+from vinylpi.config.config_loader import CONFIG_DEFAULTS
 
 pixoo_bp = Blueprint("pixoo_api", __name__)
 

@@ -2,11 +2,13 @@ import sounddevice as sd
 import soundfile as sf
 import io
 
-from vinylpi.config.config_loader import CONFIG
+from vinylpi.web.services.config import read_config
+
 
 def auto_detect_usb_device():
-    needle = CONFIG["audio"]["device_name_contains"].upper()
-    debug_log = CONFIG["debug"]["logs"]
+    cfg = read_config()
+    needle = (cfg["audio"]["device_name_contains"] or "").upper()
+    debug_log = bool(cfg["debug"]["logs"])
 
     devices = sd.query_devices()
     for idx, dev in enumerate(devices):
@@ -21,13 +23,15 @@ def auto_detect_usb_device():
     return None
 
 def record_sample():
-    debug_log = CONFIG["debug"]["logs"]
-    audio_cfg = CONFIG["audio"]
-    debug_cfg = CONFIG["debug"]
-    sample_rate = audio_cfg["sample_rate"]
-    seconds = audio_cfg["sample_seconds"]
-    channels = audio_cfg["channels"]
-    debug_wav_path = debug_cfg["wav_path"]
+    cfg = read_config()
+    debug_log = bool(cfg["debug"]["logs"])
+    audio_cfg = cfg["audio"]
+    debug_cfg = cfg["debug"]
+
+    sample_rate = int(audio_cfg["sample_rate"])
+    seconds = float(audio_cfg["sample_seconds"])
+    channels = int(audio_cfg["channels"])
+    debug_wav_path = debug_cfg.get("wav_path") or ""
 
     audio = sd.rec(int(seconds * sample_rate), samplerate=sample_rate,
                    channels=channels, dtype="int16")

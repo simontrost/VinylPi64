@@ -1,3 +1,5 @@
+let CURRENT_TRACK = { artist: "", title: "" };
+
 async function loadStatus() {
     try {
         const r = await fetch("/api/status");
@@ -25,6 +27,9 @@ async function loadStatus() {
         albumEl.innerText = album ? `${album}` : "";
 
         coverEl.src = st.cover_url || "/logo.png";
+
+        CURRENT_TRACK.artist = artist;
+        CURRENT_TRACK.title = title;
 
     } catch (e) {
         console.error(e);
@@ -59,6 +64,26 @@ async function loadRecognizerStatus() {
         statusEl.classList.remove("rec-status-running", "rec-status-stopped");
     }
 }
+
+async function showLyrics() {
+    const r = await fetch("/api/status");
+    const st = await r.json();
+
+    const artist = st.artist;
+    const title = st.title;
+
+    const lr = await fetch(`/api/lyrics?artist=${encodeURIComponent(artist)}&title=${encodeURIComponent(title)}`);
+    const res = await lr.json();
+
+    if (!res.ok) {
+        window.open(`https://genius.com/search?q=${encodeURIComponent(artist + " " + title)}`);
+        return;
+    }
+
+    document.getElementById("lyrics-box").innerText = res.lyrics;
+}
+
+
 
 async function setRecognizerRunning(shouldRun) {
     const toggle = document.getElementById("recognizerToggle");
@@ -95,6 +120,59 @@ document.addEventListener("DOMContentLoaded", () => {
 
     statusInterval = setInterval(loadStatus, 15000);
     recInterval = setInterval(loadRecognizerStatus, 15000);
+
+    const btnLyrics = document.getElementById("btn-lyrics");
+    const btnToggle = document.getElementById("btn-lyrics-toggle");
+    const box = document.getElementById("lyrics-box");
+
+    if (btnLyrics && btnToggle && box) {
+        btnLyrics.addEventListener("click", async () => {
+            box.classList.remove("hidden");
+            box.textContent = "Loading lyrics...";
+
+            const artist = (CURRENT_TRACK.artist || "").trim();
+            const title = (CURRENT_TRACK.title || "").trim();
+            if (!artist || !title) {
+                box.textContent = "No track information available.";
+                return;
+            }
+
+            try {
+                const lr = await fetch(`/api/lyrics?artist=${encodeURIComponent(artist)}&title=${encodeURIComponent(title)}`);
+                const res = await lr.json();
+
+                if (!res.ok || !res.lyrics) {
+                    box.textContent = "No lyrics found. Opening Genius...";
+                    window.open(`https://genius.com/search?q=${encodeURIComponent(artist + " " + title)}`, "_blank", "noopener,noreferrer");
+                    return;
+                }
+
+                box.textContent = res.lyrics;
+
+                box.classList.add("collapsed");
+                btnToggle.classList.remove("hidden");
+                btnToggle.textContent = "More";
+                const card = document.getElementById("lyrics-card");
+                if (card) card.classList.remove("expanded");
+
+            } catch (e) {
+                console.error(e);
+                box.textContent = "Error loading lyrics.";
+            }
+        });
+
+        const card = document.getElementById("lyrics-card");
+
+        btnToggle.addEventListener("click", () => {
+            const collapsed = box.classList.toggle("collapsed");
+
+            if (card) card.classList.toggle("expanded", !collapsed);
+
+            btnToggle.textContent = collapsed ? "More" : "Less";
+        });
+
+    }
+
 });
 
 document.addEventListener("visibilitychange", () => {

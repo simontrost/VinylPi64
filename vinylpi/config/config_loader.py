@@ -8,8 +8,7 @@ CONFIG_DEFAULTS = {
         "device_name_contains": "USB AUDIO",
         "sample_seconds": 4,
         "sample_rate": 44100,
-        "channels": 1,
-        "output_wav": ""
+        "channels": 1
     },
     "image": {
         "canvas_size": 64,
@@ -59,7 +58,6 @@ CONFIG_DEFAULTS = {
     },
 }
 
-
 def deep_update(base: dict, updates: dict) -> dict:
     for k, v in updates.items():
         if isinstance(v, dict) and isinstance(base.get(k), dict):
@@ -70,26 +68,15 @@ def deep_update(base: dict, updates: dict) -> dict:
 
 def load_config(path: Path | str | None = None) -> dict:
     path = Path(path) if path is not None else CONFIG_PATH
-
     cfg = deepcopy(CONFIG_DEFAULTS)
 
     try:
         user_cfg = json.loads(path.read_text(encoding="utf-8"))
         if isinstance(user_cfg, dict):
             deep_update(cfg, user_cfg)
-        print(f"Config found at: {path}")
     except FileNotFoundError:
-        print(f"No config was found at {path}, using defaults.")
-    except Exception as e:
-        print(f"Config is invalid at {path} (using defaults): {e}")
+        pass
+    except Exception:
+        pass
 
     return cfg
-
-CONFIG = load_config()
-
-def reload_config(path: Path | str | None = None) -> dict:
-    global CONFIG
-    new_cfg = load_config(path)
-    CONFIG.clear()
-    CONFIG.update(new_cfg)
-    return CONFIG

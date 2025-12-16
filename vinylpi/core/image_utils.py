@@ -5,7 +5,7 @@ import colorsys
 import requests
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
-from vinylpi.config.config_loader import CONFIG
+from vinylpi.web.services.config import read_config
 
 def load_image(path_or_url: str) -> Image.Image:
     if not path_or_url:
@@ -40,6 +40,7 @@ _font_cache: dict[tuple[str, int], ImageFont.FreeTypeFont] = {}
 
 
 def _load_font(size: int) -> ImageFont.FreeTypeFont:
+    CONFIG = read_config()
     img_cfg = CONFIG["image"]
     font_path = img_cfg["font_path"]
     cache_key = (font_path, size)
@@ -63,6 +64,7 @@ def _measure_text_height(font: ImageFont.FreeTypeFont, text: str = "A") -> int:
     return bbox[3] - bbox[1]
 
 def _get_font_for_config() -> tuple[ImageFont.FreeTypeFont, int]:
+    CONFIG = read_config()
     img_cfg = CONFIG["image"]
     TARGET_GLYPH_HEIGHT = img_cfg["font_size"]
 
@@ -81,6 +83,7 @@ def _get_font_for_config() -> tuple[ImageFont.FreeTypeFont, int]:
     return best_font, best_h
 
 def dynamic_text_color(bg_rgb: tuple[int, int, int]) -> tuple[int, int, int]:
+    CONFIG = read_config()
     img_cfg = CONFIG["image"]
     lum_threhsold = img_cfg.get("lum_threshold", 128)
     lum = relative_luminance(bg_rgb)
@@ -152,6 +155,7 @@ def build_static_frame(
     tick: int = 0,
     bg_color: tuple[int, int, int] | None = None,
 ) -> Image.Image:
+    CONFIG = read_config()
     img_cfg = CONFIG["image"]
 
     CANVAS_SIZE = img_cfg["canvas_size"]

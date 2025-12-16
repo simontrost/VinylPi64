@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="de">
+
 <head>
     <meta charset="UTF-8">
     <title>VinylPi Dashboard</title>
@@ -21,7 +22,7 @@
             <a href="stats.html">Statistics</a>
             <a href="about.html">About</a>
         </nav>
-    </aside>    
+    </aside>
 
     <main class="main">
 
@@ -39,22 +40,34 @@
             </div>
         </section>
 
-        <section class="control-section">
-        <div class="control-header">
-            <h2>Music detection</h2>
-            <div id="rec-status-text" class="rec-status-text">Loading status...</div>
-        </div>
+        <section class="lyrics-section">
+            <div class="lyrics-card" id="lyrics-card">
+                <pre id="lyrics-box" class="lyrics-box hidden collapsed"></pre>
 
-        <div class="toggle-row">
-            <span class="toggle-label">Recognition</span>
-            <label class="toggle-switch">
-            <input type="checkbox" id="recognizerToggle">
-            <span class="toggle-slider"></span>
-            </label>
-        </div>
+                <div class="lyrics-footer">
+                    <button id="btn-lyrics" type="button">Lyrics</button>
+                    <button id="btn-lyrics-toggle" type="button" class="hidden">More</button>
+                </div>
+            </div>
+        </section>
+
+        <section class="control-section">
+            <div class="control-header">
+                <h2>Music detection</h2>
+                <div id="rec-status-text" class="rec-status-text">Loading status...</div>
+            </div>
+
+            <div class="toggle-row">
+                <span class="toggle-label">Recognition</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="recognizerToggle">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
         </section>
 
     </main>
 
 </body>
+
 </html>

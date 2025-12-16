@@ -1,10 +1,11 @@
 from __future__ import annotations
 from typing import Optional
 import requests
-from vinylpi.config.config_loader import CONFIG
+from vinylpi.web.services.config import read_config
 
 
 def _probe_ip(ip: str, timeout: float) -> bool:
+    CONFIG = read_config()
     debug_log = CONFIG["debug"]["logs"]
     url = f"http://{ip}/post"
     payload = {"Command": "Channel/GetAllConf"}
@@ -41,6 +42,7 @@ def _probe_ip(ip: str, timeout: float) -> bool:
     return False
 
 def discover_pixoo_ip() -> Optional[str]:
+    CONFIG = read_config()
     debug_log = CONFIG["debug"]["logs"]
     divoom_cfg = CONFIG.get("divoom", {})
     disc_cfg = divoom_cfg.get("discovery", {})

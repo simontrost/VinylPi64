@@ -1,3 +1,8 @@
+:root{
+  --content-max: 1000px;
+  --content-w: min(var(--content-max), 92vw);
+}
+
 .song-section {
     display: flex;
     justify-content: center;
@@ -42,13 +47,87 @@
     opacity: 0.8;
 }
 
-.control-section {
-    margin-top: 1.5rem;
-    padding: 1rem 1.25rem;
-    background: #111;
-    border-radius: 12px;
-    border: 1px solid #333;
+
+/* lyrics Section */
+.hidden { display: none; }
+
+.lyrics-section{
+  width: var(--content-w);
+  max-width: var(--content-max);
+  margin: 10px auto 0 auto;
+  display: block;
 }
+
+.lyrics-card{
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.lyrics-card:not(.expanded){
+  max-width: 360px;
+  margin: 0 auto;
+}
+
+.lyrics-card.expanded{
+  max-width: var(--content-max);
+  margin: 0 auto;
+}
+
+.lyrics-box{
+  background: #101010;
+  border-radius: 12px;
+  padding: 12px;
+  color: #eee;
+  white-space: pre-wrap;
+  line-height: 1.35;
+  font-size: 13px;
+}
+
+.lyrics-box.collapsed{
+  max-height: 180px;
+  overflow: hidden;
+}
+
+.lyrics-footer{
+  margin-top: 12px;
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
+/* Buttons */
+#btn-lyrics,
+#btn-lyrics-toggle{
+  min-width: 140px;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  color: #fff;
+  font-weight: 600;
+}
+
+#btn-lyrics{ background: #5f2f63; }
+#btn-lyrics-toggle{ background: #2a2a2a; }
+
+#btn-lyrics-toggle.hidden{
+  display: none;
+}
+
+
+
+/* Control Section*/
+.control-section{
+  width: 100%;
+  max-width: var(--content-max);
+  margin: 1.5rem auto 0 auto;
+  padding: 1rem 1.25rem;
+  background: #111;
+  border-radius: 12px;
+  border: 1px solid #333;
+  box-sizing: border-box;
+}
+
 
 .control-header {
     display: flex;

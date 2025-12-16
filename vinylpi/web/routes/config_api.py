@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, request
-from ..services.config import read_config, write_config, reset_config
+from vinylpi.web.services.config import read_config, write_config, reset_config
 
 config_bp = Blueprint("config_api", __name__)
 

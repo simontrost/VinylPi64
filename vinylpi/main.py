@@ -3,29 +3,32 @@ import json
 from pathlib import Path
 from vinylpi.core.audio_capture import record_sample
 from vinylpi.core.recognition import recognize_song, start_scrolling_display, show_fallback_image
-from vinylpi.config.config_loader import CONFIG, reload_config
+from vinylpi.web.services.config import read_config
 from vinylpi.core.statistics import _update_stats, _increment_album_session, add_listen_time_minutes_for_confirmed_song
 from vinylpi.paths import STATUS_PATH, CONFIG_PATH
 
-_last_cfg_mtime = CONFIG_PATH.stat().st_mtime
+_last_cfg_mtime: float | None = None
 
-def _maybe_reload_config() -> bool:
+def maybe_log_config_reload() -> bool:
     global _last_cfg_mtime
+
     try:
         mtime = CONFIG_PATH.stat().st_mtime
     except FileNotFoundError:
         return False
 
-    if mtime != _last_cfg_mtime:
-        reload_config()
+    if _last_cfg_mtime is None:
         _last_cfg_mtime = mtime
-        if CONFIG["debug"]["logs"]:
+        return False
+
+    if mtime != _last_cfg_mtime:
+        _last_cfg_mtime = mtime
+        cfg = read_config(force=True)
+        if cfg.get("debug", {}).get("logs"):
             print("Config reloaded from disk.")
         return True
 
     return False
-
-
 
 def _write_status(artist, title, cover_url=None, album=None):
     data = {
@@ -198,12 +201,19 @@ def _update_album_session_on_switch(
         candidate_streak,
     )
 
-
 def main_loop():
-    delay = CONFIG["behavior"].get("loop_delay_seconds", 10)
-    debug_log = CONFIG["debug"]["logs"]
-    fallback = CONFIG["fallback"]
-    auto_sleep = CONFIG["behavior"].get("auto_sleep", 50)
+    # initial defaults (werden in der Loop überschrieben)
+    delay = 10
+    debug_log = False
+    fallback = {"allowed_failures": 3}
+    auto_sleep = 50
+
+    cfg0 = read_config()
+    delay = cfg0["behavior"].get("loop_delay_seconds", delay)
+    debug_log = cfg0["debug"].get("logs", False)
+    fallback = cfg0.get("fallback", fallback)
+    auto_sleep = cfg0["behavior"].get("auto_sleep", auto_sleep)
+
     if debug_log:
         print(f"\nStarting to loop VinylPi64 (every {delay}s)\n")
 
@@ -220,7 +230,7 @@ def main_loop():
     candidate_streak = 0
 
     MIN_TRACKS_FOR_ALBUM_SESSION = 2
-    MIN_CONSECUTIVE_FOR_SWITCH = 2  
+    MIN_CONSECUTIVE_FOR_SWITCH = 2
 
     # Song-/Artist-Stats-Tracking
     stats_current_song_id = None
@@ -229,12 +239,14 @@ def main_loop():
 
     while True:
         try:
-            cfg_reloaded = _maybe_reload_config()
+            cfg_reloaded = maybe_log_config_reload()
 
-            # reload config
-            delay = CONFIG["behavior"].get("loop_delay_seconds", 10)
-            debug_log = CONFIG["debug"]["logs"]
-            fallback = CONFIG["fallback"]
+            cfg = read_config()
+
+            delay = cfg["behavior"].get("loop_delay_seconds", 10)
+            debug_log = cfg["debug"].get("logs", False)
+            fallback = cfg.get("fallback", {})
+            auto_sleep = cfg["behavior"].get("auto_sleep", 50)
 
             if debug_log:
                 print("Recording sample...")
@@ -253,7 +265,7 @@ def main_loop():
                 if debug_log:
                     print(f"No song detected for (#{consecutive_failures} times in a row).")
 
-                allowed = fallback["allowed_failures"]
+                allowed = int(fallback.get("allowed_failures", 3))
                 fallback_due = (
                     consecutive_failures >= allowed
                     and (not last_display_was_fallback or cfg_reloaded)
@@ -339,7 +351,9 @@ def main_loop():
                         print(f"Listen time not added: {res.get('error')}")
             else:
                 if debug_log and stats_current_song_id is None:
-                    print(f"Song not confirmed yet (streak={stats_candidate_streak}/{MIN_CONSECUTIVE_FOR_SWITCH})")
+                    print(
+                        f"Song not confirmed yet (streak={stats_candidate_streak}/{MIN_CONSECUTIVE_FOR_SWITCH})"
+                    )
 
             (
                 current_album,
@@ -363,6 +377,7 @@ def main_loop():
             print(f"Error in loop: {e}")
 
         time.sleep(delay)
+
 
 
 if __name__ == "__main__":

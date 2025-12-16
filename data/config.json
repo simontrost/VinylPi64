@@ -3,8 +3,7 @@
         "device_name_contains": "USB AUDIO",
         "sample_seconds": 4,
         "sample_rate": 44100,
-        "channels": 1,
-        "output_wav": ""
+        "channels": 1
     },
     "image": {
         "canvas_size": 64,
