@@ -42,6 +42,51 @@
     opacity: 0.8;
 }
 
+/* lyrics Section */
+
+.lyrics-section{
+    display: flex;
+    justify-content: center;
+    margin-top: 10px;
+}
+
+.lyrics-card{
+    width: min(420px, 92vw);
+    padding: 14px;
+    border-radius: 14px;
+    background-color: #181818;
+    box-shadow: 0 4px 14px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.03);
+
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+#btn-lyrics{
+    width: 100%;
+    max-width: none;
+    padding: 11px 18px;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: .4px;
+    color: #fff;
+    background-color: #562c5a;
+    border: none;
+    border-radius: 999px;
+    cursor: pointer;
+}
+
+
+#btn-lyrics:hover {
+    background-color: #ff6b85;
+    transform: translateY(-1px);
+}
+
+#btn-lyrics:active {
+    transform: translateY(0);
+}
+
+
 .control-section {
     margin-top: 1.5rem;
     padding: 1rem 1.25rem;

@@ -7,7 +7,6 @@ from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 from vinylpi.web.services.config import read_config
 
-
 def load_image(path_or_url: str) -> Image.Image:
     if not path_or_url:
         raise ValueError("load_image: path_or_url is None or empty")

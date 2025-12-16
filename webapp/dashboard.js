@@ -60,6 +60,21 @@ async function loadRecognizerStatus() {
     }
 }
 
+async function openLyricsGenius() {
+  const r = await fetch("/api/status");
+  const st = await r.json();
+
+  const artist = st.artist || st.song_artist || (st.track?.artist) || "";
+  const title  = st.title  || st.song_title  || (st.track?.title)  || "";
+
+  const q = `${artist} ${title}`.trim();
+  if (!q) return alert("Kein Song erkannt.");
+
+  const url = `https://genius.com/search?q=${encodeURIComponent(q)}`;
+  window.open(url, "_blank", "noopener,noreferrer");
+}
+
+
 async function setRecognizerRunning(shouldRun) {
     const toggle = document.getElementById("recognizerToggle");
     const statusEl = document.getElementById("rec-status-text");
