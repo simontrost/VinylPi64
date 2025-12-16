@@ -44,88 +44,63 @@
 
 /* lyrics Section */
 
-.lyrics-section{
-    display: flex;
-    justify-content: center;
-    margin-top: 10px;
-}
-
-.lyrics-card{
-    width: min(420px, 92vw);
-    padding: 14px;
-    border-radius: 14px;
-    background-color: #181818;
-    box-shadow: 0 4px 14px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.03);
-
-    display: flex;
-    justify-content: center;
-    align-items: center;
-}
-
-#btn-lyrics{
-    width: 100%;
-    max-width: none;
-    padding: 11px 18px;
-    font-size: 14px;
-    font-weight: 600;
-    letter-spacing: .4px;
-    color: #fff;
-    background-color: #562c5a;
-    border: none;
-    border-radius: 999px;
-    cursor: pointer;
-}
-
-
-#btn-lyrics:hover {
-    background-color: #ff6b85;
-    transform: translateY(-1px);
-}
-
-#btn-lyrics:active {
-    transform: translateY(0);
-}
-
 .hidden { display: none; }
 
-.lyrics-actions{
+.lyrics-section{
   display: flex;
-  gap: 10px;
-  width: 100%;
+  justify-content: center;
+  margin-top: 10px;
 }
 
-#btn-lyrics, #btn-lyrics-toggle{
-  flex: 1;
-  padding: 11px 18px;
-  font-size: 14px;
-  font-weight: 600;
-  color: #fff;
-  background: #ff4d6d;
-  border: none;
-  border-radius: 999px;
-  cursor: pointer;
+/* normal: ähnlich song-card Breite */
+.lyrics-card{
+  width: min(360px, 92vw); 
+  background: #181818;
+  border-radius: 16px;
+  padding: 14px;
+  box-shadow: 0 4px 14px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.03);
 }
 
-#btn-lyrics-toggle{
-  background: #2a2a2a;
+/* expanded: volle Content-Breite */
+.lyrics-card.expanded{
+  width: min(1000px, 92vw);
 }
 
 .lyrics-box{
-  margin-top: 12px;
-  width: 100%;
-  padding: 12px;
-  border-radius: 12px;
   background: #101010;
+  border-radius: 12px;
+  padding: 12px;
   color: #eee;
   white-space: pre-wrap;
   line-height: 1.35;
   font-size: 13px;
 }
 
+/* collapsed = nur Vorschau */
 .lyrics-box.collapsed{
   max-height: 180px;
   overflow: hidden;
 }
+
+/* footer buttons unten mittig */
+.lyrics-footer{
+  margin-top: 12px;
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+
+#btn-lyrics, #btn-lyrics-toggle{
+  padding: 10px 16px;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  color: #fff;
+  font-weight: 600;
+}
+
+#btn-lyrics{ background: #ff4d6d; }
+#btn-lyrics-toggle{ background: #2a2a2a; }
 
 
 /* Control Section*/

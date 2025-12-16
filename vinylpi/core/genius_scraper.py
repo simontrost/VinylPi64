@@ -5,6 +5,17 @@ from urllib.parse import quote_plus
 HEADERS = {
     "User-Agent": "VinylPi/1.0 (non-commercial hobby project)"
 }
+import re
+from urllib.parse import quote_plus
+import requests
+from bs4 import BeautifulSoup
+
+HEADERS = {"User-Agent": "VinylPi/1.0 (non-commercial hobby project)"}
+
+def _tokens(s: str) -> set[str]:
+    s = (s or "").lower()
+    s = re.sub(r"[^a-z0-9]+", " ", s)
+    return {t for t in s.split() if t and t not in {"feat", "ft", "official", "video", "lyrics"}}
 
 def search_genius(artist: str, title: str) -> str | None:
     query = quote_plus(f"{artist} {title}")
@@ -14,12 +25,27 @@ def search_genius(artist: str, title: str) -> str | None:
     r.raise_for_status()
 
     soup = BeautifulSoup(r.text, "html.parser")
-    for a in soup.select("a[href]"):
-        href = a["href"]
-        if href.startswith("https://genius.com/") and href.endswith("-lyrics"):
-            return href
 
-    return None
+    want = _tokens(artist) | _tokens(title)
+
+    best_href = None
+    best_score = -1
+
+    for a in soup.select('a[href^="https://genius.com/"]'):
+        href = a.get("href", "")
+        if not href.endswith("-lyrics"):
+            continue
+
+        slug = href.rsplit("/", 1)[-1]
+        have = _tokens(slug.replace("-", " "))
+
+        score = len(want & have)
+        if score > best_score:
+            best_score = score
+            best_href = href
+
+    return best_href
+
 
 
 def fetch_lyrics(genius_url: str) -> str | None:
