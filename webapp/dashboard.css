@@ -52,23 +52,29 @@
 .hidden { display: none; }
 
 .lyrics-section{
-  display: flex;
-  justify-content: center;
-  margin-top: 10px;
+  display: block;
+  width: 100%;
+  max-width: var(--content-max);
+  margin: 10px auto 0 auto;
 }
 
 .lyrics-card{
-  width: min(360px, 92vw);
+  width: 100%;
+  max-width: var(--content-max);
+  box-sizing: border-box;
   background: #181818;
   border-radius: 16px;
   padding: 14px;
   box-shadow: 0 4px 14px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.03);
 }
 
-.lyrics-card.expanded{
-  width: var(--content-w);
+.lyrics-card:not(.expanded){
+  max-width: 360px;
 }
 
+.lyrics-card.expanded{
+  max-width: var(--content-max);
+}
 
 .lyrics-box{
   background: #101010;
@@ -116,12 +122,14 @@
 
 /* Control Section*/
 .control-section{
-  width: var(--content-w);
+  width: 100%;
+  max-width: var(--content-max);
   margin: 1.5rem auto 0 auto;
   padding: 1rem 1.25rem;
   background: #111;
   border-radius: 12px;
   border: 1px solid #333;
+  box-sizing: border-box;
 }
 
 
