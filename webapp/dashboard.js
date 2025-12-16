@@ -65,18 +65,22 @@ async function loadRecognizerStatus() {
     }
 }
 
-function openLyricsGenius() {
-  const artist = (CURRENT_TRACK.artist || "").trim();
-  const title  = (CURRENT_TRACK.title  || "").trim();
+async function showLyrics() {
+  const r = await fetch("/api/status");
+  const st = await r.json();
 
-  const q = `${artist} ${title}`.trim();
-  if (!q) {
-    alert("No track information available to search for lyrics.");
+  const artist = st.artist;
+  const title = st.title;
+
+  const lr = await fetch(`/api/lyrics?artist=${encodeURIComponent(artist)}&title=${encodeURIComponent(title)}`);
+  const res = await lr.json();
+
+  if (!res.ok) {
+    window.open(`https://genius.com/search?q=${encodeURIComponent(artist + " " + title)}`);
     return;
   }
 
-  const url = `https://genius.com/search?q=${encodeURIComponent(q)}`;
-  window.open(url, "_blank", "noopener,noreferrer");
+  document.getElementById("lyrics-box").innerText = res.lyrics;
 }
 
 

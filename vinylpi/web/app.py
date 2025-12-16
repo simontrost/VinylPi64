@@ -7,6 +7,7 @@ from .routes.recognizer_api import recognizer_bp
 from .routes.pixoo_api import pixoo_bp
 from .routes.stats_api import stats_bp
 from .routes.uploads_api import uploads_bp
+from .routes.genius_api import genius_bp
 
 def create_app() -> Flask:
     app = Flask(
@@ -22,5 +23,6 @@ def create_app() -> Flask:
     app.register_blueprint(pixoo_bp)
     app.register_blueprint(stats_bp)
     app.register_blueprint(uploads_bp)
+    app.register_blueprint(genius_bp)
 
     return app
