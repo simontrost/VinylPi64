@@ -42,9 +42,12 @@
 
         <section class="lyrics-section">
             <div class="lyrics-card">
-                <button id="btn-lyrics" onclick="openLyricsGenius()">
-                    Lyrics
-                </button>
+                <div class="lyrics-actions">
+                    <button id="btn-lyrics" type="button">Lyrics</button>
+                    <button id="btn-lyrics-toggle" type="button" class="hidden">More</button>
+                </div>
+
+                <pre id="lyrics-box" class="lyrics-box hidden"></pre>
             </div>
         </section>
 

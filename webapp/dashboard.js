@@ -120,6 +120,50 @@ document.addEventListener("DOMContentLoaded", () => {
 
     statusInterval = setInterval(loadStatus, 15000);
     recInterval = setInterval(loadRecognizerStatus, 15000);
+
+    const btnLyrics = document.getElementById("btn-lyrics");
+const btnToggle = document.getElementById("btn-lyrics-toggle");
+const box = document.getElementById("lyrics-box");
+
+if (btnLyrics && btnToggle && box) {
+  btnLyrics.addEventListener("click", async () => {
+    box.classList.remove("hidden");
+    box.textContent = "Loading lyrics...";
+
+    const artist = (CURRENT_TRACK.artist || "").trim();
+    const title = (CURRENT_TRACK.title || "").trim();
+    if (!artist || !title) {
+      box.textContent = "No track information available.";
+      return;
+    }
+
+    try {
+      const lr = await fetch(`/api/lyrics?artist=${encodeURIComponent(artist)}&title=${encodeURIComponent(title)}`);
+      const res = await lr.json();
+
+      if (!res.ok || !res.lyrics) {
+        box.textContent = "No lyrics found. Opening Genius...";
+        window.open(`https://genius.com/search?q=${encodeURIComponent(artist + " " + title)}`, "_blank", "noopener,noreferrer");
+        return;
+      }
+
+      box.textContent = res.lyrics;
+
+      box.classList.add("collapsed");
+      btnToggle.classList.remove("hidden");
+      btnToggle.textContent = "More";
+    } catch (e) {
+      console.error(e);
+      box.textContent = "Error loading lyrics.";
+    }
+  });
+
+  btnToggle.addEventListener("click", () => {
+    const collapsed = box.classList.toggle("collapsed");
+    btnToggle.textContent = collapsed ? "More" : "Less";
+  });
+}
+
 });
 
 document.addEventListener("visibilitychange", () => {

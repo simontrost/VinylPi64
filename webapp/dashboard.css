@@ -86,7 +86,49 @@
     transform: translateY(0);
 }
 
+.hidden { display: none; }
 
+.lyrics-actions{
+  display: flex;
+  gap: 10px;
+  width: 100%;
+}
+
+#btn-lyrics, #btn-lyrics-toggle{
+  flex: 1;
+  padding: 11px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  background: #ff4d6d;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+#btn-lyrics-toggle{
+  background: #2a2a2a;
+}
+
+.lyrics-box{
+  margin-top: 12px;
+  width: 100%;
+  padding: 12px;
+  border-radius: 12px;
+  background: #101010;
+  color: #eee;
+  white-space: pre-wrap;
+  line-height: 1.35;
+  font-size: 13px;
+}
+
+.lyrics-box.collapsed{
+  max-height: 180px;
+  overflow: hidden;
+}
+
+
+/* Control Section*/
 .control-section {
     margin-top: 1.5rem;
     padding: 1rem 1.25rem;
