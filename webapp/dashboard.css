@@ -1,3 +1,8 @@
+:root{
+  --content-max: 1000px;
+  --content-w: min(var(--content-max), 92vw);
+}
+
 .song-section {
     display: flex;
     justify-content: center;
@@ -52,19 +57,18 @@
   margin-top: 10px;
 }
 
-/* normal: ähnlich song-card Breite */
 .lyrics-card{
-  width: min(360px, 92vw); 
+  width: min(360px, 92vw);
   background: #181818;
   border-radius: 16px;
   padding: 14px;
   box-shadow: 0 4px 14px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.03);
 }
 
-/* expanded: volle Content-Breite */
 .lyrics-card.expanded{
-  width: min(1000px, 92vw);
+  width: var(--content-w);
 }
+
 
 .lyrics-box{
   background: #101010;
@@ -76,21 +80,21 @@
   font-size: 13px;
 }
 
-/* collapsed = nur Vorschau */
 .lyrics-box.collapsed{
   max-height: 180px;
   overflow: hidden;
 }
 
-/* footer buttons unten mittig */
 .lyrics-footer{
   margin-top: 12px;
   display: flex;
-  justify-content: center;
   gap: 10px;
+  width: 100%;
 }
 
 #btn-lyrics, #btn-lyrics-toggle{
+  flex: 1;
+  min-width: 140px;
   padding: 10px 16px;
   border: none;
   border-radius: 999px;
@@ -102,15 +106,24 @@
 #btn-lyrics{ background: #ff4d6d; }
 #btn-lyrics-toggle{ background: #2a2a2a; }
 
+#btn-lyrics-toggle.hidden{
+  display: none;
+}
+#btn-lyrics-toggle.hidden ~ #btn-lyrics{
+  flex: 1;
+}
+
 
 /* Control Section*/
-.control-section {
-    margin-top: 1.5rem;
-    padding: 1rem 1.25rem;
-    background: #111;
-    border-radius: 12px;
-    border: 1px solid #333;
+.control-section{
+  width: var(--content-w);
+  margin: 1.5rem auto 0 auto;
+  padding: 1rem 1.25rem;
+  background: #111;
+  border-radius: 12px;
+  border: 1px solid #333;
 }
+
 
 .control-header {
     display: flex;
