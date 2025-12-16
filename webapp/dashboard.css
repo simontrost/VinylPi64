@@ -105,8 +105,12 @@
   color: #fff;
   font-weight: 600;
 }
+#btn-lyrics{
+  background: #5e2e62; 
+  display: block;
+  margin: 14px auto 0 auto;
+}
 
-#btn-lyrics{ background: #ff4d6d; }
 #btn-lyrics-toggle{ background: #2a2a2a; }
 
 #btn-lyrics-toggle.hidden{
