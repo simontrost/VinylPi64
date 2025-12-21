@@ -220,6 +220,8 @@ async function loadConfig() {
     // BEHAVIOR
     document.getElementById("behaviorLoopDelay").value =
         behavior.loop_delay_seconds ?? 1;
+    document.getElementById("behaviorAutoSleep").value =
+        behavior.auto_sleep ?? 50;
 
     // DEBUG
     document.getElementById("debugLogs").checked =
