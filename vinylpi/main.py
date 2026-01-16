@@ -42,25 +42,30 @@ def variant_score(title: str, album: str | None) -> int:
 
     score = 0
 
-    if "live" in t:
-        score -= 100
-    if "acoustic" in t:
-        score -= 80
-    if "cover" in t:
-        score -= 80
-    if "remix" in t:
-        score -= 60
-    if "instrumental" in t:
-        score -= 40
-    if "remaster" in t:
-        score -= 20
-    if "greatest hits" in a:
-        score -= 30
-    if "compilation" in a:
-        score -= 30
+    is_live = "live" in t or "unplugged" in t
+    is_remix = "remix" in t
+    is_cover = "cover" in t
+    is_instrumental = "instrumental" in t
+    is_remaster = "remaster" in t
 
-    if album and not any(x in a for x in ["live", "hits", "best of"]):
-        score += 20
+    if is_cover:
+        score -= 100
+    elif is_remix:
+        score -= 60
+    elif is_instrumental:
+        score -= 40
+    elif is_remaster:
+        score -= 10
+    elif is_live:
+        score -= 20
+
+    if album:
+        if "greatest hits" in a or "compilation" in a:
+            score -= 20
+        elif not is_live:
+            score += 20
+        else:
+            score += 10
 
     return score
 
@@ -376,26 +381,31 @@ def main_loop():
                 artist.strip().casefold(),
                 canonical_title,
             )
-
             score = variant_score(title, album)
 
+            better_variant = False
             is_same_canonical = song_id == last_song_id
 
             if is_same_canonical:
                 if last_song_variant_score is not None and score <= last_song_variant_score:
-                    # Schlechtere oder gleiche Variante → IGNORIEREN
                     if debug_log:
                         print("Same song, worse or equal variant – ignoring.")
                     time.sleep(delay)
                     continue
                 else:
+                    if last_song_variant_score is not None and score > last_song_variant_score:
+                        better_variant = True
                     last_song_variant_score = score
 
 
             is_same_song = (song_id == last_song_id)
             should_skip_pixoo = (
-                is_same_song and not last_display_was_fallback and not cfg_reloaded
+                is_same_song
+                and not last_display_was_fallback
+                and not cfg_reloaded
+                and not better_variant
             )
+
 
             if should_skip_pixoo:
                 if debug_log:
@@ -408,11 +418,11 @@ def main_loop():
                     is_same_song=is_same_song,
                 )
 
-                start_scrolling_display(cover_img, artist, title)
+                start_scrolling_display(cover_img, artist, canonical_title)
                 last_song_id = song_id
                 last_song_variant_score = score
                 last_display_was_fallback = False
-                _write_status(artist, title, cover_url=cover_url, album=album)
+                _write_status(artist, canonical_title, cover_url=cover_url, album=album)
 
             (
                 stats_current_song_id,
@@ -454,7 +464,7 @@ def main_loop():
                 candidate_streak,
             ) = _update_album_session_on_switch(
                 album=album,
-                title=title,
+                title=canonical_title,
                 current_album=current_album,
                 current_album_unique_tracks=current_album_unique_tracks,
                 current_album_session_counted=current_album_session_counted,
