@@ -1,6 +1,5 @@
 import time
 import json
-from pathlib import Path
 from vinylpi.core.audio_capture import record_sample
 from vinylpi.core.recognition import recognize_song, start_scrolling_display, show_fallback_image
 from vinylpi.web.services.config import read_config
@@ -8,6 +7,79 @@ from vinylpi.core.statistics import _update_stats, _increment_album_session, add
 from vinylpi.paths import STATUS_PATH, CONFIG_PATH
 
 _last_cfg_mtime: float | None = None
+
+
+import re
+
+_REMOVED_SUFFIXES = [
+    r"\(.*?remaster.*?\)",
+    r"\(.*?remastered.*?\)",
+    r"\(.*?remix.*?\)", 
+    r"\(.*?version.*?\)",
+    r"\(.*?edit.*?\)",
+    r"\(.*?deluxe.*?\)",
+    r"\(.*?mono.*?\)",
+    r"\(.*?stereo.*?\)",
+    r"\(.*?reissue.*?\)",
+    r"\(.*?\d{4}.*?\)",
+]
+
+_REMOVED_KEYWORDS = [
+    "remaster",
+    "remix",
+    "remastered",
+    "version",
+    "edit",
+    "deluxe",
+    "mono",
+    "stereo",
+    "reissue",
+]
+
+def variant_score(title: str, album: str | None) -> int:
+    t = title.lower()
+    a = (album or "").lower()
+
+    score = 0
+
+    if "live" in t:
+        score -= 100
+    if "acoustic" in t:
+        score -= 80
+    if "cover" in t:
+        score -= 80
+    if "remix" in t:
+        score -= 60
+    if "instrumental" in t:
+        score -= 40
+    if "remaster" in t:
+        score -= 20
+    if "greatest hits" in a:
+        score -= 30
+    if "compilation" in a:
+        score -= 30
+
+    if album and not any(x in a for x in ["live", "hits", "best of"]):
+        score += 20
+
+    return score
+
+
+def canonicalize_title(title: str) -> str:
+    t = title.lower()
+
+    for pat in _REMOVED_SUFFIXES:
+        t = re.sub(pat, "", t)
+
+    t = re.split(r"\s+-\s+", t)[0]
+
+    for kw in _REMOVED_KEYWORDS:
+        t = re.sub(rf"\b{re.escape(kw)}\b", "", t)
+
+    t = re.sub(r"\s+", " ", t).strip()
+
+    return t
+
 
 def maybe_log_config_reload() -> bool:
     global _last_cfg_mtime
@@ -219,6 +291,7 @@ def main_loop():
 
     # Pixoo / display-status
     last_song_id = None
+    last_song_variant_score = None
     last_display_was_fallback = False
     consecutive_failures = 0
 
@@ -297,10 +370,27 @@ def main_loop():
                 time.sleep(delay)
                 continue
 
+            canonical_title = canonicalize_title(title)
+
             song_id = (
                 artist.strip().casefold(),
-                title.strip().casefold(),
+                canonical_title,
             )
+
+            score = variant_score(title, album)
+
+            is_same_canonical = song_id == last_song_id
+
+            if is_same_canonical:
+                if last_song_variant_score is not None and score <= last_song_variant_score:
+                    # Schlechtere oder gleiche Variante → IGNORIEREN
+                    if debug_log:
+                        print("Same song, worse or equal variant – ignoring.")
+                    time.sleep(delay)
+                    continue
+                else:
+                    last_song_variant_score = score
+
 
             is_same_song = (song_id == last_song_id)
             should_skip_pixoo = (
@@ -320,6 +410,7 @@ def main_loop():
 
                 start_scrolling_display(cover_img, artist, title)
                 last_song_id = song_id
+                last_song_variant_score = score
                 last_display_was_fallback = False
                 _write_status(artist, title, cover_url=cover_url, album=album)
 
@@ -331,7 +422,7 @@ def main_loop():
             ) = _update_song_stats_on_switch(
                 song_id=song_id,
                 artist=artist,
-                title=title,
+                title=canonical_title,
                 album=album,
                 stats_current_song_id=stats_current_song_id,
                 stats_candidate_song_id=stats_candidate_song_id,
@@ -340,7 +431,7 @@ def main_loop():
             )
 
             if did_confirm_switch:
-                res = add_listen_time_minutes_for_confirmed_song(artist, title, album)
+                res = add_listen_time_minutes_for_confirmed_song(artist, canonical_title, album)
                 if debug_log:
                     if res.get("ok"):
                         print(
