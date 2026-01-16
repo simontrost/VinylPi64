@@ -55,6 +55,10 @@ def handle_no_result(cfg: LoopConfig, disp: DisplayState, cfg_reloaded: bool) ->
 
 def should_update_display(*, disp: DisplayState, song_id: tuple[str, str], score: int) -> tuple[bool, bool]:
     is_same_song = (song_id == disp.last_song_id)
+
+    if is_same_song and disp.last_display_was_fallback:
+        return (True, False)
+
     better_variant = False
 
     if is_same_song:
