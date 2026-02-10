@@ -8,6 +8,7 @@ from .routes.pixoo_api import pixoo_bp
 from .routes.stats_api import stats_bp
 from .routes.uploads_api import uploads_bp
 from .routes.genius_api import genius_bp
+from vinylpi.web.routes.ha_api import bp as ha_api_bp
 
 def create_app() -> Flask:
     app = Flask(
@@ -24,5 +25,5 @@ def create_app() -> Flask:
     app.register_blueprint(stats_bp)
     app.register_blueprint(uploads_bp)
     app.register_blueprint(genius_bp)
-
+    app.register_blueprint(ha_api_bp)
     return app

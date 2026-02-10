@@ -79,7 +79,7 @@ If you use different hardware, you will most likely have to modify parts of the 
 
 ### 0. Install OS on the Raspberry Pi
 
-- I recommend using **Raspberry Pi OS Lite (64-bit)** for best performance (again I am using the Raspberry PI zero 2 w). 
+- I recommend using **Raspberry Pi OS Lite (64-bit)** for best performance (again I am using the Raspberry Pi zero 2 w). 
 - Flash it using the official [**Raspberry Pi Imager**](https://www.raspberrypi.com/software/).
 - Enable SSH during flashing.  
 - Boot the Pi and connect via SSH:
@@ -110,11 +110,11 @@ hint: you might need to `pip install --upgrade pip` first
 ```
 arecord -l
 ```
-eg:  `0 USB AUDIO CODEC: Audio (hw:0,0), ALSA (2 in, 2 out)`
+eg:  `0 USB AUDIO CODEC: Audio (hw:0,0), ALSA (2 in, 2 out)`  
 hint: you might also want to get ffmpeg `sudo apt install ffmpeg`
 
 ### 5. Configuration:
-If you don't want to use the web interface, you will have toi edit the config manually
+If you don't want to use the web interface, you will have to edit the config manually
 ```bash
 nano config.json
 ```
@@ -145,7 +145,7 @@ Wants=network-online.target
 User=pi
 WorkingDirectory=/home/pi/VinylPi64
 #ExecStart=/home/pi/VinylPi64/venv/bin/gunicorn --bind 0.0.0.0:5000 vinylpi.dashboard:app
-ExecStart=/home/simon/VinylPi64/venv/bin/python3 -m vinylpi.web.dashboard
+ExecStart=/home/pi/VinylPi64/venv/bin/python3 -m vinylpi.web.dashboard
 Restart=on-failure
 
 [Install]
