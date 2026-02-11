@@ -1,5 +1,18 @@
 import re
 
+_LIVE_MARKERS = (
+    "live",
+    "unplugged",
+    "acoustic",
+    "session",
+    "mtv unplugged",
+    "radio",
+    "bbc",
+    "kexp",
+    "music bank",
+)
+
+
 _REMOVED_SUFFIXES = [
     r"\(.*?remaster.*?\)",
     r"\(.*?remastered.*?\)",
@@ -73,6 +86,10 @@ def variant_score(title: str, album: str | None) -> int:
 
     return score
 
+def is_live_variant(title: str, album: str | None) -> bool:
+    t = (title or "").lower()
+    a = (album or "").lower()
+    return any(m in t for m in _LIVE_MARKERS) or any(m in a for m in _LIVE_MARKERS)
 
 
 def canonicalize_title(title: str) -> str:

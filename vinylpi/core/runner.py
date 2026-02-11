@@ -3,7 +3,7 @@ from vinylpi.core.audio_capture import record_sample
 from vinylpi.core.recognition import recognize_song
 from vinylpi.web.services.config import read_config
 from vinylpi.config.config_watcher import maybe_log_config_reload
-
+from vinylpi.core.title_variants import is_live_variant
 from vinylpi.core.loop_state import LoopConfig, DisplayState, AlbumState, StatsSwitchState
 from vinylpi.core.loop_logic import (
     handle_no_result,
@@ -41,11 +41,24 @@ def main_loop():
 
             result = recognize_song(wav_bytes)
 
-            if result is None:
-                if handle_no_result(cfg, disp, cfg_reloaded):
-                    break
-                time.sleep(cfg.delay)
-                continue
+            if result is not None:
+                artist, title, cover_img, album, cover_url = result
+
+                locked = bool(album_state.current_album_session_counted and album_state.current_album)
+                if locked and album:
+                    locked_album = album_state.current_album
+
+                    if album.strip() != locked_album.strip() and is_live_variant(title, album):
+                        if cfg.debug_log:
+                            print(
+                                f"Ignoring live/unplugged mismatch: detected album='{album}' "
+                                f"but locked_album='{locked_album}' (title='{title}')"
+                            )
+
+                        if handle_no_result(cfg, disp, cfg_reloaded):
+                            break
+                        time.sleep(cfg.delay)
+                        continue
 
             info = handle_song_result(cfg, disp, cfg_reloaded, result)
             if info is None:
