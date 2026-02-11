@@ -1,7 +1,8 @@
 from vinylpi.core.recognition import start_scrolling_display, show_fallback_image
 from vinylpi.core.title_variants import canonicalize_title, variant_score
 from vinylpi.core.status import write_status
-
+from vinylpi.core.image_utils import dynamic_bg_color
+from vinylpi.web.routes.ha_api import send_rgb_to_ha
 from vinylpi.core.statistics import (
     _update_stats,
     _increment_album_session,
@@ -118,6 +119,12 @@ def handle_song_result(cfg: LoopConfig, disp: DisplayState, cfg_reloaded: bool, 
     )
 
     start_scrolling_display(cover_img, artist, canonical_title)
+    try:
+        rgb = dynamic_bg_color(cover_img)
+        send_rgb_to_ha(rgb)
+    except Exception as e:
+        if cfg.debug_log:
+            print(f"[HA] Could not compute/send RGB: {e}")
 
     disp.last_song_id = song_id
     disp.last_song_variant_score = score

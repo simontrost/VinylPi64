@@ -1,5 +1,6 @@
 from __future__ import annotations
-
+import os
+import requests
 from flask import Blueprint, request, jsonify, abort
 
 from vinylpi.web.services import pixoo
@@ -8,6 +9,13 @@ from vinylpi.web.services import recognizer
 bp = Blueprint("ha_api", __name__, url_prefix="/api/ha")
 
 API_TOKEN = "CHANGE_ME"
+
+HA_WEBHOOK_URL = os.getenv(
+    "HA_WEBHOOK_URL",
+    "http://192.168.2.40:8123/api/webhook/vinylpi_cover_color"
+)
+
+_last_sent_rgb = None
 
 def require_token():
     token = request.headers.get("X-Api-Token", "")
@@ -19,6 +27,22 @@ DESIGN_PRESETS = {
     "lofi": "123456",
     "waves": "ABCDEF",
 }
+
+def send_rgb_to_ha(rgb):
+    global _last_sent_rgb
+    if rgb == _last_sent_rgb:
+        return
+    _last_sent_rgb = rgb
+
+    r, g, b = rgb
+    try:
+        requests.post(
+            HA_WEBHOOK_URL,
+            json={"r": int(r), "g": int(g), "b": int(b)},
+            timeout=2,
+        ).raise_for_status()
+    except Exception as e:
+        print(f"[HA] Failed sending RGB: {e}")
 
 @bp.post("/design/<name>")
 def show_design(name: str):
@@ -43,7 +67,6 @@ def music_mode_off():
     require_token()
     stopped = recognizer.stop()
     return jsonify({"ok": True, "stopped": stopped})
-
 
 @bp.post("/off")
 def pixoo_off():
