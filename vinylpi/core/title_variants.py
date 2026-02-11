@@ -41,11 +41,15 @@ def variant_score(title: str, album: str | None) -> int:
 
     score = 0
 
-    is_live = "live" in t or "unplugged" in t
-    is_remix = "remix" in t
-    is_cover = "cover" in t
-    is_instrumental = "instrumental" in t
-    is_remaster = "remaster" in t
+    live_markers = ("live", "unplugged", "session", "acoustic", "mtv unplugged", "radio", "bbc", "kexp")
+    is_live = any(m in t for m in live_markers) or any(m in a for m in live_markers)
+
+    remix_markers = ("remix",)
+    is_remix = any(m in t for m in remix_markers) or any(m in a for m in remix_markers)
+
+    is_cover = "cover" in t or "cover" in a
+    is_instrumental = "instrumental" in t or "instrumental" in a
+    is_remaster = "remaster" in t or "remaster" in a
 
     if is_cover:
         score -= 100
@@ -53,20 +57,22 @@ def variant_score(title: str, album: str | None) -> int:
         score -= 60
     elif is_instrumental:
         score -= 40
+    elif is_live:
+        score -= 60
     elif is_remaster:
         score -= 10
-    elif is_live:
-        score -= 20
 
     if album:
         if "greatest hits" in a or "compilation" in a:
             score -= 20
-        elif not is_live:
+
+        if not is_live:
             score += 20
         else:
-            score += 10
+            score += 0
 
     return score
+
 
 
 def canonicalize_title(title: str) -> str:
