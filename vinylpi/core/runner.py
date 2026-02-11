@@ -40,6 +40,11 @@ def main_loop():
                 continue
 
             result = recognize_song(wav_bytes)
+            if result is None:
+                if handle_no_result(cfg, disp, cfg_reloaded):
+                    break
+                time.sleep(cfg.delay)
+                continue
 
             if result is not None:
                 artist, title, cover_img, album, cover_url = result
