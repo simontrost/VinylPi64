@@ -61,7 +61,7 @@
     },
     "homeassistant": {
         "use_ha": true,
-        "base_url": "http://minecraftserver:8123",
+        "base_url": "",
         "webhook_id": "vinylpi_cover_color"
-}
+    }
 }

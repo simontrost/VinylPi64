@@ -56,6 +56,11 @@ CONFIG_DEFAULTS = {
         "loop_delay_seconds": 1,
         "auto_sleep": 30
     },
+    "homeassistant": {
+        "use_ha": true,
+        "base_url": "",
+        "webhook_id": "vinylpi_cover_color"
+    }
 }
 
 def deep_update(base: dict, updates: dict) -> dict:
