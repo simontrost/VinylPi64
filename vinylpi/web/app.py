@@ -8,7 +8,7 @@ from .routes.pixoo_api import pixoo_bp
 from .routes.stats_api import stats_bp
 from .routes.uploads_api import uploads_bp
 from .routes.genius_api import genius_bp
-from vinylpi.web.routes.ha_api import bp as ha_api_bp
+from .routes.ha_api import bp as ha_api_bp
 
 def create_app() -> Flask:
     app = Flask(

@@ -138,6 +138,7 @@ async function loadConfig() {
     const discovery = divoom.discovery || {};
     const debug = cfg.debug || {};
     const behavior = cfg.behavior || {};
+    const homeassistant = cfg.homeassistant || {};
 
     // AUDIO
     document.getElementById("audioDeviceName").value =
@@ -232,6 +233,14 @@ async function loadConfig() {
         debug.preview_path || "";
     document.getElementById("debugWavPath").value =
         debug.wav_path || "";
+
+    // HOME ASSISTANT
+    document.getElementById("useHA").checked =
+        !!homeassistant.use_ha;
+    document.getElementById("baseURL").value =
+        homeassistant.base_url || "";
+    document.getElementById("webHookID").value =
+        homeassistant.webhook_id || "";
 }
 
 document.getElementById("settings-form").addEventListener("submit", async (e) => {
@@ -247,6 +256,7 @@ document.getElementById("settings-form").addEventListener("submit", async (e) =>
     cfg.divoom.discovery = cfg.divoom.discovery || {};
     cfg.debug = cfg.debug || {};
     cfg.behavior = cfg.behavior || {};
+    cfg.homeassistant = cfg.homeassistant || {};
 
     const audio = cfg.audio;
     const image = cfg.image;
@@ -255,6 +265,7 @@ document.getElementById("settings-form").addEventListener("submit", async (e) =>
     const discovery = cfg.divoom.discovery;
     const debug = cfg.debug;
     const behavior = cfg.behavior;
+    const homeassistant = cfg.homeassistant;
 
     // AUDIO
     audio.device_name_contains =
@@ -325,6 +336,7 @@ document.getElementById("settings-form").addEventListener("submit", async (e) =>
     divoom.auto_reset_gif_id =
         document.getElementById("divoomAutoResetGif").checked;
 
+    // DISCOVERY
     discovery.enabled =
         document.getElementById("discoveryEnabled").checked;
     discovery.subnet_prefix =
@@ -349,6 +361,14 @@ document.getElementById("settings-form").addEventListener("submit", async (e) =>
         document.getElementById("debugPreviewPath").value;
     debug.wav_path =
         document.getElementById("debugWavPath").value;
+
+    // HOME ASSISTANT
+    homeassistant.use_ha =
+        document.getElementById("useHA").checked;
+    homeassistant.base_url =
+        document.getElementById("baseURL").value;
+    homeassistant.webhook_id =
+        document.getElementById("webHookID").value;
 
     await fetch("/api/config", {
         method: "POST",

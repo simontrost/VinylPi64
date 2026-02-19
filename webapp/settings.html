@@ -271,6 +271,26 @@
                 </div>
             </div>
 
+            <!-- Home Assistant -->
+            <div class="card">
+                <h2>Home Assistant</h2>
+
+                <div class="form-row">
+                    <label for="useHA">Use HA Integration</label>
+                    <input type="checkbox" id="useHA">
+                </div>
+
+                <div class="form-row">
+                    <label for="baseURL">Base URL</label>
+                    <input type="text" id="baseURL" placeholder="http://homeassistant:8123">
+                </div>
+
+                <div class="form-row">
+                    <label for="webHookID">Webhook ID</label>
+                    <input type="text" id="webHookID" placeholder="vinylpi_cover_color">
+                </div>
+            </div>
+
             <div class="settings-actions">
                 <button class="btn-primary" type="submit">Save</button>
                 <button class="btn-danger" type="button" id="reset-defaults">Reset to defaults</button>
