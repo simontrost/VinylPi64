@@ -1,34 +1,49 @@
 from __future__ import annotations
+
 import os
+import hmac
 import requests
 from flask import Blueprint, request, jsonify, abort
 
 from vinylpi.web.services import pixoo
 from vinylpi.web.services import recognizer
+from vinylpi.web.services.config import read_config
 
 bp = Blueprint("ha_api", __name__, url_prefix="/api/ha")
 
-API_TOKEN = "CHANGE_ME"
+API_TOKEN = os.getenv("VINYLPI_API_TOKEN", "")
+if not API_TOKEN:
+    raise RuntimeError("VINYLPI_API_TOKEN is not set")
 
-HA_WEBHOOK_URL = os.getenv(
-    "HA_WEBHOOK_URL",
-    "http://192.168.2.40:8123/api/webhook/vinylpi_cover_color"
-)
+cfg = read_config()
+ha_cfg = cfg.get("homeassistant", {})
+
+USE_HA = bool(ha_cfg.get("use_ha", False))
+
+if USE_HA:
+    base_url = ha_cfg.get("base_url")
+    webhook_id = ha_cfg.get("webhook_id")
+
+    if not base_url or not webhook_id:
+        raise RuntimeError("Home Assistant config incomplete")
+
+    HA_WEBHOOK_URL = f"{base_url.rstrip('/')}/api/webhook/{webhook_id}"
+else:
+    HA_WEBHOOK_URL = None
 
 _last_sent_rgb = None
 
+
 def require_token():
     token = request.headers.get("X-Api-Token", "")
-    if token != API_TOKEN:
+    if not hmac.compare_digest(token, API_TOKEN):
         abort(401)
 
-# test
-DESIGN_PRESETS = {
-    "lofi": "123456",
-    "waves": "ABCDEF",
-}
 
 def send_rgb_to_ha(rgb):
+    if not HA_WEBHOOK_URL:
+        return
+
     global _last_sent_rgb
     if rgb == _last_sent_rgb:
         return
@@ -43,17 +58,6 @@ def send_rgb_to_ha(rgb):
         ).raise_for_status()
     except Exception as e:
         print(f"[HA] Failed sending RGB: {e}")
-
-@bp.post("/design/<name>")
-def show_design(name: str):
-    require_token()
-
-    file_id = DESIGN_PRESETS.get(name)
-    if not file_id:
-        return jsonify({"ok": False, "error": f"Unknown design: {name}"}), 400
-
-    pixoo.play_remote_gif(file_id)
-    return jsonify({"ok": True, "design": name, "file_id": file_id})
 
 
 @bp.post("/music_mode/on")
