@@ -57,7 +57,7 @@ CONFIG_DEFAULTS = {
         "auto_sleep": 30
     },
     "homeassistant": {
-        "use_ha": true,
+        "use_ha": True,
         "base_url": "",
         "webhook_id": "vinylpi_cover_color"
     }
