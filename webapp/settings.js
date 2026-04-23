@@ -149,8 +149,6 @@ async function loadConfig() {
         audio.sample_rate ?? 44100;
     document.getElementById("audioChannels").value =
         audio.channels ?? 1;
-    document.getElementById("audioOutputWav").value =
-        audio.output_wav || "";
 
     // IMAGE / DISPLAY
     document.getElementById("imageCanvasSize").value =
@@ -276,8 +274,6 @@ document.getElementById("settings-form").addEventListener("submit", async (e) =>
         parseInt(document.getElementById("audioSampleRate").value) || 44100;
     audio.channels =
         parseInt(document.getElementById("audioChannels").value) || 1;
-    audio.output_wav =
-        document.getElementById("audioOutputWav").value;
 
     // IMAGE / DISPLAY
     image.canvas_size =
