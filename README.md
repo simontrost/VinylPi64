@@ -15,7 +15,7 @@
 VinylPi is a Raspberry Pi project that listens to audio from a turntable, identifies the currently playing song using **ShazamIO**, fetches album metadata and artwork, generates a **64×64 pixel frame**, and displays it on a **Divoom Pixoo**. It also features a webapp with a dashboard and settings.
 
 <p align="left">
-  <img src="./webapp/Logo.png" width="400" alt="VinylPi Logo">
+  <img src="webapp/Logo.png" width="400" alt="VinylPi Logo">
 </p>
 
 **Important: Hardware-specific implementation**
