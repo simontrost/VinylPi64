@@ -2,7 +2,9 @@ import json
 from pathlib import Path
 import time
 import requests
-
+import os
+import base64
+from urllib.parse import quote_plus
 from vinylpi.paths import STATS_PATH, BASE_DIR, MB_URL, MB_UA
 
 def _load_stats() -> dict:
@@ -42,7 +44,6 @@ def _update_stats(artist: str, title: str, album: str | None, cover_url: str | N
     )
 
     song_entry["count"] = song_entry.get("count", 0) + 1
-
     if album and not song_entry.get("album"):
         song_entry["album"] = album
 
@@ -65,6 +66,135 @@ def _increment_album_session(album: str) -> None:
     albums[album] = albums.get(album, 0) + 1
     _save_stats(stats)
 
+_SPOTIFY_TOKEN_CACHE = {
+    "access_token": None,
+    "expires_at": 0,
+}
+
+
+def _spotify_get_access_token() -> str | None:
+    client_id = os.environ.get("SPOTIFY_CLIENT_ID", "").strip()
+    client_secret = os.environ.get("SPOTIFY_CLIENT_SECRET", "").strip()
+
+    if not client_id or not client_secret:
+        return None
+
+    now = time.time()
+    if _SPOTIFY_TOKEN_CACHE["access_token"] and now < _SPOTIFY_TOKEN_CACHE["expires_at"]:
+        return _SPOTIFY_TOKEN_CACHE["access_token"]
+
+    auth_raw = f"{client_id}:{client_secret}".encode("utf-8")
+    auth_b64 = base64.b64encode(auth_raw).decode("ascii")
+
+    r = requests.post(
+        "https://accounts.spotify.com/api/token",
+        headers={
+            "Authorization": f"Basic {auth_b64}",
+            "Content-Type": "application/x-www-form-urlencoded",
+        },
+        data={"grant_type": "client_credentials"},
+        timeout=10,
+    )
+    r.raise_for_status()
+
+    data = r.json()
+    token = data.get("access_token")
+    expires_in = int(data.get("expires_in", 3600))
+
+    if not token:
+        return None
+
+    _SPOTIFY_TOKEN_CACHE["access_token"] = token
+    _SPOTIFY_TOKEN_CACHE["expires_at"] = now + expires_in - 60
+
+    return token
+
+
+def _spotify_fetch_track_length_ms(artist: str, title: str, album: str | None = None) -> int | None:
+    token = _spotify_get_access_token()
+    if not token:
+        return None
+
+    a = (artist or "").strip()
+    t = (title or "").strip()
+    al = (album or "").strip()
+
+    if not a or not t:
+        return None
+
+    query = f'track:"{t}" artist:"{a}"'
+    if al:
+        query += f' album:"{al}"'
+
+    r = requests.get(
+        "https://api.spotify.com/v1/search",
+        headers={"Authorization": f"Bearer {token}"},
+        params={
+            "q": query,
+            "type": "track",
+            "limit": 10,
+        },
+        timeout=10,
+    )
+    r.raise_for_status()
+
+    items = (((r.json().get("tracks") or {}).get("items")) or [])
+    if not items:
+        return None
+
+    title_cf = t.casefold()
+    artist_cf = a.casefold()
+    album_cf = al.casefold()
+
+    best_ms = None
+    best_score = -10_000
+
+    for item in items:
+        duration_ms = item.get("duration_ms")
+        if not duration_ms:
+            continue
+
+        score = 0
+
+        item_title = (item.get("name") or "").strip().casefold()
+        if item_title == title_cf:
+            score += 60
+        elif title_cf in item_title or item_title in title_cf:
+            score += 30
+
+        item_artists = item.get("artists") or []
+        artist_names = [
+            (ar.get("name") or "").strip().casefold()
+            for ar in item_artists
+        ]
+
+        if artist_cf in artist_names:
+            score += 60
+        elif any(artist_cf in x or x in artist_cf for x in artist_names if x):
+            score += 25
+
+        item_album = item.get("album") or {}
+        item_album_name = (item_album.get("name") or "").strip().casefold()
+
+        if album_cf:
+            if item_album_name == album_cf:
+                score += 40
+            elif album_cf in item_album_name or item_album_name in album_cf:
+                score += 20
+
+        if item.get("explicit") is True:
+            score += 1
+
+        if duration_ms < 30_000:
+            score -= 50
+        if duration_ms > 30 * 60_000:
+            score -= 50
+
+        if score > best_score:
+            best_score = score
+            best_ms = int(duration_ms)
+
+    return best_ms
 
 def _mb_fetch_track_length_ms(artist: str, title: str, album: str | None = None) -> int | None:
     a = (artist or "").strip()
@@ -152,18 +282,42 @@ def add_listen_time_minutes_for_confirmed_song(
     song_key = f"{artist} – {title}"
     cache_key = song_key.casefold()
 
+    source = None
+
     if cache_key in cache and isinstance(cache[cache_key], dict) and cache[cache_key].get("ms"):
         ms = int(cache[cache_key]["ms"])
         minutes = float(cache[cache_key].get("minutes", ms / 60000.0))
+        source = cache[cache_key].get("source", "cache")
         cached = True
     else:
+        ms = None
+
         try:
-            ms = _mb_fetch_track_length_ms(artist, title, album)
+            ms = _spotify_fetch_track_length_ms(artist, title, album)
+            if ms:
+                source = "spotify"
         except Exception as e:
-            return {"ok": False, "error": f"MusicBrainz request failed: {e}"}
+            spotify_error = str(e)
+        else:
+            spotify_error = None
 
         if not ms:
-            return {"ok": False, "error": "No duration found on MusicBrainz"}
+            try:
+                ms = _mb_fetch_track_length_ms(artist, title, album)
+                if ms:
+                    source = "musicbrainz"
+            except Exception as e:
+                mb_error = str(e)
+                return {
+                    "ok": False,
+                    "error": f"Spotify and MusicBrainz request failed: spotify={spotify_error}, musicbrainz={mb_error}",
+                }
+
+        if not ms:
+            return {
+                "ok": False,
+                "error": "No duration found on Spotify or MusicBrainz",
+            }
 
         minutes = ms / 60000.0
         cached = False
@@ -175,22 +329,35 @@ def add_listen_time_minutes_for_confirmed_song(
             "artist": artist,
             "title": title,
             "album": album,
+            "source": source,
         }
 
-    stats["listening"]["total_seconds"] = float(stats["listening"]["total_seconds"]) + (ms / 1000.0)
+    stats["listening"]["total_seconds"] = (
+        float(stats["listening"]["total_seconds"]) + (ms / 1000.0)
+    )
 
     songs = stats.setdefault("songs", {})
-    entry = songs.get(song_key) or {"artist": artist, "title": title, "album": album, "count": 0}
+    entry = songs.get(song_key) or {
+        "artist": artist,
+        "title": title,
+        "album": album,
+        "count": 0,
+    }
+
     entry["duration_ms"] = int(ms)
     entry["duration_minutes"] = round(minutes, 2)
+    entry["duration_source"] = source
+
     songs[song_key] = entry
 
     _save_stats(stats)
 
     total_minutes = stats["listening"]["total_seconds"] / 60.0
+
     return {
         "ok": True,
         "minutes": round(minutes, 2),
         "cached": cached,
+        "source": source,
         "total_minutes": round(total_minutes, 2),
     }
