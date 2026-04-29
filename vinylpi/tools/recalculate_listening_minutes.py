@@ -256,6 +256,7 @@ def main():
     load_env_file(BASE_DIR / ".env")
 
     stats = load_stats()
+    stats["durations_cache"] = {}
     songs = stats.get("songs") or {}
 
     durations_cache = stats.setdefault("durations_cache", {})
