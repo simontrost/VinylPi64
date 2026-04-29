@@ -6,6 +6,7 @@ import os
 import base64
 from urllib.parse import quote_plus
 from vinylpi.paths import STATS_PATH, BASE_DIR, MB_URL, MB_UA
+import re
 
 def _load_stats() -> dict:
     if STATS_PATH.exists():
@@ -110,13 +111,35 @@ def _spotify_get_access_token() -> str | None:
     return token
 
 
+def _clean_title_for_duration_search(title: str) -> str:
+    t = title or ""
+
+    patterns = [
+        r"\s*\(feat\.?.*?\)",
+        r"\s*\(featuring\s+.*?\)",
+        r"\s*\(ft\.?.*?\)",
+        r"\s*\[feat\.?.*?\]",
+        r"\s*\[featuring\s+.*?\]",
+        r"\s*\[ft\.?.*?\]",
+        r"\s+feat\.?\s+.*$",
+        r"\s+featuring\s+.*$",
+        r"\s+ft\.?\s+.*$",
+    ]
+
+    for pat in patterns:
+        t = re.sub(pat, "", t, flags=re.IGNORECASE)
+
+    t = re.sub(r"\s+", " ", t).strip()
+    return t
+
 def _spotify_fetch_track_length_ms(artist: str, title: str, album: str | None = None) -> int | None:
     token = _spotify_get_access_token()
     if not token:
         return None
 
     a = (artist or "").strip()
-    t = (title or "").strip()
+    t_raw = (title or "").strip()
+    t = _clean_title_for_duration_search(t_raw)
     al = (album or "").strip()
 
     if not a or not t:

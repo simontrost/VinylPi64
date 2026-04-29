@@ -7,6 +7,26 @@ from pathlib import Path
 
 import requests
 
+import re
+
+def clean_title_for_search(title: str) -> str:
+    t = title or ""
+
+    patterns = [
+        r"\s*\(feat\.?.*?\)",
+        r"\s*\(ft\.?.*?\)",
+        r"\s*\[feat\.?.*?\]",
+        r"\s*\[ft\.?.*?\]",
+        r"\s+feat\.?\s+.*$",
+        r"\s+ft\.?\s+.*$",
+    ]
+
+    for pat in patterns:
+        t = re.sub(pat, "", t, flags=re.IGNORECASE)
+
+    t = re.sub(r"\s+", " ", t).strip()
+    return t
+
 BASE_DIR = Path(__file__).resolve().parents[2]
 STATS_PATH = BASE_DIR / "data" / "stats.json"
 
@@ -74,11 +94,15 @@ def spotify_token():
 
 
 def spotify_duration_ms(artist, title, album=None):
+    search_title = clean_title_for_search(title)
+
+    artist_cf = artist.casefold().strip()
+    title_cf = search_title.casefold().strip()
     token = spotify_token()
     if not token:
         return None
 
-    q = f'track:"{title}" artist:"{artist}"'
+    q = f'track:"{search_title}" artist:"{artist}"'
     if album:
         q += f' album:"{album}"'
 
@@ -224,7 +248,7 @@ def fetch_duration_ms(artist, title, album=None):
     except Exception as e:
         print(f"  MusicBrainz failed: {e}")
 
-    return None, None
+    return None, "none"
 
 
 def main():
@@ -253,7 +277,7 @@ def main():
         cached = durations_cache.get(cache_key)
         if isinstance(cached, dict) and cached.get("ms"):
             ms = int(cached["ms"])
-            source = cached.get("source", "cache")
+            source = cached.get("source", "unknown")
             print(f"[cached:{source}] {artist} – {title} = {round(ms / 60000, 2)} min x {count}")
         else:
             print(f"[fetch] {artist} – {title}")
