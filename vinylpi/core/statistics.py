@@ -384,3 +384,47 @@ def add_listen_time_minutes_for_confirmed_song(
         "source": source,
         "total_minutes": round(total_minutes, 2),
     }
+
+def add_measured_listen_time_seconds(
+    artist: str,
+    title: str,
+    album: str | None,
+    seconds: float,
+) -> dict:
+    seconds = max(0.0, float(seconds))
+
+    if seconds < 10:
+        return {"ok": False, "error": "Measured listen time too short"}
+
+    stats = _load_stats()
+    stats.setdefault("listening", {})
+    stats["listening"].setdefault("total_seconds", 0.0)
+
+    stats["listening"]["total_seconds"] = (
+        float(stats["listening"]["total_seconds"]) + seconds
+    )
+
+    song_key = f"{artist} – {title}"
+    songs = stats.setdefault("songs", {})
+    entry = songs.get(song_key) or {
+        "artist": artist,
+        "title": title,
+        "album": album,
+        "count": 0,
+    }
+
+    entry["duration_ms"] = int(seconds * 1000)
+    entry["duration_minutes"] = round(seconds / 60.0, 2)
+    entry["duration_source"] = "measured_timer"
+    entry["measured_listen_seconds"] = round(seconds, 2)
+
+    songs[song_key] = entry
+    _save_stats(stats)
+
+    return {
+        "ok": True,
+        "seconds": round(seconds, 2),
+        "minutes": round(seconds / 60.0, 2),
+        "source": "measured_timer",
+        "total_minutes": round(stats["listening"]["total_seconds"] / 60.0, 2),
+    }

@@ -41,3 +41,12 @@ class StatsSwitchState:
     current_song_id: Optional[tuple[str, str]] = None
     candidate_song_id: Optional[tuple[str, str]] = None
     candidate_streak: int = 0
+
+@dataclass
+class TimedListenState:
+    active_song_id: Optional[tuple[str, str]] = None
+    active_artist: Optional[str] = None
+    active_title: Optional[str] = None
+    active_album: Optional[str] = None
+    active_started_at: Optional[float] = None
+    active_needs_timer_fallback: bool = False

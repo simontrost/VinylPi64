@@ -7,10 +7,12 @@ from vinylpi.core.statistics import (
     _update_stats,
     _increment_album_session,
     add_listen_time_minutes_for_confirmed_song,
+    add_measured_listen_time_seconds,
 )
 
 from vinylpi.core.loop_state import LoopConfig, DisplayState, AlbumState, StatsSwitchState
 
+import time
 
 def log_pixoo_update_reason(*, debug_log: bool, last_display_was_fallback: bool, cfg_reloaded: bool, is_same_song: bool) -> None:
     if not debug_log:
@@ -231,11 +233,12 @@ def update_album_session_on_switch(*, st: AlbumState, album: str | None, title: 
         st.current_album_session_counted = True
 
 
-def maybe_add_listen_time(cfg: LoopConfig, did_confirm_switch: bool, artist: str, title: str, album: str | None) -> None:
+def maybe_add_listen_time(cfg: LoopConfig, did_confirm_switch: bool, artist: str, title: str, album: str | None) -> dict:
     if not did_confirm_switch:
-        return
+        return {"ok": None, "skipped": True}
 
     res = add_listen_time_minutes_for_confirmed_song(artist, title, album)
+
     if cfg.debug_log:
         if res.get("ok"):
             print(
@@ -244,3 +247,57 @@ def maybe_add_listen_time(cfg: LoopConfig, did_confirm_switch: bool, artist: str
             )
         else:
             print(f"Listen time not added: {res.get('error')}")
+
+    return res
+
+
+def flush_timed_listen_if_needed(cfg: LoopConfig, st) -> None:
+    if not st.active_song_id:
+        return
+
+    if not st.active_needs_timer_fallback:
+        return
+
+    if st.active_started_at is None:
+        return
+
+    seconds = time.monotonic() - st.active_started_at
+
+    res = add_measured_listen_time_seconds(
+        st.active_artist or "",
+        st.active_title or "",
+        st.active_album,
+        seconds,
+    )
+
+    if cfg.debug_log:
+        if res.get("ok"):
+            print(
+                f"Added measured listen time: +{res['minutes']} min "
+                f"(source=measured_timer), total={res['total_minutes']} min"
+            )
+        else:
+            print(f"Measured listen time not added: {res.get('error')}")
+
+
+def start_or_replace_timed_listen(
+    *,
+    cfg: LoopConfig,
+    st,
+    song_id,
+    artist: str,
+    title: str,
+    album: str | None,
+    needs_timer_fallback: bool,
+) -> None:
+    if st.active_song_id == song_id:
+        return
+
+    flush_timed_listen_if_needed(cfg, st)
+
+    st.active_song_id = song_id
+    st.active_artist = artist
+    st.active_title = title
+    st.active_album = album
+    st.active_started_at = time.monotonic()
+    st.active_needs_timer_fallback = needs_timer_fallback

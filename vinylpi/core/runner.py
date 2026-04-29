@@ -4,13 +4,15 @@ from vinylpi.core.recognition import recognize_song
 from vinylpi.web.services.config import read_config
 from vinylpi.config.config_watcher import maybe_log_config_reload
 from vinylpi.core.title_variants import is_live_variant
-from vinylpi.core.loop_state import LoopConfig, DisplayState, AlbumState, StatsSwitchState
+from vinylpi.core.loop_state import LoopConfig, DisplayState, AlbumState, StatsSwitchState, TimedListenState
 from vinylpi.core.loop_logic import (
     handle_no_result,
     handle_song_result,
     update_song_stats_on_switch,
     update_album_session_on_switch,
     maybe_add_listen_time,
+    flush_timed_listen_if_needed,
+    start_or_replace_timed_listen,
 )
 
 def main_loop():
@@ -21,6 +23,7 @@ def main_loop():
     disp = DisplayState()
     album_state = AlbumState()
     stats_state = StatsSwitchState()
+    timed_listen_state = TimedListenState()
 
     MIN_TRACKS_FOR_ALBUM_SESSION = 2
     MIN_CONSECUTIVE_FOR_SWITCH = 2
@@ -41,6 +44,8 @@ def main_loop():
 
             result = recognize_song(wav_bytes)
             if result is None:
+                flush_timed_listen_if_needed(cfg, timed_listen_state)
+                timed_listen_state = TimedListenState()
                 if handle_no_result(cfg, disp, cfg_reloaded):
                     break
                 time.sleep(cfg.delay)
@@ -79,7 +84,26 @@ def main_loop():
                 cover_url=info.get("cover_url"),
                 min_consecutive=MIN_CONSECUTIVE_FOR_SWITCH,
             )
-            maybe_add_listen_time(cfg, did_confirm, info["artist"], info["title"], info["album"])
+            listen_res = maybe_add_listen_time(
+                cfg,
+                did_confirm,
+                info["artist"],
+                info["title"],
+                info["album"],
+            )
+
+            if did_confirm:
+                needs_timer_fallback = not bool(listen_res.get("ok"))
+
+                start_or_replace_timed_listen(
+                    cfg=cfg,
+                    st=timed_listen_state,
+                    song_id=info["song_id"],
+                    artist=info["artist"],
+                    title=info["title"],
+                    album=info["album"],
+                    needs_timer_fallback=needs_timer_fallback,
+                )
 
             update_album_session_on_switch(
                 st=album_state,
