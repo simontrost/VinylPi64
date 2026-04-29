@@ -47,7 +47,7 @@ If you use different hardware, you will most likely have to modify parts of the 
   - dashboard with current song, lyrics and switch (on/off)
   - settings: configure vinylpi
   - pixoo: configure your divoom pixoo
-  - statistics: keeps track of your listened minutes, songs, artists and albums
+  - statistics: keeps track of your listened minutes, songs, artists, genres and albums
   - about: support me :)  
 - Home Assistant Integration
 ---
@@ -117,13 +117,16 @@ hint: you might also want to get ffmpeg `sudo apt install ffmpeg`
 ### 5. Configuration:
 If you don't want to use the web interface, you will have to edit the config manually
 ```bash
-nano config.json
+nano data/config.json
 ```
-
+Get an [Last FM API key (free)](https://www.last.fm/api) for the statistics webpage and add it to the env:
+```bash
+nano vinylpi.env
+```
 ### 6. Execute
 with active env:
 ```bash
-python vinylpi/dashboard.py
+python -m vinylpi.web.dashboard
 ```
 hint: you can start the actual music detection from the webapp: `http://vinylpi.local:8080/`or via `python -m vinylpi.main`
 
