@@ -3,7 +3,8 @@
         "device_name_contains": "USB AUDIO",
         "sample_seconds": 4,
         "sample_rate": 44100,
-        "channels": 1
+        "channels": 1,
+        "output_wav": ""
     },
     "image": {
         "canvas_size": 64,
@@ -27,15 +28,15 @@
         ],
         "uppercase": true,
         "preview_scale": 8,
-        "marquee_speed": 20,
-        "sleep_seconds": 0.01
+        "marquee_speed": 30,
+        "sleep_seconds": 0.1
     },
     "divoom": {
-        "ip": "",
-        "device_name": "",
-        "device_id": 0,
-        "device_mac": "",
-        "timeout": 2.0,
+        "ip": "192.168.2.41",
+        "device_name": "PixooDivoom",
+        "device_id": 300313799,
+        "device_mac": "9454c56ed060",
+        "timeout": 2,
         "auto_reset_gif_id": false,
         "discovery": {
             "enabled": true,
@@ -52,16 +53,16 @@
     },
     "fallback": {
         "enabled": true,
-        "image_path": "assets/fallback/fallback.png",
+        "image_path": "assets/fallback/fallback_1776938629.png",
         "allowed_failures": 3
     },
     "behavior": {
         "loop_delay_seconds": 1,
-        "auto_sleep": 30
+        "auto_sleep": 100
     },
     "homeassistant": {
         "use_ha": true,
-        "base_url": "",
+        "base_url": "http://192.168.2.47:8123",
         "webhook_id": "vinylpi_cover_color"
     }
 }

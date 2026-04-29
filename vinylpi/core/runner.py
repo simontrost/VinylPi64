@@ -76,6 +76,7 @@ def main_loop():
                 artist=info["artist"],
                 title=info["title"],
                 album=info["album"],
+                cover_url=info.get("cover_url"),
                 min_consecutive=MIN_CONSECUTIVE_FOR_SWITCH,
             )
             maybe_add_listen_time(cfg, did_confirm, info["artist"], info["title"], info["album"])

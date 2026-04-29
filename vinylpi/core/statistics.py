@@ -26,7 +26,7 @@ def _save_stats(stats: dict) -> None:
         print(f"Could not write stats file: {e}")
 
 
-def _update_stats(artist: str, title: str, album: str | None) -> None:
+def _update_stats(artist: str, title: str, album: str | None, cover_url: str | None = None) -> None:
     stats = _load_stats()
 
     song_key = f"{artist} – {title}"
@@ -37,13 +37,18 @@ def _update_stats(artist: str, title: str, album: str | None) -> None:
             "title": title,
             "album": album,
             "count": 0,
+            "cover_url": cover_url
         },
     )
+
     song_entry["count"] = song_entry.get("count", 0) + 1
 
     if album and not song_entry.get("album"):
         song_entry["album"] = album
 
+    if cover_url and not song_entry.get("cover_url"):
+        song_entry["cover_url"] = cover_url
+        
     stats["songs"][song_key] = song_entry
 
     stats["artists"][artist] = stats["artists"].get(artist, 0) + 1

@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="base.css">
     <link rel="stylesheet" href="stats.css">
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="stats.js" defer></script>
 </head>
 
@@ -44,25 +45,32 @@
                 <div id="stats-minutes" class="stats-minutes-value">—</div>
                 <div class="stats-minutes-sub">Based on recognized tracks</div>
             </div>
-
-
             <div class="stats-grid">
                 <div class="stats-card">
                     <h2>Top Songs</h2>
-                    <ul id="stats-songs" class="stats-list">
-                    </ul>
+                    <ul id="stats-songs" class="stats-list"></ul>
                 </div>
 
                 <div class="stats-card">
                     <h2>Top Artists</h2>
-                    <ul id="stats-artists" class="stats-list">
-                    </ul>
+                    <ul id="stats-artists" class="stats-list"></ul>
                 </div>
 
                 <div class="stats-card">
                     <h2>Top Albums</h2>
-                    <ul id="stats-albums" class="stats-list">
-                    </ul>
+                    <ul id="stats-albums" class="stats-list"></ul>
+                </div>
+            </div>
+
+            <div class="stats-visual-grid">
+                <div class="stats-card stats-chart-card">
+                    <h2>Top Genres</h2>
+                    <canvas id="genre-radar"></canvas>
+                </div>
+
+                <div class="stats-card stats-chart-card album-carousel-card">
+                    <h2>Top Albums</h2>
+                    <div id="album-carousel" class="album-carousel"></div>
                 </div>
             </div>
         </section>

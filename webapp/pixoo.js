@@ -169,8 +169,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    // --- NEW: Community GIFs ---
-
     async function loadLikedGifs() {
         if (!likesStatus || !likesSelect) return;
 
@@ -241,7 +239,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    // --- Event-Wiring ---
 
     if (brightnessSlider) {
         brightnessSlider.addEventListener("input", (e) => {

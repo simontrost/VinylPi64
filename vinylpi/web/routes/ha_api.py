@@ -12,8 +12,11 @@ from vinylpi.web.services.config import read_config
 bp = Blueprint("ha_api", __name__, url_prefix="/api/ha")
 
 API_TOKEN = os.getenv("VINYLPI_API_TOKEN", "")
-if not API_TOKEN:
-    raise RuntimeError("VINYLPI_API_TOKEN is not set")
+
+def _check_token():
+    if not API_TOKEN:
+        return False
+    return request.headers.get("X-Api-Token") == API_TOKEN
 
 cfg = read_config()
 ha_cfg = cfg.get("homeassistant", {})

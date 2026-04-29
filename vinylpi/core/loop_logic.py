@@ -106,6 +106,7 @@ def handle_song_result(cfg: LoopConfig, disp: DisplayState, cfg_reloaded: bool, 
             "artist": artist,
             "title": canonical_title,
             "album": album,
+            "cover_url": cover_url,
             "song_id": song_id,
             "score": score,
             "did_update_display": False,
@@ -136,13 +137,23 @@ def handle_song_result(cfg: LoopConfig, disp: DisplayState, cfg_reloaded: bool, 
         "artist": artist,
         "title": canonical_title,
         "album": album,
+        "cover_url": cover_url,
         "song_id": song_id,
         "score": score,
         "did_update_display": True,
     }
 
 
-def update_song_stats_on_switch(*, st: StatsSwitchState, song_id, artist: str, title: str, album: str | None, min_consecutive: int) -> bool:
+def update_song_stats_on_switch(
+    *,
+    st: StatsSwitchState,
+    song_id,
+    artist: str,
+    title: str,
+    album: str | None,
+    cover_url: str | None,
+    min_consecutive: int
+) -> bool:
     did_confirm_switch = False
 
     if st.current_song_id is None:
@@ -156,7 +167,7 @@ def update_song_stats_on_switch(*, st: StatsSwitchState, song_id, artist: str, t
             st.current_song_id = song_id
             st.candidate_song_id = None
             st.candidate_streak = 0
-            _update_stats(artist, title, album)
+            _update_stats(artist, title, album, cover_url)
             did_confirm_switch = True
 
         return did_confirm_switch
@@ -176,7 +187,7 @@ def update_song_stats_on_switch(*, st: StatsSwitchState, song_id, artist: str, t
         st.current_song_id = song_id
         st.candidate_song_id = None
         st.candidate_streak = 0
-        _update_stats(artist, title, album)
+        _update_stats(artist, title, album, cover_url)
         did_confirm_switch = True
 
     return did_confirm_switch

@@ -1,3 +1,8 @@
+from dotenv import load_dotenv
+from vinylpi.paths import BASE_DIR
+
+load_dotenv("vinylpi.env")
+
 from flask import Flask
 from vinylpi.paths import WEBAPP_DIR
 from .routes.pages import pages_bp

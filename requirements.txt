@@ -7,3 +7,4 @@ audioop-lts; python_version >= "3.13"
 flask
 #gunicorn
 beautifulsoup4
+python-dotenv
