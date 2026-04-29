@@ -10,6 +10,7 @@ BLACKLIST = {
     "favourite",
     "favorite",
     "awesome",
+    "beautiful",
     "good",
     "spotify",
 }
