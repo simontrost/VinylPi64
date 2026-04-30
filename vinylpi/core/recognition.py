@@ -66,6 +66,13 @@ async def _recognize_async(wav_bytes: bytes):
     images = track.get("images") or {}
     cover_url = images.get("coverart")
 
+    track_id = track.get("key")
+
+    artist_id = None
+    artists = track.get("artists") or []
+    if artists:
+        artist_id = artists[0].get("adamid")
+
     album = None
     sections = track.get("sections") or []
     for sec in sections:
@@ -88,8 +95,7 @@ async def _recognize_async(wav_bytes: bytes):
         return None
 
     cover_img = load_image(cover_url)
-    return artist, title, cover_img, album, cover_url
-
+    return artist, title, cover_img, album, cover_url, track_id, artist_id
 
 def recognize_song(wav_bytes: bytes,) -> Optional[Tuple[str, str, Image.Image, str | None, str | None]]:
     try:

@@ -14,7 +14,7 @@ from .routes.stats_api import stats_bp
 from .routes.uploads_api import uploads_bp
 from .routes.genius_api import genius_bp
 from .routes.ha_api import bp as ha_api_bp
-
+from .routes.shazam_api import shazam_bp
 def create_app() -> Flask:
     app = Flask(
         __name__,
@@ -31,4 +31,6 @@ def create_app() -> Flask:
     app.register_blueprint(uploads_bp)
     app.register_blueprint(genius_bp)
     app.register_blueprint(ha_api_bp)
+    app.register_blueprint(shazam_bp)
+    
     return app

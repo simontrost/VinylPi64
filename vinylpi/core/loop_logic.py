@@ -77,7 +77,7 @@ def should_update_display(*, disp: DisplayState, song_id: tuple[str, str], score
 def handle_song_result(cfg: LoopConfig, disp: DisplayState, cfg_reloaded: bool, result):
     disp.consecutive_failures = 0
 
-    artist, title, cover_img, album, cover_url = result
+    artist, title, cover_img, album, cover_url, track_id, artist_id = result
 
     if artist == "UNKNOWN" and title == "UNKNOWN":
         if cfg.debug_log:
@@ -109,6 +109,8 @@ def handle_song_result(cfg: LoopConfig, disp: DisplayState, cfg_reloaded: bool, 
             "title": canonical_title,
             "album": album,
             "cover_url": cover_url,
+            "track_id": track_id,
+            "artist_id": artist_id,
             "song_id": song_id,
             "score": score,
             "did_update_display": False,
@@ -135,13 +137,14 @@ def handle_song_result(cfg: LoopConfig, disp: DisplayState, cfg_reloaded: bool, 
     disp.last_song_id = song_id
     disp.last_song_variant_score = score
     disp.last_display_was_fallback = False
-
     write_status(
         artist,
         canonical_title,
         cover_url=cover_url,
         album=album,
         bg_color=bg_color,
+        track_id=track_id,
+        artist_id=artist_id,
     )
 
     return {
@@ -149,6 +152,8 @@ def handle_song_result(cfg: LoopConfig, disp: DisplayState, cfg_reloaded: bool, 
         "title": canonical_title,
         "album": album,
         "cover_url": cover_url,
+        "track_id": track_id,
+        "artist_id": artist_id,
         "song_id": song_id,
         "score": score,
         "did_update_display": True,

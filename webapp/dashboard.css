@@ -104,6 +104,7 @@
 
 /* Buttons */
 #btn-lyrics,
+#btn-track-info,
 #btn-lyrics-toggle{
   min-width: 140px;
   padding: 10px 16px;
@@ -116,6 +117,7 @@
 
 #btn-lyrics{ background: #5f2f63; }
 #btn-lyrics-toggle{ background: #2a2a2a; }
+#btn-track-info{ background: #e0aa21; }
 
 #btn-lyrics-toggle.hidden{
   display: none;
@@ -268,4 +270,99 @@
     .song-album {
         font-size: 15px;
     }
+}
+
+.info-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    z-index: 40;
+}
+
+.track-info-drawer {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: min(420px, 92vw);
+    height: 100vh;
+    background: #111;
+    color: #eee;
+    z-index: 50;
+    box-shadow: -18px 0 40px rgba(0, 0, 0, 0.55);
+    transform: translateX(105%);
+    transition: transform 0.25s ease;
+    padding: 24px;
+    box-sizing: border-box;
+    overflow-y: auto;
+}
+
+.track-info-drawer.open {
+    transform: translateX(0);
+}
+
+.track-info-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.track-info-label {
+    font-size: 12px;
+    opacity: 0.65;
+    margin-bottom: 6px;
+}
+
+.track-info-header h2 {
+    margin: 0;
+    font-size: 20px;
+}
+
+.track-info-close {
+    border: none;
+    background: #2a2a2a;
+    color: #fff;
+    width: 36px;
+    height: 36px;
+    border-radius: 999px;
+    cursor: pointer;
+    font-size: 24px;
+    line-height: 1;
+}
+
+.track-info-content {
+    font-size: 14px;
+    line-height: 1.45;
+}
+
+.track-info-block {
+    background: #181818;
+    border: 1px solid #2d2d2d;
+    border-radius: 14px;
+    padding: 14px;
+    margin-bottom: 14px;
+}
+
+.track-info-block h3 {
+    margin: 0 0 10px 0;
+    font-size: 15px;
+}
+
+.track-info-row {
+    margin: 7px 0;
+    opacity: 0.9;
+}
+
+.track-info-row strong {
+    color: #fff;
+}
+
+.track-info-link {
+    color: #9cc7ff;
+    text-decoration: none;
+}
+
+.track-info-link:hover {
+    text-decoration: underline;
 }

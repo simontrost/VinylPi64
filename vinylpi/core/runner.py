@@ -52,7 +52,7 @@ def main_loop():
                 continue
 
             if result is not None:
-                artist, title, cover_img, album, cover_url = result
+                artist, title, cover_img, album, cover_url, track_id, artist_id = result
 
                 locked = bool(album_state.current_album_session_counted and album_state.current_album)
                 if locked and album:

@@ -48,6 +48,7 @@
 
                 <div class="lyrics-footer">
                     <button id="btn-lyrics" type="button">Lyrics</button>
+                    <button id="btn-track-info" type="button">Info</button>
                     <button id="btn-lyrics-toggle" type="button" class="hidden">More</button>
                 </div>
             </div>
@@ -69,6 +70,22 @@
         </section>
 
     </main>
+
+    <div id="info-backdrop" class="info-backdrop hidden"></div>
+
+    <aside id="track-info-drawer" class="track-info-drawer">
+        <div class="track-info-header">
+            <div>
+                <div class="track-info-label">Shazam Info</div>
+                <h2 id="track-info-heading">Track Info</h2>
+            </div>
+            <button id="btn-track-info-close" type="button" class="track-info-close">×</button>
+        </div>
+
+        <div id="track-info-content" class="track-info-content">
+            Keine Daten geladen.
+        </div>
+    </aside>
 
 </body>
 
