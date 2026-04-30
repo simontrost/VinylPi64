@@ -100,14 +100,16 @@
   display: flex;
   justify-content: center;
   gap: 12px;
+  width: 100%;
 }
 
 /* Buttons */
 #btn-lyrics,
 #btn-track-info,
 #btn-lyrics-toggle{
-  min-width: 140px;
-  padding: 10px 16px;
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 10px 14px;
   border: none;
   border-radius: 999px;
   cursor: pointer;
@@ -115,9 +117,9 @@
   font-weight: 600;
 }
 
-#btn-lyrics{ background: #5f2f63; }
-#btn-lyrics-toggle{ background: #2a2a2a; }
-#btn-track-info{ background: #e0aa21; }
+#btn-lyrics{ background: #7e2cb5; }
+#btn-lyrics-toggle{ background: #dd117d; }
+#btn-track-info{ background: #ff8c00; }
 
 #btn-lyrics-toggle.hidden{
   display: none;
@@ -270,6 +272,8 @@
     .song-album {
         font-size: 15px;
     }
+
+    
 }
 
 .info-backdrop {
@@ -365,4 +369,17 @@
 
 .track-info-link:hover {
     text-decoration: underline;
+}
+
+@media (max-width: 800px) {
+    .lyrics-footer {
+        gap: 8px;
+    }
+
+    #btn-lyrics,
+    #btn-track-info,
+    #btn-lyrics-toggle {
+        padding: 10px 8px;
+        font-size: 14px;
+    }
 }

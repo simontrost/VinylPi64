@@ -1,6 +1,5 @@
 import asyncio
 
-
 async def _get_shazam_info_async(
     track_id: str | None,
     artist_id: str | None,

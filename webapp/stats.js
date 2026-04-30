@@ -172,9 +172,9 @@ function renderGenreCharts(topTags, radarTags) {
             datasets: [{
                 data: radarValues,
                 fill: true,
-                backgroundColor: "rgba(80, 20, 106, 0.3)",
-                borderColor: "rgba(224, 14, 133, 1)",
-                pointBackgroundColor: "rgba(237, 156, 116, 1)"
+                backgroundColor: "rgba(113, 41, 195, 0.3)",
+                borderColor: "rgba(221, 17, 125, 1)",
+                pointBackgroundColor: "rgba(255, 140, 38, 1)"
             }]
         },
         options: {

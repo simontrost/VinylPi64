@@ -211,7 +211,7 @@ function renderTrackInfo(data) {
             ${trackUrl}
         </div>
 
-        <div class="track-info-block">
+        <div class="track-info-block">s
             <h3>Artist</h3>
             <div class="track-info-row"><strong>Name:</strong> ${escapeHtml(artist.name || CURRENT_TRACK.artist || "Unbekannt")}</div>
             ${artistUrl}
@@ -233,7 +233,7 @@ async function showTrackInfo() {
 
     if (!trackId && !artistId) {
         if (content) {
-            content.textContent = "Für diesen Song sind keine Shazam-IDs gespeichert. Warte auf die nächste Erkennung oder prüfe /api/status.";
+            content.textContent = "No Shazam-IDs saved for this song, wait for new recognition or check /api/status.";
         }
         return;
     }
@@ -247,7 +247,7 @@ async function showTrackInfo() {
 
         if (!data.ok) {
             if (content) {
-                content.textContent = `Keine Shazam-Infos gefunden: ${data.error || "unknown error"}`;
+                content.textContent = `No Shazam-Infos found: ${data.error || "unknown error"}`;
             }
             return;
         }
