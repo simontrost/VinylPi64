@@ -211,7 +211,7 @@ function renderTrackInfo(data) {
             ${trackUrl}
         </div>
 
-        <div class="track-info-block">s
+        <div class="track-info-block">
             <h3>Artist</h3>
             <div class="track-info-row"><strong>Name:</strong> ${escapeHtml(artist.name || CURRENT_TRACK.artist || "Unbekannt")}</div>
             ${artistUrl}
