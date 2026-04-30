@@ -4,30 +4,37 @@
 }
 
 .song-section {
-    display: flex;
-    justify-content: center;
-    margin-top: 16px;
-    margin-bottom: 50px;
+    width: var(--content-w);
+    max-width: var(--content-max);
+    margin: 16px auto 50px auto;
 }
 
 .song-card {
-    background: #2b2b2b;
+    width: 100%;
+    box-sizing: border-box;
+    background:
+        linear-gradient(
+            135deg,
+            color-mix(in srgb, var(--song-bg, #2b2b2b) 90%, #000 10%),
+            color-mix(in srgb, var(--song-bg, #2b2b2b) 55%, #000 45%)
+        );
     border-radius: 24px;
-    padding: 28px 32px;
+    padding: 36px 40px;
     box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55);
     display: flex;
     flex-direction: column;
     align-items: center;
-    max-width: 360px;
     text-align: center;
+    transition: background 0.35s ease;
 }
 
 .song-cover {
-    width: 190px;
-    height: 190px;
-    border-radius: 18px;
+    width: min(360px, 70vw);
+    height: min(360px, 70vw);
+    border-radius: 20px;
     object-fit: cover;
-    margin-bottom: 18px;
+    margin-bottom: 24px;
+    box-shadow: 0 18px 35px rgba(0, 0, 0, 0.35);
 }
 
 .song-artist {
@@ -242,7 +249,6 @@
 
     .song-card {
         width: 100%;
-        max-width: 380px;
         padding: 24px 20px;
     }
 

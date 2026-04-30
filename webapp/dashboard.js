@@ -15,6 +15,10 @@ async function loadStatus() {
             artistEl.innerText = "";
             albumEl.innerText = "";
             coverEl.src = "/logo.png";
+            const songCard = document.querySelector(".song-card");
+            if (songCard) {
+                songCard.style.setProperty("--song-bg", "#2b2b2b");
+            }
             return;
         }
 
@@ -27,6 +31,10 @@ async function loadStatus() {
         albumEl.innerText = album ? `${album}` : "";
 
         coverEl.src = st.cover_url || "/logo.png";
+        const songCard = document.querySelector(".song-card");
+        if (songCard) {
+            songCard.style.setProperty("--song-bg", st.bg_color || "#2b2b2b");
+        }
 
         CURRENT_TRACK.artist = artist;
         CURRENT_TRACK.title = title;

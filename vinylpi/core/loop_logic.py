@@ -122,8 +122,11 @@ def handle_song_result(cfg: LoopConfig, disp: DisplayState, cfg_reloaded: bool, 
     )
 
     start_scrolling_display(cover_img, artist, canonical_title)
+    bg_color = None
+
     try:
         rgb = dynamic_bg_color(cover_img)
+        bg_color = f"rgb({rgb[0]}, {rgb[1]}, {rgb[2]})"
         send_rgb_to_ha(rgb)
     except Exception as e:
         if cfg.debug_log:
@@ -133,7 +136,13 @@ def handle_song_result(cfg: LoopConfig, disp: DisplayState, cfg_reloaded: bool, 
     disp.last_song_variant_score = score
     disp.last_display_was_fallback = False
 
-    write_status(artist, canonical_title, cover_url=cover_url, album=album)
+    write_status(
+        artist,
+        canonical_title,
+        cover_url=cover_url,
+        album=album,
+        bg_color=bg_color,
+    )
 
     return {
         "artist": artist,
