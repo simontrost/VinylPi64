@@ -68,7 +68,7 @@ If you use different hardware, you will most likely have to modify parts of the 
 
 ### WebApp Mobile
 
-| <img src="assets/readme/webapp_dashboard_mobile.PNG" height="600" /> | <img src="assets/readme/webapp_pixoo_mobile.PNG" height="600" /> |
+| <img src="assets/readme/webapp_dashboard_mobile.jpeg" height="600" /> | <img src="assets/readme/webapp_pixoo_mobile.PNG" height="600" /> |
 
 ### WebApp Desktop
 
@@ -119,7 +119,7 @@ If you don't want to use the web interface, you will have to edit the config man
 ```bash
 nano data/config.json
 ```
-Get an [Last FM API key (free)](https://www.last.fm/api) for the statistics webpage and add it to the env:
+Get an [Spotify API Keyset](https://developer.spotify.com/documentation/web-api) and a [Last FM API key (free)](https://www.last.fm/api) for the statistics webpage and add it to the env:
 ```bash
 nano vinylpi.env
 ```
