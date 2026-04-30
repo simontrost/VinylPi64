@@ -194,26 +194,26 @@ function renderTrackInfo(data) {
     }
 
     const trackUrl = track.url
-        ? `<div class="track-info-row"><a class="track-info-link" href="${escapeHtml(track.url)}" target="_blank" rel="noopener noreferrer">Shazam Track öffnen</a></div>`
+        ? `<div class="track-info-row"><a class="track-info-link" href="${escapeHtml(track.url)}" target="_blank" rel="noopener noreferrer">Open Shazam Track</a></div>`
         : "";
 
     const artistUrl = artist.url
-        ? `<div class="track-info-row"><a class="track-info-link" href="${escapeHtml(artist.url)}" target="_blank" rel="noopener noreferrer">Shazam Artist öffnen</a></div>`
+        ? `<div class="track-info-row"><a class="track-info-link" href="${escapeHtml(artist.url)}" target="_blank" rel="noopener noreferrer">Open Shazam Artist</a></div>`
         : "";
 
     content.innerHTML = `
         <div class="track-info-block">
             <h3>Song</h3>
-            <div class="track-info-row"><strong>Titel:</strong> ${escapeHtml(track.title || "Unbekannt")}</div>
-            <div class="track-info-row"><strong>Artist:</strong> ${escapeHtml(track.artist || "Unbekannt")}</div>
-            <div class="track-info-row"><strong>Album:</strong> ${escapeHtml(track.album || "Unbekannt")}</div>
+            <div class="track-info-row"><strong>Title:</strong> ${escapeHtml(track.title || "Unknown")}</div>
+            <div class="track-info-row"><strong>Artist:</strong> ${escapeHtml(track.artist || "Unknown")}</div>
+            <div class="track-info-row"><strong>Album:</strong> ${escapeHtml(track.album || "Unknown")}</div>
             ${track.genres ? `<div class="track-info-row"><strong>Genre:</strong> ${escapeHtml(track.genres)}</div>` : ""}
             ${trackUrl}
         </div>
 
         <div class="track-info-block">
             <h3>Artist</h3>
-            <div class="track-info-row"><strong>Name:</strong> ${escapeHtml(artist.name || CURRENT_TRACK.artist || "Unbekannt")}</div>
+            <div class="track-info-row"><strong>Name:</strong> ${escapeHtml(artist.name || CURRENT_TRACK.artist || "Unknown")}</div>
             ${artistUrl}
         </div>
     `;
