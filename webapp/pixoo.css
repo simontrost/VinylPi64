@@ -1,165 +1,27 @@
-/* pixoo.css */
-
-.pixoo-section {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
+.pixoo-section { display: grid; gap: 16px; max-width: 1040px; margin: 0 auto; }
+.pixoo-section .card { margin-bottom: 0; }
+.pixoo-status-text { margin: 0 0 6px; font-size: 1rem; font-weight: 780; }
+.pixoo-status-sub { margin: 0; font-size: .9rem; color: var(--muted); }
+.pixoo-row { display: flex; align-items: center; gap: 16px; margin-top: 12px; }
+.pixoo-row label { width: 150px; font-weight: 780; font-size: 14px; color: rgba(246,244,255,.88); }
+.pixoo-slider-wrap { flex: 1; display: flex; align-items: center; gap: 12px; }
+#pixooBrightness { width: 100%; }
+.pixoo-slider-value { min-width: 48px; text-align: right; font-size: .9rem; color: var(--muted); font-weight: 800; }
+.pixoo-channel-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+.pixoo-channel-btn.active { border: 0; color: #100c1d; background: linear-gradient(135deg, var(--yellow), var(--pink)); }
+.pixoo-reboot-status { margin-left: 12px; font-size: .9rem; color: var(--muted); }
+.pixoo-help { margin: 0 0 10px; font-size: .92rem; line-height: 1.5; }
+.pixoo-select { width: 100%; padding: 0 12px; }
+.card .btn-danger { background: linear-gradient(135deg, var(--red), var(--purple)); color: #fff; }
+@media (min-width: 980px) {
+    .pixoo-section { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .pixoo-section .card:first-child,
+    .pixoo-section .card:nth-child(4),
+    .pixoo-section .card:nth-child(5) { grid-column: span 2; }
 }
-
-/* Status */
-
-.pixoo-status-text {
-    margin: 0 0 0.3rem 0;
-    font-size: 0.95rem;
-}
-
-.pixoo-status-sub {
-    margin: 0;
-    font-size: 0.85rem;
-    opacity: 0.8;
-}
-
-/* Brightness row */
-
-.pixoo-row {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    margin-top: 8px;
-}
-
-.pixoo-row label {
-    width: 140px;
-    font-weight: 500;
-    font-size: 16px;
-}
-
-.pixoo-slider-wrap {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-#pixooBrightness {
-    width: 100%;
-}
-
-.pixoo-slider-value {
-    min-width: 42px;
-    text-align: right;
-    font-size: 0.9rem;
-    opacity: 0.85;
-}
-
-/* Channel buttons */
-
-.pixoo-channel-grid {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    margin-top: 0.5rem;
-}
-
-.pixoo-channel-btn {
-    padding: 8px 14px;
-    border-radius: 999px;
-    border: none;
-    background: #3a3a3a;
-    color: #f0f0f0;
-    font-size: 14px;
-    font-weight: 500;
-    cursor: pointer;
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
-    transition: background 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
-}
-
-.pixoo-channel-btn:hover {
-    background: #454545;
-}
-
-.pixoo-channel-btn:active {
-    transform: translateY(1px);
-    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.7);
-}
-
-.pixoo-channel-btn.active {
-    background: linear-gradient(180deg, #ffae36, #ff8c00);
-    color: #000;
-}
-
-/* Reboot */
-
-.pixoo-reboot-status {
-    margin-left: 12px;
-    font-size: 0.9rem;
-    opacity: 0.85;
-}
-
-/* Help text */
-
-.pixoo-help {
-    font-size: 0.9rem;
-    opacity: 0.85;
-}
-
-/* Force red gradient for reboot button inside cards */
-.card .btn-danger {
-    background: linear-gradient(180deg, #ff5555, #cc0000);
-    color: #ffffff;
-}
-
-.card .pixoo-channel-btn {
-    padding: 8px 14px;
-    border-radius: 999px;
-    border: none;
-    background: #3a3a3a;
-    color: #f0f0f0;
-    font-size: 14px;
-    font-weight: 500;
-    cursor: pointer;
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
-    transition: background 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
-}
-
-.card .pixoo-channel-btn:hover {
-    background: #454545;
-}
-
-.card .pixoo-channel-btn:active {
-    transform: translateY(1px);
-    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.7);
-}
-
-.card .pixoo-channel-btn.active {
-    background: linear-gradient(180deg, #ffae36, #ff8c00);
-    color: #000;
-}
-
-.pixoo-select {
-    width: 100%;
-    padding: 6px 8px;
-    border-radius: 8px;
-    border: 1px solid #444;
-    background: #222;
-    color: #f0f0f0;
-    font-size: 0.9rem;
-}
-
-
-/* Responsive */
-
 @media (max-width: 800px) {
-    .pixoo-row {
-        flex-direction: column;
-        align-items: flex-start;
-    }
-
-    .pixoo-row label {
-        width: auto;
-    }
-
-    .pixoo-slider-wrap {
-        width: 100%;
-    }
+    .pixoo-row { flex-direction: column; align-items: flex-start; }
+    .pixoo-row label { width: auto; }
+    .pixoo-slider-wrap { width: 100%; }
+    .pixoo-reboot-status { margin-left: 0; display: block; margin-top: 10px; }
 }

@@ -1,75 +1,49 @@
-.about-section {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-}
-.social-card {
-    margin-top: 24px;
-}
-
-.social-links {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    margin-top: 14px;
-}
-
+.about-section { display: grid; gap: 16px; max-width: 940px; margin: 0 auto; }
+.about-section .card { margin-bottom: 0; }
+.about-section p { margin-bottom: 0; }
+.social-card { margin-top: 0; }
+.social-links { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
 .social-item {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
-
-    padding: 8px 12px;
+    gap: 9px;
+    min-height: 44px;
+    padding: 9px 13px;
+    border: 1px solid var(--border);
     border-radius: 999px;
-
-    background: #1f1f1f;
-    color: #e6e6e6;
+    background: rgba(255,255,255,.07);
+    color: var(--text);
     text-decoration: none;
     font-size: 14px;
-    font-weight: 500;
-
-    transition: background 0.2s ease, transform 0.15s ease, box-shadow 0.15s ease;
+    font-weight: 850;
+    transition: background .2s ease, transform .15s ease, box-shadow .15s ease, border-color .15s ease;
 }
-
 .social-item:hover {
-    background: #2a2a2a;
+    background: rgba(255,255,255,.11);
+    border-color: var(--border-strong);
     transform: translateY(-1px);
-    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.35);
+    box-shadow: 0 10px 22px rgba(0,0,0,.24);
+    text-decoration: none;
 }
-
 .social-icon-circle {
-    width: 26px;
-    height: 26px;
+    width: 28px;
+    height: 28px;
     border-radius: 50%;
-    background: #2b2b2b;
+    background: linear-gradient(135deg, var(--purple), var(--pink));
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
+    color: #fff;
 }
-
-.social-icon {
-    width: 16px;
-    height: 16px;
-    display: block;
+.social-icon { width: 16px; height: 16px; display: block; }
+.social-icon path { fill: currentColor; }
+.social-label { white-space: nowrap; }
+@media (min-width: 900px) {
+    .about-section { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .about-section .card:nth-child(3), .about-section .card:nth-child(4) { grid-column: span 2; }
 }
-
-.social-icon path {
-    fill: currentColor;
-}
-
-.social-label {
-    white-space: nowrap;
-}
-
 @media (max-width: 700px) {
-    .social-links {
-        flex-direction: column;
-        align-items: flex-start;
-    }
-
-    .social-item {
-        width: 100%;
-        justify-content: flex-start;
-    }
+    .social-links { flex-direction: column; align-items: stretch; }
+    .social-item { width: 100%; justify-content: flex-start; }
 }
