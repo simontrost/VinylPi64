@@ -274,16 +274,5 @@ function updateAlbumCarousel() {
     });
 }
 
-// UI helper: keep top statistic cards visually equal in expanded/collapsed mode.
-document.addEventListener("click", () => {
-    requestAnimationFrame(() => {
-        const grid = document.querySelector(".stats-grid");
-        if (!grid) return;
-
-        const anyExpanded = Array.from(grid.querySelectorAll(".stats-toggle"))
-            .some((btn) => (btn.textContent || "").trim().toLowerCase() === "less");
-
-        grid.classList.toggle("has-expanded-stats", anyExpanded);
-    });
 });
 

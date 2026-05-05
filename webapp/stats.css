@@ -206,58 +206,67 @@
 }
 
 
-/* FIX: equal height stats cards */
+
+
+/* FIX v5: compact statistic cards + equal-height entries.
+   The cards are no longer forced to expanded height.
+   Instead every list entry gets a stable row height, so Songs/Artists/Albums
+   align visually even when songs contain an artist subtitle. */
 .stats-grid {
-    align-items: stretch;
-}
-
-.stats-card {
-    display: flex;
-    flex-direction: column;
-}
-
-.stats-list {
-    flex: 1;
-}
-
-/* keep button bottom aligned */
-.stats-toggle-wrapper {
-    margin-top: auto;
-}
-
-
-/* FIX v4: force equal heights for the three top statistic cards.
-   Grid stretch alone can be overwritten by earlier rules, so this targets
-   only the direct cards inside .stats-grid and uses !important. */
-.stats-grid {
-    display: grid !important;
-    align-items: stretch !important;
+    align-items: start !important;
 }
 
 .stats-grid > .stats-card {
-    height: 100% !important;
-    min-height: 370px;
-    display: flex !important;
-    flex-direction: column !important;
+    height: auto !important;
+    min-height: 0 !important;
+    display: block !important;
 }
 
 .stats-grid > .stats-card .stats-list {
-    flex: 1 1 auto !important;
+    flex: initial !important;
 }
 
 .stats-grid > .stats-card .stats-toggle-wrapper {
-    margin-top: auto !important;
+    margin-top: 12px !important;
 }
 
-/* When any list is expanded, give all three top cards enough room,
-   so they still stay visually aligned instead of one card becoming taller. */
-.stats-grid:has(.stats-toggle[data-expanded="true"]) > .stats-card,
-.stats-grid:has(.stats-toggle.less) > .stats-card,
-.stats-grid:has(button.stats-toggle:not(:empty)) > .stats-card {
-    min-height: 680px;
+.stats-grid .stats-item {
+    min-height: 60px;
+    display: grid !important;
+    grid-template-columns: 38px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
 }
 
+.stats-grid .stats-rank {
+    min-width: 0;
+}
 
-.stats-grid.has-expanded-stats > .stats-card {
-    min-height: 680px !important;
+.stats-grid .stats-text {
+    align-self: center;
+}
+
+.stats-grid .stats-main {
+    line-height: 1.25;
+}
+
+.stats-grid .stats-sub {
+    min-height: 18px;
+    line-height: 1.25;
+}
+
+/* Artists usually have no subtitle. Reserve the same subtitle space anyway,
+   so artist rows become exactly as high as song/album rows. */
+#stats-artists .stats-sub:empty::before,
+#stats-albums .stats-sub:empty::before {
+    content: "\\00a0";
+}
+
+/* If the JS does not render an empty .stats-sub for artists, reserve space
+   by giving the text block a stable two-line layout. */
+#stats-artists .stats-text,
+#stats-albums .stats-text {
+    display: grid;
+    align-content: center;
+    min-height: 40px;
 }
