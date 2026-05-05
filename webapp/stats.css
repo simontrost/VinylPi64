@@ -224,3 +224,40 @@
 .stats-toggle-wrapper {
     margin-top: auto;
 }
+
+
+/* FIX v4: force equal heights for the three top statistic cards.
+   Grid stretch alone can be overwritten by earlier rules, so this targets
+   only the direct cards inside .stats-grid and uses !important. */
+.stats-grid {
+    display: grid !important;
+    align-items: stretch !important;
+}
+
+.stats-grid > .stats-card {
+    height: 100% !important;
+    min-height: 370px;
+    display: flex !important;
+    flex-direction: column !important;
+}
+
+.stats-grid > .stats-card .stats-list {
+    flex: 1 1 auto !important;
+}
+
+.stats-grid > .stats-card .stats-toggle-wrapper {
+    margin-top: auto !important;
+}
+
+/* When any list is expanded, give all three top cards enough room,
+   so they still stay visually aligned instead of one card becoming taller. */
+.stats-grid:has(.stats-toggle[data-expanded="true"]) > .stats-card,
+.stats-grid:has(.stats-toggle.less) > .stats-card,
+.stats-grid:has(button.stats-toggle:not(:empty)) > .stats-card {
+    min-height: 680px;
+}
+
+
+.stats-grid.has-expanded-stats > .stats-card {
+    min-height: 680px !important;
+}
