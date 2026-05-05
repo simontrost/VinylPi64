@@ -270,3 +270,38 @@
     align-content: center;
     min-height: 40px;
 }
+
+
+/* FIX v7: expanded lists also align.
+   Use a fixed row height for all statistic rows. Long song names are clamped,
+   so Songs/Artists/Albums stay equal with 5 or 10 entries. */
+.stats-grid .stats-item {
+    height: 62px !important;
+    min-height: 62px !important;
+    max-height: 62px !important;
+    overflow: hidden;
+    padding-top: 8px !important;
+    padding-bottom: 8px !important;
+}
+
+.stats-grid .stats-main {
+    line-height: 1.2 !important;
+    max-height: 38px;
+    overflow: hidden;
+}
+
+.stats-grid .stats-sub {
+    height: 17px !important;
+    line-height: 17px !important;
+    margin-top: 3px !important;
+    overflow: hidden;
+}
+
+.stats-grid .stats-badge {
+    align-self: center;
+}
+
+.stats-grid > .stats-card {
+    height: auto !important;
+    min-height: 0 !important;
+}
