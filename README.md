@@ -68,7 +68,7 @@ If you use different hardware, you will most likely have to modify parts of the 
 
 ### WebApp Mobile
 
-| <img src="assets/readme/webapp_dashboard_mobile.jpeg" height="600" /> | <img src="assets/readme/webapp_pixoo_mobile.PNG" height="600" /> |
+| <img src="assets/readme/webapp_dashboard_mobile.jpeg" height="600" /> | <img src="assets/readme/webapp_pixoo_mobile.jpeg" height="600" /> |
 
 ### WebApp Desktop
 
