@@ -1,3 +1,4 @@
+<<<<<<< Updated upstream
 /* Unified modern settings UI */
 .main { max-width: 1320px; }
 
@@ -218,6 +219,299 @@
     border-radius: 999px;
     background: var(--muted);
     transition: transform .15s ease, background .15s ease;
+=======
+.settings-page-title {
+    max-width: 1180px;
+    margin: 0 auto 18px;
+}
+
+.settings-page-title h1 {
+    margin: 0;
+    font-size: clamp(26px, 4vw, 40px);
+}
+
+.settings-page-title p {
+    margin: 10px 0 0;
+    max-width: 680px;
+}
+
+#settings-form {
+    max-width: 1180px;
+    margin: 0 auto;
+}
+
+.settings-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 260px;
+    gap: 20px;
+    align-items: start;
+}
+
+.settings-panels {
+    display: grid;
+    gap: 16px;
+}
+
+.settings-side-panel {
+    position: sticky;
+    top: 24px;
+    display: grid;
+    gap: 14px;
+}
+
+.settings-mini-card {
+    background: rgba(32, 32, 39, 0.92);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    box-shadow: var(--shadow);
+}
+
+.settings-mini-card h3 {
+    margin: 0 0 10px;
+    font-size: 15px;
+}
+
+.settings-mini-card p {
+    margin: 0;
+    font-size: 13px;
+}
+
+.settings-toc {
+    display: grid;
+    gap: 4px;
+}
+
+.settings-toc a {
+    color: var(--muted);
+    text-decoration: none;
+    padding: 8px 10px;
+    border-radius: 10px;
+    font-size: 14px;
+}
+
+.settings-toc a:hover {
+    color: var(--text);
+    background: rgba(255, 255, 255, 0.045);
+}
+
+.settings-card {
+    padding: 0;
+    overflow: hidden;
+}
+
+.settings-card-header {
+    width: 100%;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    padding: 18px 20px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 12px;
+    align-items: center;
+    text-align: left;
+}
+
+.settings-card-header:hover {
+    background: rgba(255, 255, 255, 0.025);
+}
+
+.settings-card-title h2 {
+    margin: 0;
+    font-size: 18px;
+}
+
+.settings-card-title span {
+    display: block;
+    margin-top: 5px;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.chevron {
+    color: var(--muted);
+    transition: transform 0.18s ease;
+}
+
+.settings-card.is-open .chevron {
+    transform: rotate(180deg);
+    color: var(--pink);
+}
+
+.settings-card-content {
+    display: none;
+    padding: 0 20px 20px;
+}
+
+.settings-card.is-open .settings-card-content {
+    display: block;
+}
+
+.form-group {
+    padding: 16px;
+    margin-top: 12px;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.025);
+}
+
+.form-group:first-child {
+    margin-top: 0;
+}
+
+.group-title {
+    margin: 0 0 14px;
+    color: var(--yellow);
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 220px minmax(0, 360px);
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 12px;
+}
+
+.form-row:last-child {
+    margin-bottom: 0;
+}
+
+.form-row label {
+    width: auto;
+    color: var(--muted);
+    font-size: 14px;
+    font-weight: 650;
+}
+
+.form-hint {
+    grid-column: 2;
+    color: var(--muted-2);
+    font-size: 12px;
+    margin-top: -6px;
+}
+
+.form-row input[type="text"],
+.form-row input[type="number"],
+.pixoo-select {
+    height: 42px;
+    width: 100%;
+    min-width: 0;
+    padding: 0 12px;
+    border-radius: 11px;
+    border: 1px solid var(--border-strong);
+    background: #17171d;
+    color: var(--text);
+    font-size: 14px;
+    outline: none;
+}
+
+.form-row input[type="text"]:focus,
+.form-row input[type="number"]:focus,
+.pixoo-select:focus {
+    border-color: rgba(239, 45, 143, 0.7);
+    box-shadow: 0 0 0 3px rgba(239, 45, 143, 0.11);
+}
+
+.form-row input[type="color"] {
+    width: 58px;
+    height: 40px;
+    border-radius: 11px;
+    border: 1px solid var(--border-strong);
+    background: #17171d;
+    padding: 4px;
+    cursor: pointer;
+}
+
+.form-row input[type="checkbox"] {
+    width: 40px;
+    height: 24px;
+    margin: 0;
+    appearance: none;
+    border: 1px solid var(--border-strong);
+    border-radius: 999px;
+    background: #17171d;
+    position: relative;
+    cursor: pointer;
+}
+
+.form-row input[type="checkbox"]::before {
+    content: "";
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    left: 2px;
+    top: 2px;
+    border-radius: 999px;
+    background: var(--muted);
+    transition: transform 0.16s ease, background 0.16s ease;
+}
+
+.form-row input[type="checkbox"]:checked {
+    background: rgba(239, 45, 143, 0.72);
+    border-color: rgba(239, 45, 143, 0.85);
+}
+
+.form-row input[type="checkbox"]:checked::before {
+    transform: translateX(16px);
+    background: #fff;
+}
+
+.form-row input[type="file"] {
+    font-size: 14px;
+    color: var(--muted);
+}
+
+.form-row input[type="file"]::file-selector-button {
+    margin-right: 10px;
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
+    background: #2b2b34;
+    color: var(--text);
+    padding: 8px 12px;
+    cursor: pointer;
+}
+
+.gallery {
+    margin-top: 12px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
+    gap: 12px;
+}
+
+.gallery-item {
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 8px;
+    text-align: center;
+    font-size: 12px;
+    background: rgba(255, 255, 255, 0.025);
+}
+
+.gallery-item.current {
+    border-color: rgba(34, 197, 94, 0.8);
+}
+
+.gallery-item img {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    object-fit: cover;
+    border-radius: 10px;
+    margin-bottom: 8px;
+    image-rendering: pixelated;
+}
+
+.gallery-item button {
+    margin: 3px 2px 0;
+    padding: 7px 9px;
+    font-size: 12px;
+>>>>>>> Stashed changes
 }
 .form-row input[type="checkbox"]:checked { border-color: rgba(255,45,157,.68); background: linear-gradient(135deg, var(--pink), var(--yellow)); }
 .form-row input[type="checkbox"]:checked::before { transform: translateX(19px); background: #fff; }
@@ -241,6 +535,7 @@
     justify-content: space-between;
     align-items: center;
     gap: 12px;
+<<<<<<< Updated upstream
     margin-top: 4px;
     padding: 14px;
     border: 1px solid var(--border);
@@ -248,6 +543,15 @@
     background: rgba(12,10,30,.82);
     backdrop-filter: blur(16px);
     box-shadow: var(--shadow-soft);
+=======
+    margin-top: 18px;
+    padding: 14px;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background: rgba(23, 23, 29, 0.9);
+    backdrop-filter: blur(12px);
+    box-shadow: var(--shadow);
+>>>>>>> Stashed changes
 }
 .settings-toast {
     position: fixed;
@@ -269,6 +573,7 @@
 .settings-toast.show { transform: translateY(0); opacity: 1; }
 .is-hidden-by-setting { display: none !important; }
 
+<<<<<<< Updated upstream
 @media (max-width: 1080px) {
     .settings-shell { grid-template-columns: 1fr; }
     .settings-side-panel { position: static; grid-row: 1; }
@@ -279,4 +584,62 @@
     .form-row { grid-template-columns: 1fr; gap: 8px; }
     .form-hint { grid-column: 1; }
     .settings-actions { flex-direction: column; align-items: stretch; }
+=======
+.settings-toast {
+    position: fixed;
+    right: 22px;
+    bottom: 22px;
+    z-index: 1000;
+    max-width: min(340px, calc(100vw - 44px));
+    padding: 12px 14px;
+    border-radius: 14px;
+    color: #fff;
+    background: #2b2b34;
+    border: 1px solid rgba(239, 45, 143, 0.35);
+    box-shadow: var(--shadow);
+    transform: translateY(18px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.settings-toast.show {
+    transform: translateY(0);
+    opacity: 1;
+}
+
+.is-hidden-by-setting {
+    display: none !important;
+}
+
+@media (max-width: 1050px) {
+    .settings-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .settings-side-panel {
+        position: static;
+        order: -1;
+    }
+
+    .settings-toc {
+        grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+    }
+}
+
+@media (max-width: 760px) {
+    .form-row {
+        grid-template-columns: 1fr;
+        gap: 7px;
+    }
+
+    .form-hint {
+        grid-column: 1;
+    }
+
+    .settings-actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+>>>>>>> Stashed changes
 }

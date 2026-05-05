@@ -1,4 +1,5 @@
 :root {
+<<<<<<< Updated upstream
     --bg: #09081a;
     --bg-2: #11102a;
     --surface: rgba(255, 255, 255, 0.055);
@@ -28,11 +29,36 @@
 * { box-sizing: border-box; }
 
 html { scroll-behavior: smooth; }
+=======
+    --bg: #151519;
+    --bg-soft: #1b1b21;
+    --surface: #202027;
+    --surface-2: #25252d;
+    --border: rgba(255, 255, 255, 0.08);
+    --border-strong: rgba(255, 255, 255, 0.14);
+    --text: #f2f2f4;
+    --muted: #a7a7b0;
+    --muted-2: #74747d;
+    --pink: #ef2d8f;
+    --purple: #7c3aed;
+    --yellow: #f5c542;
+    --danger: #ef4444;
+    --green: #22c55e;
+    --sidebar-w: 190px;
+    --radius: 18px;
+    --shadow: 0 14px 36px rgba(0, 0, 0, 0.28);
+}
+
+* {
+    box-sizing: border-box;
+}
+>>>>>>> Stashed changes
 
 body {
     margin: 0;
     min-height: 100vh;
     background:
+<<<<<<< Updated upstream
         radial-gradient(circle at 18% 8%, rgba(140, 53, 255, 0.34), transparent 34%),
         radial-gradient(circle at 82% 10%, rgba(255, 45, 157, 0.18), transparent 30%),
         radial-gradient(circle at 65% 96%, rgba(255, 212, 42, 0.08), transparent 34%),
@@ -55,10 +81,23 @@ body::before {
         linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
     background-size: 42px 42px;
     mask-image: radial-gradient(circle at center, black, transparent 78%);
+=======
+        radial-gradient(circle at top left, rgba(124, 58, 237, 0.13), transparent 32rem),
+        radial-gradient(circle at top right, rgba(239, 45, 143, 0.09), transparent 28rem),
+        var(--bg);
+    color: var(--text);
+    font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 16px;
+}
+
+a {
+    color: inherit;
+>>>>>>> Stashed changes
 }
 
 .sidebar {
     position: fixed;
+<<<<<<< Updated upstream
     left: 18px;
     top: 18px;
     bottom: 18px;
@@ -80,11 +119,20 @@ body::before {
     line-height: 1.45;
     color: var(--yellow);
     text-shadow: 0 0 18px rgba(255, 212, 42, 0.26);
+=======
+    inset: 0 auto 0 0;
+    width: var(--sidebar-w);
+    height: 100vh;
+    padding: 22px 14px;
+    background: rgba(13, 13, 17, 0.92);
+    border-right: 1px solid var(--border);
+>>>>>>> Stashed changes
 }
 
 .nav {
     display: flex;
     flex-direction: column;
+<<<<<<< Updated upstream
     gap: 8px;
 }
 
@@ -101,10 +149,27 @@ body::before {
     font-size: 14px;
     font-weight: 760;
     transition: color .16s ease, background .16s ease, border-color .16s ease, transform .16s ease;
+=======
+    gap: 6px;
+}
+
+.nav a {
+    display: flex;
+    align-items: center;
+    min-height: 42px;
+    padding: 0 14px;
+    border-radius: 12px;
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 15px;
+    font-weight: 650;
+    transition: color 0.15s ease, background 0.15s ease;
+>>>>>>> Stashed changes
 }
 
 .nav a:hover {
     color: var(--text);
+<<<<<<< Updated upstream
     background: rgba(255,255,255,.055);
     border-color: var(--border);
     transform: translateX(2px);
@@ -123,12 +188,33 @@ body::before {
     padding: 28px clamp(18px, 4vw, 44px) 42px;
     min-height: 100vh;
     max-width: 1320px;
+=======
+    background: rgba(255, 255, 255, 0.045);
+}
+
+.nav a.active {
+    color: var(--text);
+    background: rgba(255, 255, 255, 0.075);
+    box-shadow: inset 3px 0 0 var(--pink);
+}
+
+.pixel-title {
+    font-family: "Press Start 2P", Inter, system-ui, sans-serif;
+    letter-spacing: -0.03em;
+}
+
+.main {
+    margin-left: var(--sidebar-w);
+    padding: 28px clamp(20px, 4vw, 48px);
+    min-height: 100vh;
+>>>>>>> Stashed changes
 }
 
 .main-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
+<<<<<<< Updated upstream
     gap: 22px;
     margin: 0 0 28px;
     padding: 18px 20px;
@@ -152,6 +238,25 @@ body::before {
     border-radius: 22px;
     object-fit: cover;
     box-shadow: 0 0 0 1px var(--border), 0 18px 34px rgba(0,0,0,.38);
+=======
+    gap: 18px;
+    max-width: 1180px;
+    margin: 0 auto 26px;
+}
+
+.header-title {
+    font-size: clamp(20px, 2vw, 26px);
+    color: var(--text);
+}
+
+.header-logo {
+    width: 64px;
+    height: 64px;
+    border-radius: 18px;
+    object-fit: cover;
+    border: 1px solid var(--border);
+    background: #101014;
+>>>>>>> Stashed changes
 }
 
 .card,
@@ -159,6 +264,7 @@ body::before {
 .stats-intro-card,
 .stats-minutes-card,
 .control-section,
+<<<<<<< Updated upstream
 .lyrics-card,
 .settings-mini-card {
     border: 1px solid var(--border);
@@ -212,19 +318,67 @@ button,
     cursor: pointer;
     box-shadow: 0 10px 22px rgba(0,0,0,.22);
     transition: transform .12s ease, background .16s ease, border-color .16s ease, box-shadow .16s ease;
+=======
+.lyrics-card {
+    background: rgba(32, 32, 39, 0.92);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+}
+
+.card {
+    padding: 20px;
+    margin-bottom: 18px;
+}
+
+.card h2,
+.stats-card h2,
+.control-header h2 {
+    margin: 0 0 14px;
+    font-size: 18px;
+    font-weight: 760;
+}
+
+p {
+    color: var(--muted);
+    line-height: 1.55;
+}
+
+button,
+.btn-primary,
+.btn-danger {
+    appearance: none;
+    border: 1px solid var(--border-strong);
+    border-radius: 12px;
+    background: #2b2b34;
+    color: var(--text);
+    padding: 10px 14px;
+    font: inherit;
+    font-size: 14px;
+    font-weight: 720;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+>>>>>>> Stashed changes
 }
 
 button:hover,
 .btn-primary:hover,
+<<<<<<< Updated upstream
 .btn-danger:hover,
 .card button:hover {
     transform: translateY(-1px);
     border-color: var(--border-strong);
     background: rgba(255,255,255,.12);
+=======
+.btn-danger:hover {
+    background: #34343e;
+    border-color: rgba(255, 255, 255, 0.2);
+>>>>>>> Stashed changes
 }
 
 button:active,
 .btn-primary:active,
+<<<<<<< Updated upstream
 .btn-danger:active,
 .card button:active {
     transform: translateY(0);
@@ -241,12 +395,29 @@ button:active,
     border-color: rgba(255, 77, 109, .38);
     color: #fff;
     background: linear-gradient(135deg, var(--red), var(--purple));
+=======
+.btn-danger:active {
+    transform: translateY(1px);
+}
+
+.btn-primary {
+    color: #fff;
+    background: #33333d;
+    border-color: rgba(239, 45, 143, 0.35);
+}
+
+.btn-danger {
+    color: #fff;
+    background: rgba(239, 68, 68, 0.18);
+    border-color: rgba(239, 68, 68, 0.4);
+>>>>>>> Stashed changes
 }
 
 .about-link,
 .track-info-link {
     color: var(--yellow);
     text-decoration: none;
+<<<<<<< Updated upstream
     font-weight: 800;
 }
 
@@ -304,6 +475,31 @@ input[type="checkbox"] {
         border-right: 0;
         border-top: 0;
         padding: 10px 12px;
+=======
+    font-weight: 650;
+}
+
+.about-link:hover,
+.track-info-link:hover {
+    text-decoration: underline;
+}
+
+.hidden {
+    display: none !important;
+}
+
+@media (max-width: 800px) {
+    .sidebar {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        width: 100%;
+        height: auto;
+        padding: 10px;
+        border-right: 0;
+        border-bottom: 1px solid var(--border);
+        overflow-x: auto;
+>>>>>>> Stashed changes
     }
 
     .sidebar::before { display: none; }
@@ -311,6 +507,7 @@ input[type="checkbox"] {
     .nav {
         flex-direction: row;
         gap: 8px;
+<<<<<<< Updated upstream
         overflow-x: auto;
         padding-bottom: 2px;
     }
@@ -320,15 +517,33 @@ input[type="checkbox"] {
         min-height: 38px;
         padding: 9px 12px;
         font-size: 13px;
+=======
+    }
+
+    .nav a {
+        white-space: nowrap;
+        min-height: 38px;
+        padding: 0 12px;
+        font-size: 14px;
+    }
+
+    .nav a.active {
+        box-shadow: inset 0 -3px 0 var(--pink);
+>>>>>>> Stashed changes
     }
 
     .main {
         margin-left: 0;
+<<<<<<< Updated upstream
         padding: 18px 14px 32px;
+=======
+        padding: 18px 14px 28px;
+>>>>>>> Stashed changes
     }
 
     .main-header {
         margin-bottom: 18px;
+<<<<<<< Updated upstream
         padding: 14px;
     }
 
@@ -336,5 +551,13 @@ input[type="checkbox"] {
         width: 60px;
         height: 60px;
         border-radius: 18px;
+=======
+    }
+
+    .header-logo {
+        width: 54px;
+        height: 54px;
+        border-radius: 15px;
+>>>>>>> Stashed changes
     }
 }

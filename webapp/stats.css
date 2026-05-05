@@ -1,3 +1,4 @@
+<<<<<<< Updated upstream
 .stats-section { display: grid; gap: 18px; max-width: 1120px; margin: 0 auto; }
 .stats-intro-card { padding: 24px; display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
 .stats-intro-card h1 { margin: 0 0 8px; font-size: clamp(24px, 3.3vw, 40px); letter-spacing: -0.05em; }
@@ -41,3 +42,211 @@
 .album-slide.side { filter: brightness(.58); }
 @media (max-width: 960px) { .stats-grid, .stats-visual-grid { grid-template-columns: 1fr; } }
 @media (max-width: 800px) { .stats-intro-card { flex-direction: column; align-items: flex-start; } }
+=======
+.stats-section {
+    max-width: 1180px;
+    margin: 0 auto;
+    display: grid;
+    gap: 18px;
+}
+
+.stats-intro-card,
+.stats-minutes-card,
+.stats-card {
+    padding: 20px;
+}
+
+.stats-intro-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+}
+
+.stats-intro-card h1 {
+    margin: 0 0 8px;
+    font-size: clamp(22px, 3vw, 34px);
+}
+
+.stats-subtitle {
+    margin: 0;
+    color: var(--muted);
+    max-width: 720px;
+}
+
+.stats-minutes-card {
+    display: grid;
+    gap: 4px;
+}
+
+.stats-minutes-label,
+.stats-minutes-sub {
+    color: var(--muted);
+    font-size: 14px;
+}
+
+.stats-minutes-value {
+    font-size: clamp(38px, 7vw, 64px);
+    font-weight: 850;
+    line-height: 1;
+    color: var(--text);
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+}
+
+.stats-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.stats-item {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.055);
+}
+
+.stats-item:last-child {
+    border-bottom: 0;
+}
+
+.stats-rank {
+    min-width: 28px;
+    color: var(--yellow);
+    font-weight: 800;
+    font-size: 14px;
+}
+
+.stats-text {
+    flex: 1;
+    min-width: 0;
+}
+
+.stats-main {
+    font-size: 15px;
+    font-weight: 650;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+.stats-sub {
+    margin-top: 4px;
+    font-size: 13px;
+    color: var(--muted);
+}
+
+.stats-badge {
+    font-size: 13px;
+    padding: 4px 8px;
+    border-radius: 999px;
+    background: #2b2b34;
+    color: var(--muted);
+    white-space: nowrap;
+}
+
+.stats-empty {
+    color: var(--muted);
+    font-size: 14px;
+    padding: 8px 0;
+}
+
+.stats-toggle-wrapper {
+    margin-top: 10px;
+    text-align: center;
+}
+
+.stats-toggle {
+    padding: 7px 12px;
+    font-size: 13px;
+}
+
+.stats-visual-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+.stats-chart-card {
+    min-height: 340px;
+}
+
+.stats-chart-card canvas {
+    width: 100% !important;
+    max-height: 280px;
+}
+
+.album-carousel-card {
+    overflow: hidden;
+    position: relative;
+}
+
+.album-carousel {
+    position: relative;
+    height: 270px;
+    margin-top: 10px;
+    perspective: 900px;
+}
+
+.album-slide {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 150px;
+    height: 150px;
+    transform-style: preserve-3d;
+    transition: transform 900ms ease, opacity 900ms ease, filter 900ms ease;
+}
+
+.album-slide img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 16px;
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55);
+}
+
+.album-slide-title {
+    margin-top: 10px;
+    text-align: center;
+    font-size: 12px;
+    color: var(--muted);
+    opacity: 0;
+    transition: opacity 900ms ease;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.album-slide.active .album-slide-title {
+    opacity: 1;
+}
+
+.album-slide.active {
+    z-index: 10;
+}
+
+.album-slide.side {
+    filter: brightness(0.65);
+}
+
+@media (max-width: 900px) {
+    .stats-grid,
+    .stats-visual-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .stats-intro-card {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}
+>>>>>>> Stashed changes

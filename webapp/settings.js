@@ -457,3 +457,16 @@ loadConfig();
         }
     });
 }
+
+// Minimal UI accordion behavior
+document.addEventListener("DOMContentLoaded", () => {
+    document.querySelectorAll(".settings-card-header").forEach((btn) => {
+        btn.addEventListener("click", () => {
+            const card = btn.closest(".settings-card");
+            if (!card) return;
+            const isOpen = card.classList.toggle("is-open");
+            btn.setAttribute("aria-expanded", String(isOpen));
+        });
+    });
+});
+

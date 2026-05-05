@@ -1,3 +1,4 @@
+<<<<<<< Updated upstream
 .pixoo-section { display: grid; gap: 16px; max-width: 1040px; margin: 0 auto; }
 .pixoo-section .card { margin-bottom: 0; }
 .pixoo-status-text { margin: 0 0 6px; font-size: 1rem; font-weight: 780; }
@@ -24,4 +25,100 @@
     .pixoo-row label { width: auto; }
     .pixoo-slider-wrap { width: 100%; }
     .pixoo-reboot-status { margin-left: 0; display: block; margin-top: 10px; }
+=======
+.pixoo-section {
+    max-width: 1040px;
+    margin: 0 auto;
+    display: grid;
+    gap: 16px;
+}
+
+.pixoo-status-text {
+    margin: 0 0 6px;
+    color: var(--text);
+    font-weight: 650;
+}
+
+.pixoo-status-sub,
+.pixoo-help {
+    margin: 0;
+    color: var(--muted);
+    font-size: 14px;
+}
+
+.pixoo-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-top: 12px;
+}
+
+.pixoo-row label {
+    width: 150px;
+    color: var(--muted);
+    font-size: 14px;
+    font-weight: 650;
+}
+
+.pixoo-slider-wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+#pixooBrightness {
+    width: 100%;
+    accent-color: var(--pink);
+}
+
+.pixoo-slider-value {
+    min-width: 44px;
+    text-align: right;
+    color: var(--muted);
+    font-size: 14px;
+}
+
+.pixoo-channel-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 9px;
+    margin-top: 12px;
+}
+
+.pixoo-channel-btn.active {
+    border-color: rgba(245, 197, 66, 0.7);
+    color: var(--yellow);
+    background: rgba(245, 197, 66, 0.1);
+}
+
+.pixoo-reboot-status {
+    color: var(--muted);
+    font-size: 14px;
+}
+
+.pixoo-select {
+    width: 100%;
+}
+
+.card .btn-danger {
+    color: #fff;
+    background: rgba(239, 68, 68, 0.18);
+    border-color: rgba(239, 68, 68, 0.4);
+}
+
+@media (max-width: 800px) {
+    .pixoo-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .pixoo-row label {
+        width: auto;
+    }
+
+    .pixoo-slider-wrap {
+        width: 100%;
+    }
+>>>>>>> Stashed changes
 }

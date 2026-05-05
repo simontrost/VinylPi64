@@ -1,4 +1,18 @@
+<<<<<<< Updated upstream
 :root{
+    --content-max: 1040px;
+    --content-w: min(var(--content-max), 100%);
+}
+
+.song-section,
+.lyrics-section,
+.control-section {
+    width: var(--content-w);
+    max-width: var(--content-max);
+    margin-left: auto;
+    margin-right: auto;
+=======
+:root {
     --content-max: 1040px;
     --content-w: min(var(--content-max), 100%);
 }
@@ -12,11 +26,18 @@
     margin-right: auto;
 }
 
+.song-section {
+    margin-top: 8px;
+    margin-bottom: 18px;
+>>>>>>> Stashed changes
+}
+
 .song-section { margin-top: 4px; margin-bottom: 18px; }
 
 .song-card {
     position: relative;
     width: 100%;
+<<<<<<< Updated upstream
     min-height: 520px;
     padding: clamp(26px, 4vw, 44px);
     border: 1px solid var(--border);
@@ -33,6 +54,19 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
+=======
+    padding: clamp(22px, 4vw, 34px);
+    border-radius: 22px;
+    background:
+        linear-gradient(135deg,
+            color-mix(in srgb, var(--song-bg, #25252d) 80%, #111 20%),
+            color-mix(in srgb, var(--song-bg, #25252d) 35%, #151519 65%)
+        );
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+    display: grid;
+    justify-items: center;
+>>>>>>> Stashed changes
     text-align: center;
     transition: background .35s ease;
 }
@@ -59,6 +93,7 @@
 }
 
 .song-cover {
+<<<<<<< Updated upstream
     position: relative;
     z-index: 1;
     width: min(330px, 62vw);
@@ -127,25 +162,105 @@
     grid-template-columns: repeat(3, 1fr);
     gap: 10px;
     width: 100%;
+=======
+    width: min(330px, 68vw);
+    height: min(330px, 68vw);
+    border-radius: 18px;
+    object-fit: cover;
+    margin-bottom: 22px;
+    box-shadow: 0 18px 36px rgba(0, 0, 0, 0.36);
+}
+
+.song-artist {
+    font-size: 16px;
+    color: var(--muted);
+    margin-bottom: 5px;
+}
+
+.song-title {
+    font-size: clamp(22px, 3vw, 34px);
+    font-weight: 820;
+    line-height: 1.15;
+}
+
+.song-album {
+    margin-top: 8px;
+    font-size: 15px;
+    color: var(--muted);
+}
+
+.lyrics-section {
+    margin-top: 0;
+}
+
+.lyrics-card {
+    padding: 14px;
+    box-shadow: none;
+}
+
+.lyrics-card:not(.expanded) {
+    max-width: 520px;
+}
+
+.lyrics-card.expanded {
+    max-width: var(--content-max);
+}
+
+.lyrics-box {
+    background: #111116;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 14px;
+    color: #eeeeef;
+    white-space: pre-wrap;
+    line-height: 1.45;
+    font-size: 14px;
+}
+
+.lyrics-box.collapsed {
+    max-height: 180px;
+    overflow: hidden;
+}
+
+.lyrics-footer {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 12px;
+>>>>>>> Stashed changes
 }
 
 #btn-lyrics,
 #btn-track-info,
+<<<<<<< Updated upstream
 #btn-lyrics-toggle{
     width: 100%;
     min-width: 0;
     border: 0;
     color: #100c1d;
+=======
+#btn-lyrics-toggle {
+    min-width: 100px;
+>>>>>>> Stashed changes
 }
 #btn-lyrics{ background: linear-gradient(135deg, var(--purple), var(--pink)); color: #fff; }
 #btn-lyrics-toggle{ background: linear-gradient(135deg, var(--pink), var(--yellow)); }
 #btn-track-info{ background: linear-gradient(135deg, var(--yellow), var(--orange)); }
 
+<<<<<<< Updated upstream
 .control-section{
+=======
+#btn-lyrics-toggle {
+    border-color: rgba(239, 45, 143, 0.32);
+}
+
+.control-section {
+>>>>>>> Stashed changes
     margin-top: 18px;
     padding: 18px 20px;
 }
 
+<<<<<<< Updated upstream
 .control-header {
     display: flex;
     align-items: center;
@@ -167,24 +282,66 @@
 .rec-status-running { background: rgba(51, 228, 155, .16); color: #a9ffd9; }
 .rec-status-stopped { background: rgba(255, 77, 109, .18); color: #ffc0cc; }
 
+=======
+.control-header,
+>>>>>>> Stashed changes
 .toggle-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 1rem;
+    gap: 14px;
 }
+
+.control-header {
+    margin-bottom: 14px;
+}
+
+.rec-status-text {
+    font-size: 13px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: #2b2b34;
+    color: var(--muted);
+    border: 1px solid var(--border);
+}
+
+.rec-status-running {
+    color: #bbf7d0;
+    background: rgba(34, 197, 94, 0.12);
+    border-color: rgba(34, 197, 94, 0.24);
+}
+
+.rec-status-stopped {
+    color: #fecaca;
+    background: rgba(239, 68, 68, 0.13);
+    border-color: rgba(239, 68, 68, 0.24);
+}
+<<<<<<< Updated upstream
 .toggle-label { color: var(--muted); font-weight: 760; }
+=======
+
+.toggle-label {
+    color: var(--muted);
+    font-weight: 650;
+}
+>>>>>>> Stashed changes
 
 .toggle-switch {
     position: relative;
     display: inline-block;
+<<<<<<< Updated upstream
     width: 72px;
     height: 36px;
+=======
+    width: 62px;
+    height: 32px;
+>>>>>>> Stashed changes
 }
 .toggle-switch input { opacity: 0; width: 0; height: 0; }
 .toggle-slider {
     position: absolute;
     inset: 0;
+<<<<<<< Updated upstream
     background: rgba(255,255,255,.1);
     border: 1px solid var(--border);
     border-radius: 999px;
@@ -206,6 +363,34 @@
 .toggle-switch input:checked + .toggle-slider {
     background: linear-gradient(135deg, var(--pink), var(--yellow));
     box-shadow: 0 0 0 4px rgba(255,45,157,.12);
+=======
+    background: #2b2b34;
+    border: 1px solid var(--border-strong);
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.toggle-slider::before {
+    content: "";
+    position: absolute;
+    width: 24px;
+    height: 24px;
+    left: 3px;
+    top: 3px;
+    border-radius: 50%;
+    background: #e8e8ea;
+    transition: transform 0.2s ease;
+}
+
+.toggle-switch input:checked + .toggle-slider {
+    background: rgba(239, 45, 143, 0.75);
+    border-color: rgba(239, 45, 143, 0.85);
+}
+
+.toggle-switch input:checked + .toggle-slider::before {
+    transform: translateX(30px);
+>>>>>>> Stashed changes
 }
 .toggle-switch input:checked + .toggle-slider::before { transform: translateX(36px); }
 .toggle-switch input:disabled + .toggle-slider { opacity: .55; cursor: default; }
@@ -213,12 +398,17 @@
 .info-backdrop {
     position: fixed;
     inset: 0;
+<<<<<<< Updated upstream
     background: rgba(4, 3, 12, 0.62);
     backdrop-filter: blur(8px);
+=======
+    background: rgba(0, 0, 0, 0.48);
+>>>>>>> Stashed changes
     z-index: 40;
 }
 .track-info-drawer {
     position: fixed;
+<<<<<<< Updated upstream
     top: 14px;
     right: 14px;
     bottom: 14px;
@@ -252,4 +442,96 @@
     .lyrics-footer { gap: 8px; }
     #btn-lyrics, #btn-track-info, #btn-lyrics-toggle { padding: 10px 8px; font-size: 13px; }
     .control-header { align-items: flex-start; flex-direction: column; }
+=======
+    top: 0;
+    right: 0;
+    width: min(430px, 92vw);
+    height: 100vh;
+    background: #17171c;
+    color: var(--text);
+    z-index: 50;
+    box-shadow: -18px 0 44px rgba(0, 0, 0, 0.55);
+    transform: translateX(105%);
+    transition: transform 0.25s ease;
+    padding: 24px;
+    overflow-y: auto;
+    border-left: 1px solid var(--border);
+}
+
+.track-info-drawer.open {
+    transform: translateX(0);
+}
+
+.track-info-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    margin-bottom: 22px;
+}
+
+.track-info-label {
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 7px;
+}
+
+.track-info-header h2 {
+    margin: 0;
+    font-size: 20px;
+}
+
+.track-info-close {
+    width: 36px;
+    height: 36px;
+    border-radius: 999px;
+    font-size: 22px;
+    line-height: 1;
+    padding: 0;
+}
+
+.track-info-content {
+    font-size: 14px;
+    line-height: 1.45;
+}
+
+.track-info-block {
+    background: #202027;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 14px;
+    margin-bottom: 14px;
+}
+
+.track-info-block h3 {
+    margin: 0 0 10px;
+    font-size: 15px;
+}
+
+.track-info-row {
+    margin: 7px 0;
+    color: var(--muted);
+}
+
+.track-info-row strong {
+    color: var(--text);
+}
+
+@media (max-width: 800px) {
+    .song-card {
+        padding: 22px 18px;
+    }
+
+    .lyrics-footer {
+        gap: 8px;
+    }
+
+    #btn-lyrics,
+    #btn-track-info,
+    #btn-lyrics-toggle {
+        flex: 1;
+        min-width: 0;
+        padding-inline: 8px;
+    }
+>>>>>>> Stashed changes
 }
