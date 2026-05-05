@@ -273,6 +273,3 @@ function updateAlbumCarousel() {
         `;
     });
 }
-
-});
-
