@@ -2,6 +2,8 @@ import os
 import time
 import requests
 
+from vinylpi.core.stats_db import upsert_tag_cache as db_upsert_tag_cache
+
 LASTFM_URL = "https://ws.audioscrobbler.com/2.0/"
 
 BLACKLIST = {
@@ -67,11 +69,6 @@ def get_cached_or_fetch_tags(stats: dict, artist: str, title: str) -> list[dict]
         print(f"Last.fm tags failed for {artist} – {title}: {e}")
         tags = []
 
-    cache[key] = {
-        "artist": artist,
-        "title": title,
-        "tags": tags,
-        "ts": int(time.time()),
-    }
-
+    cache[key] = {"artist": artist, "title": title, "tags": tags, "ts": int(time.time())}
+    db_upsert_tag_cache(artist, title, tags)
     return tags

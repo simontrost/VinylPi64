@@ -1,15 +1,14 @@
 import json
-from vinylpi.paths import STATS_PATH
 from collections import Counter
+
 from vinylpi.core.genre_tags import get_cached_or_fetch_tags
+from vinylpi.core.stats_db import get_stats_snapshot
 
 def get_top_stats(limit: int = 10):
-    if not STATS_PATH.exists():
-        return {"top_songs": [], "top_artists": [], "top_albums": []}
-
     try:
-        stats = json.loads(STATS_PATH.read_text(encoding="utf-8"))
-    except Exception:
+        stats = get_stats_snapshot()
+    except Exception as e:
+        print(f"Could not load stats from SQLite: {e}")
         return {"top_songs": [], "top_artists": [], "top_albums": []}
 
     songs = list((stats.get("songs") or {}).values())
@@ -75,8 +74,6 @@ def get_top_stats(limit: int = 10):
     ]
 
     radar_tags = top_tags[:6]
-
-    STATS_PATH.write_text(json.dumps(stats, indent=4), encoding="utf-8")
 
     return {
         "top_songs": songs_sorted,

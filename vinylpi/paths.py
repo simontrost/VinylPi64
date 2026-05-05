@@ -5,7 +5,7 @@ DATA_DIR = BASE_DIR / "data"
 
 CONFIG_PATH = DATA_DIR / "config.json"
 STATS_PATH = DATA_DIR / "stats.json"
-
+DB_PATH = DATA_DIR / "vinylpi.db"
 STATUS_PATH = DATA_DIR / "status.json"
 
 WEBAPP_DIR = BASE_DIR / "webapp"

@@ -7,7 +7,14 @@ import base64
 from urllib.parse import quote_plus
 from vinylpi.paths import STATS_PATH, BASE_DIR, MB_URL, MB_UA
 import re
-
+from vinylpi.core.stats_db import (
+    update_song_stats as db_update_song_stats,
+    increment_album_session as db_increment_album_session,
+    add_listening_seconds as db_add_listening_seconds,
+    update_song_duration as db_update_song_duration,
+    add_measured_seconds_to_song as db_add_measured_seconds_to_song,
+    upsert_duration_cache as db_upsert_duration_cache,
+)
 def _load_stats() -> dict:
     if STATS_PATH.exists():
         try:
@@ -30,6 +37,7 @@ def _save_stats(stats: dict) -> None:
 
 
 def _update_stats(artist: str, title: str, album: str | None, cover_url: str | None = None) -> None:
+    db_update_song_stats(artist, title, album, cover_url)
     stats = _load_stats()
 
     song_key = f"{artist} – {title}"
@@ -59,6 +67,7 @@ def _update_stats(artist: str, title: str, album: str | None, cover_url: str | N
 
 
 def _increment_album_session(album: str) -> None:
+    db_increment_album_session(album)
     if not album:
         return
 
@@ -355,10 +364,29 @@ def add_listen_time_minutes_for_confirmed_song(
             "source": source,
         }
 
-    stats["listening"]["total_seconds"] = (
-        float(stats["listening"]["total_seconds"]) + (ms / 1000.0)
+        db_upsert_duration_cache(
+            artist=artist,
+            title=title,
+            album=album,
+            ms=int(ms),
+            minutes=float(minutes),
+            source=source,
+        )
+        
+    listen_seconds = ms / 1000.0
+
+    db_add_listening_seconds(listen_seconds)
+    db_update_song_duration(
+        artist=artist,
+        title=title,
+        duration_ms=int(ms),
+        duration_minutes=round(minutes, 2),
+        duration_source=source,
     )
 
+    stats["listening"]["total_seconds"] = (
+        float(stats["listening"]["total_seconds"]) + listen_seconds
+    )
     songs = stats.setdefault("songs", {})
     entry = songs.get(song_key) or {
         "artist": artist,
@@ -395,6 +423,16 @@ def add_measured_listen_time_seconds(
 
     if seconds < 10:
         return {"ok": False, "error": "Measured listen time too short"}
+
+    db_add_listening_seconds(seconds)
+    db_update_song_duration(
+        artist=artist,
+        title=title,
+        duration_ms=int(seconds * 1000),
+        duration_minutes=round(seconds / 60.0, 2),
+        duration_source="measured_timer",
+    )
+    db_add_measured_seconds_to_song(artist, title, seconds)
 
     stats = _load_stats()
     stats.setdefault("listening", {})
