@@ -204,3 +204,23 @@
         align-items: flex-start;
     }
 }
+
+
+/* FIX: equal height stats cards */
+.stats-grid {
+    align-items: stretch;
+}
+
+.stats-card {
+    display: flex;
+    flex-direction: column;
+}
+
+.stats-list {
+    flex: 1;
+}
+
+/* keep button bottom aligned */
+.stats-toggle-wrapper {
+    margin-top: auto;
+}

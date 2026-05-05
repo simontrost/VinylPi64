@@ -298,3 +298,14 @@
         padding-inline: 8px;
     }
 }
+
+
+/* FIX: center lyrics + buttons */
+.lyrics-card {
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.lyrics-footer {
+    justify-content: center !important;
+}
