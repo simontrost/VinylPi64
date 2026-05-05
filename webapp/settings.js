@@ -1,60 +1,3 @@
-
-function showToast(message, timeout = 2400) {
-    const toast = document.getElementById("settingsToast");
-    if (!toast) {
-        alert(message);
-        return;
-    }
-    toast.textContent = message;
-    toast.classList.add("show");
-    window.clearTimeout(showToast._timer);
-    showToast._timer = window.setTimeout(() => toast.classList.remove("show"), timeout);
-}
-
-function setRowHidden(selector, hidden) {
-    document.querySelectorAll(selector).forEach(el => {
-        el.classList.toggle("is-hidden-by-setting", !!hidden);
-    });
-}
-
-function updateConditionalUI() {
-    const useDynamicBg = document.getElementById("useDynamicBg");
-    const useDynamicText = document.getElementById("useDynamicText");
-    const discoveryEnabled = document.getElementById("discoveryEnabled");
-    const useHA = document.getElementById("useHA");
-
-    if (useDynamicBg) setRowHidden('[data-setting-row="manual-bg"]', useDynamicBg.checked);
-    if (useDynamicText) setRowHidden('[data-setting-row="manual-text"]', useDynamicText.checked);
-    if (discoveryEnabled) setRowHidden('[data-setting-row="discovery-details"]', !discoveryEnabled.checked);
-    if (useHA) setRowHidden('[data-setting-row="ha-details"]', !useHA.checked);
-}
-
-function initSettingsUI() {
-    document.querySelectorAll(".settings-card-header").forEach(header => {
-        header.addEventListener("click", () => {
-            const card = header.closest(".settings-card");
-            if (!card) return;
-            const isOpen = card.classList.toggle("is-open");
-            header.setAttribute("aria-expanded", String(isOpen));
-        });
-    });
-
-    document.querySelectorAll('.settings-toc a[href^="#"]').forEach(link => {
-        link.addEventListener("click", () => {
-            const target = document.querySelector(link.getAttribute("href"));
-            if (!target) return;
-            target.classList.add("is-open");
-            const header = target.querySelector(".settings-card-header");
-            if (header) header.setAttribute("aria-expanded", "true");
-        });
-    });
-
-    ["useDynamicBg", "useDynamicText", "discoveryEnabled", "useHA"].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.addEventListener("change", updateConditionalUI);
-    });
-}
-
 let CURRENT_CFG = null;
 
 function rgbToHex(arr) {
@@ -96,7 +39,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const data = await res.json();
         if (data.ok && data.image_path) {
           fallbackPathInput.value = data.image_path;
-          showToast("Fallback image updated.");
+          alert("Fallback image updated.");
           if (!galleryContainer.classList.contains("hidden")) {
             await loadFallbackGallery();
           }
@@ -296,8 +239,6 @@ async function loadConfig() {
         homeassistant.base_url || "";
     document.getElementById("webHookID").value =
         homeassistant.webhook_id || "";
-
-    updateConditionalUI();
 }
 
 document.getElementById("settings-form").addEventListener("submit", async (e) => {
@@ -431,11 +372,10 @@ document.getElementById("settings-form").addEventListener("submit", async (e) =>
         body: JSON.stringify(cfg),
     });
 
-    showToast("Settings saved.");
+    alert("Saved settings.");
     
 });
 
-initSettingsUI();
 loadConfig();
 
 const resetBtn = document.getElementById("reset-defaults");
@@ -449,9 +389,8 @@ if (resetBtn) {
 
         const data = await res.json().catch(() => ({}));
         if (data.ok) {
-            await initSettingsUI();
-loadConfig();
-            showToast("Settings reset to defaults.");
+            await loadConfig();
+            alert("Settings reset to defaults.");
         } else {
             alert("Reset failed.");
         }

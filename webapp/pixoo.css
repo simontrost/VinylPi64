@@ -1,31 +1,3 @@
-<<<<<<< Updated upstream
-.pixoo-section { display: grid; gap: 16px; max-width: 1040px; margin: 0 auto; }
-.pixoo-section .card { margin-bottom: 0; }
-.pixoo-status-text { margin: 0 0 6px; font-size: 1rem; font-weight: 780; }
-.pixoo-status-sub { margin: 0; font-size: .9rem; color: var(--muted); }
-.pixoo-row { display: flex; align-items: center; gap: 16px; margin-top: 12px; }
-.pixoo-row label { width: 150px; font-weight: 780; font-size: 14px; color: rgba(246,244,255,.88); }
-.pixoo-slider-wrap { flex: 1; display: flex; align-items: center; gap: 12px; }
-#pixooBrightness { width: 100%; }
-.pixoo-slider-value { min-width: 48px; text-align: right; font-size: .9rem; color: var(--muted); font-weight: 800; }
-.pixoo-channel-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
-.pixoo-channel-btn.active { border: 0; color: #100c1d; background: linear-gradient(135deg, var(--yellow), var(--pink)); }
-.pixoo-reboot-status { margin-left: 12px; font-size: .9rem; color: var(--muted); }
-.pixoo-help { margin: 0 0 10px; font-size: .92rem; line-height: 1.5; }
-.pixoo-select { width: 100%; padding: 0 12px; }
-.card .btn-danger { background: linear-gradient(135deg, var(--red), var(--purple)); color: #fff; }
-@media (min-width: 980px) {
-    .pixoo-section { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .pixoo-section .card:first-child,
-    .pixoo-section .card:nth-child(4),
-    .pixoo-section .card:nth-child(5) { grid-column: span 2; }
-}
-@media (max-width: 800px) {
-    .pixoo-row { flex-direction: column; align-items: flex-start; }
-    .pixoo-row label { width: auto; }
-    .pixoo-slider-wrap { width: 100%; }
-    .pixoo-reboot-status { margin-left: 0; display: block; margin-top: 10px; }
-=======
 .pixoo-section {
     max-width: 1040px;
     margin: 0 auto;
@@ -120,5 +92,4 @@
     .pixoo-slider-wrap {
         width: 100%;
     }
->>>>>>> Stashed changes
 }

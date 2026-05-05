@@ -1,48 +1,3 @@
-<<<<<<< Updated upstream
-.stats-section { display: grid; gap: 18px; max-width: 1120px; margin: 0 auto; }
-.stats-intro-card { padding: 24px; display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
-.stats-intro-card h1 { margin: 0 0 8px; font-size: clamp(24px, 3.3vw, 40px); letter-spacing: -0.05em; }
-.stats-subtitle { margin: 0; font-size: .98rem; color: var(--muted); max-width: 760px; }
-.stats-minutes-card {
-    padding: 22px 24px;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    background:
-        radial-gradient(circle at 0 0, rgba(255,212,42,.16), transparent 36%),
-        linear-gradient(135deg, rgba(255,45,157,.13), rgba(255,255,255,.04));
-}
-.stats-minutes-label { font-size: .86rem; color: var(--muted); font-weight: 850; text-transform: uppercase; letter-spacing: .08em; }
-.stats-minutes-value { font-size: clamp(36px, 6vw, 70px); font-weight: 950; line-height: 1; letter-spacing: -0.07em; }
-.stats-minutes-sub { font-size: .86rem; color: var(--muted); }
-.stats-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
-.stats-card { padding: 20px; }
-.stats-card h2 { margin: 0 0 14px; font-size: 18px; }
-.stats-list { list-style: none; padding: 0; margin: 0; }
-.stats-item { display: flex; align-items: flex-start; justify-content: space-between; gap: .75rem; padding: .7rem 0; border-bottom: 1px solid rgba(255,255,255,.07); min-height: 2.7rem; }
-.stats-item:last-child { border-bottom: none; }
-.stats-rank { font-weight: 950; font-size: .86rem; color: var(--yellow); min-width: 2.2rem; }
-.stats-text { flex: 1; min-width: 0; }
-.stats-main { font-size: .95rem; font-weight: 800; color: var(--text); white-space: normal; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-.stats-sub { font-size: .8rem; color: var(--muted); }
-.stats-badge { font-size: .78rem; font-weight: 900; padding: .18rem .55rem; border-radius: 999px; background: rgba(255,255,255,.09); color: var(--yellow); white-space: nowrap; }
-.stats-empty { padding: .6rem 0; font-size: .9rem; color: var(--muted); }
-.stats-toggle-wrapper { margin-top: .5rem; text-align: center; }
-.stats-toggle { min-height: 32px; padding: 5px 12px; font-size: .75rem; }
-.stats-visual-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-.stats-chart-card { min-height: 340px; }
-.stats-chart-card canvas { width: 100% !important; max-height: 280px; }
-.album-carousel-card { overflow: hidden; position: relative; }
-.album-carousel { position: relative; height: 270px; margin-top: 1rem; perspective: 900px; }
-.album-slide { position: absolute; top: 50%; left: 50%; width: 150px; height: 150px; transform-style: preserve-3d; transition: transform 900ms ease, opacity 900ms ease, filter 900ms ease; }
-.album-slide img { width: 100%; height: 100%; object-fit: cover; border-radius: 22px; box-shadow: 0 22px 44px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.12); }
-.album-slide-title { margin-top: .7rem; text-align: center; font-size: .78rem; color: var(--muted); opacity: 0; transition: opacity 900ms ease; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.album-slide.active { z-index: 10; }
-.album-slide.active .album-slide-title { opacity: 1; color: var(--text); }
-.album-slide.side { filter: brightness(.58); }
-@media (max-width: 960px) { .stats-grid, .stats-visual-grid { grid-template-columns: 1fr; } }
-@media (max-width: 800px) { .stats-intro-card { flex-direction: column; align-items: flex-start; } }
-=======
 .stats-section {
     max-width: 1180px;
     margin: 0 auto;
@@ -249,4 +204,3 @@
         align-items: flex-start;
     }
 }
->>>>>>> Stashed changes
