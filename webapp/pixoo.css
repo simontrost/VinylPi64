@@ -1,37 +1,35 @@
-/* pixoo.css */
-
 .pixoo-section {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
+    max-width: 1040px;
+    margin: 0 auto;
+    display: grid;
+    gap: 16px;
 }
-
-/* Status */
 
 .pixoo-status-text {
-    margin: 0 0 0.3rem 0;
-    font-size: 0.95rem;
+    margin: 0 0 6px;
+    color: var(--text);
+    font-weight: 650;
 }
 
-.pixoo-status-sub {
+.pixoo-status-sub,
+.pixoo-help {
     margin: 0;
-    font-size: 0.85rem;
-    opacity: 0.8;
+    color: var(--muted);
+    font-size: 14px;
 }
-
-/* Brightness row */
 
 .pixoo-row {
     display: flex;
     align-items: center;
-    gap: 16px;
-    margin-top: 8px;
+    gap: 14px;
+    margin-top: 12px;
 }
 
 .pixoo-row label {
-    width: 140px;
-    font-weight: 500;
-    font-size: 16px;
+    width: 150px;
+    color: var(--muted);
+    font-size: 14px;
+    font-weight: 650;
 }
 
 .pixoo-slider-wrap {
@@ -43,116 +41,48 @@
 
 #pixooBrightness {
     width: 100%;
+    accent-color: var(--pink);
 }
 
 .pixoo-slider-value {
-    min-width: 42px;
+    min-width: 44px;
     text-align: right;
-    font-size: 0.9rem;
-    opacity: 0.85;
+    color: var(--muted);
+    font-size: 14px;
 }
-
-/* Channel buttons */
 
 .pixoo-channel-grid {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem;
-    margin-top: 0.5rem;
-}
-
-.pixoo-channel-btn {
-    padding: 8px 14px;
-    border-radius: 999px;
-    border: none;
-    background: #3a3a3a;
-    color: #f0f0f0;
-    font-size: 14px;
-    font-weight: 500;
-    cursor: pointer;
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
-    transition: background 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
-}
-
-.pixoo-channel-btn:hover {
-    background: #454545;
-}
-
-.pixoo-channel-btn:active {
-    transform: translateY(1px);
-    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.7);
+    gap: 9px;
+    margin-top: 12px;
 }
 
 .pixoo-channel-btn.active {
-    background: linear-gradient(180deg, #ffae36, #ff8c00);
-    color: #000;
+    border-color: rgba(245, 197, 66, 0.7);
+    color: var(--yellow);
+    background: rgba(245, 197, 66, 0.1);
 }
-
-/* Reboot */
 
 .pixoo-reboot-status {
-    margin-left: 12px;
-    font-size: 0.9rem;
-    opacity: 0.85;
-}
-
-/* Help text */
-
-.pixoo-help {
-    font-size: 0.9rem;
-    opacity: 0.85;
-}
-
-/* Force red gradient for reboot button inside cards */
-.card .btn-danger {
-    background: linear-gradient(180deg, #ff5555, #cc0000);
-    color: #ffffff;
-}
-
-.card .pixoo-channel-btn {
-    padding: 8px 14px;
-    border-radius: 999px;
-    border: none;
-    background: #3a3a3a;
-    color: #f0f0f0;
+    color: var(--muted);
     font-size: 14px;
-    font-weight: 500;
-    cursor: pointer;
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
-    transition: background 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
-}
-
-.card .pixoo-channel-btn:hover {
-    background: #454545;
-}
-
-.card .pixoo-channel-btn:active {
-    transform: translateY(1px);
-    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.7);
-}
-
-.card .pixoo-channel-btn.active {
-    background: linear-gradient(180deg, #ffae36, #ff8c00);
-    color: #000;
 }
 
 .pixoo-select {
     width: 100%;
-    padding: 6px 8px;
-    border-radius: 8px;
-    border: 1px solid #444;
-    background: #222;
-    color: #f0f0f0;
-    font-size: 0.9rem;
 }
 
-
-/* Responsive */
+.card .btn-danger {
+    color: #fff;
+    background: rgba(239, 68, 68, 0.18);
+    border-color: rgba(239, 68, 68, 0.4);
+}
 
 @media (max-width: 800px) {
     .pixoo-row {
         flex-direction: column;
-        align-items: flex-start;
+        align-items: stretch;
     }
 
     .pixoo-row label {
