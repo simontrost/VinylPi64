@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" fill="none">
+  <rect width="512" height="512" rx="84" fill="#06081A"/>
+
+  <g transform="translate(49 48)">
+    <!-- Left vinyl half -->
+    <path d="M164 44 A164 164 0 0 0 164 372" stroke="#A53CFF" stroke-width="18" stroke-linecap="round" fill="none"/>
+    <path d="M164 106 A102 102 0 0 0 164 310" stroke="#7C2BE0" stroke-width="16" stroke-linecap="round" fill="none"/>
+    <path d="M164 150 A58 58 0 0 0 164 266" stroke="#6723BE" stroke-width="14" stroke-linecap="round" fill="none"/>
+    <line x1="164" y1="44" x2="164" y2="372" stroke="#A53CFF" stroke-width="18" stroke-linecap="round"/>
+    <circle cx="164" cy="208" r="54" fill="#C33DFF"/>
+    <circle cx="164" cy="208" r="15" fill="#06081A"/>
+
+    <!-- Right pcb half -->
+    <path d="M200 44 H336 L396 104 V160 H380 V196 L410 226 V312 L354 372 H200 V44Z" stroke="#FF4FB8" stroke-width="18" stroke-linejoin="round" fill="none"/>
+
+    <!-- traces -->
+    <path d="M252 98 V152 L274 174 V218 H248 V274 L286 312" stroke="#FF4FB8" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    <path d="M320 188 H284 V248 L304 268 V318" stroke="#FF4FB8" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+
+    <!-- nodes -->
+    <circle cx="252" cy="98" r="12" fill="#06081A" stroke="#FF4FB8" stroke-width="10"/>
+    <circle cx="286" cy="312" r="12" fill="#06081A" stroke="#FF4FB8" stroke-width="10"/>
+    <circle cx="320" cy="188" r="12" fill="#06081A" stroke="#FF4FB8" stroke-width="10"/>
+
+    <!-- connectors -->
+    <rect x="388" y="128" width="34" height="68" rx="4" fill="#F2C94C"/>
+    <rect x="388" y="252" width="34" height="68" rx="4" fill="#F2C94C"/>
+    <rect x="396" y="142" width="14" height="12" fill="#06081A"/>
+    <rect x="396" y="164" width="14" height="12" fill="#06081A"/>
+    <rect x="396" y="186" width="14" height="12" fill="#06081A"/>
+    <rect x="396" y="266" width="14" height="12" fill="#06081A"/>
+    <rect x="396" y="288" width="14" height="12" fill="#06081A"/>
+    <rect x="396" y="310" width="14" height="12" fill="#06081A"/>
+  </g>
+</svg>
