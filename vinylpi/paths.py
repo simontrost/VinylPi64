@@ -4,9 +4,10 @@ BASE_DIR = Path(__file__).resolve().parents[1]
 DATA_DIR = BASE_DIR / "data"
 
 CONFIG_PATH = DATA_DIR / "config.json"
-STATS_PATH = DATA_DIR / "stats.json"
+STATS_PATH = DATA_DIR / "stats.json"  # legacy import path
 DB_PATH = DATA_DIR / "vinylpi.db"
-STATUS_PATH = DATA_DIR / "status.json"
+
+STATUS_PATH = DATA_DIR / "status.json"  # legacy path; runtime status is stored in SQLite
 
 WEBAPP_DIR = BASE_DIR / "webapp"
 

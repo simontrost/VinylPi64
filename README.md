@@ -47,7 +47,7 @@ If you use different hardware, you will most likely have to modify parts of the 
   - dashboard with current song, lyrics and switch (on/off)
   - settings: configure vinylpi
   - pixoo: configure your divoom pixoo
-  - statistics: keeps track of your listened minutes, songs, artists, genres and albums
+  - statistics: keeps track of your listened minutes, songs, artists, genres and albums in SQLite
   - about: support me :)  
 - Home Assistant Integration
 ---
@@ -119,6 +119,7 @@ If you don't want to use the web interface, you will have to edit the config man
 ```bash
 nano data/config.json
 ```
+Runtime data such as song statistics, caches and the current dashboard status is stored in `data/vinylpi.db`. The configuration remains in `data/config.json` so it can still be edited easily.
 Get an [Spotify API Keyset](https://developer.spotify.com/documentation/web-api) and a [Last FM API key (free)](https://www.last.fm/api) for the statistics webpage and add it to the env:
 ```bash
 nano vinylpi.env

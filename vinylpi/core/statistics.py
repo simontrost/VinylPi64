@@ -1,80 +1,32 @@
-import json
-from pathlib import Path
 import time
 import requests
 import os
 import base64
 from urllib.parse import quote_plus
-from vinylpi.paths import STATS_PATH, BASE_DIR, MB_URL, MB_UA
+from vinylpi.paths import BASE_DIR, MB_URL, MB_UA
 import re
 from vinylpi.core.stats_db import (
-    update_song_stats as db_update_song_stats,
-    increment_album_session as db_increment_album_session,
-    add_listening_seconds as db_add_listening_seconds,
-    update_song_duration as db_update_song_duration,
-    add_measured_seconds_to_song as db_add_measured_seconds_to_song,
-    upsert_duration_cache as db_upsert_duration_cache,
+    add_listening_seconds,
+    get_duration_cache,
+    get_stats_snapshot,
+    increment_album_session,
+    update_song_duration,
+    update_song_stats,
+    upsert_duration_cache,
 )
+
 def _load_stats() -> dict:
-    if STATS_PATH.exists():
-        try:
-            return json.loads(STATS_PATH.read_text(encoding="utf-8"))
-        except Exception:
-            pass
-
-    return {
-        "songs": {},
-        "artists": {},
-        "albums": {},
-    }
-
-
-def _save_stats(stats: dict) -> None:
-    try:
-        STATS_PATH.write_text(json.dumps(stats, indent=4), encoding="utf-8")
-    except Exception as e:
-        print(f"Could not write stats file: {e}")
+    """Compatibility helper returning the former stats.json structure."""
+    return get_stats_snapshot()
 
 
 def _update_stats(artist: str, title: str, album: str | None, cover_url: str | None = None) -> None:
-    db_update_song_stats(artist, title, album, cover_url)
-    stats = _load_stats()
-
-    song_key = f"{artist} – {title}"
-    song_entry = stats["songs"].get(
-        song_key,
-        {
-            "artist": artist,
-            "title": title,
-            "album": album,
-            "count": 0,
-            "cover_url": cover_url
-        },
-    )
-
-    song_entry["count"] = song_entry.get("count", 0) + 1
-    if album and not song_entry.get("album"):
-        song_entry["album"] = album
-
-    if cover_url and not song_entry.get("cover_url"):
-        song_entry["cover_url"] = cover_url
-        
-    stats["songs"][song_key] = song_entry
-
-    stats["artists"][artist] = stats["artists"].get(artist, 0) + 1
-
-    _save_stats(stats)
+    update_song_stats(artist, title, album, cover_url)
 
 
 def _increment_album_session(album: str) -> None:
-    db_increment_album_session(album)
-    if not album:
-        return
+    increment_album_session(album)
 
-    stats = _load_stats()
-    albums = stats.setdefault("albums", {})
-    albums[album] = albums.get(album, 0) + 1
-    _save_stats(stats)
 
 _SPOTIFY_TOKEN_CACHE = {
     "access_token": None,
@@ -304,114 +256,66 @@ def add_listen_time_minutes_for_confirmed_song(
     title: str,
     album: str | None = None,
 ) -> dict:
-    stats = _load_stats()
-
-    stats.setdefault("listening", {})
-    stats["listening"].setdefault("total_seconds", 0.0)
-
-    cache = stats.setdefault("durations_cache", {})
-
-    song_key = f"{artist} – {title}"
-    cache_key = song_key.casefold()
-
+    cached_entry = get_duration_cache(artist, title)
     source = None
 
-    if cache_key in cache and isinstance(cache[cache_key], dict) and cache[cache_key].get("ms"):
-        ms = int(cache[cache_key]["ms"])
-        minutes = float(cache[cache_key].get("minutes", ms / 60000.0))
-        source = cache[cache_key].get("source", "cache")
+    if cached_entry and cached_entry.get("ms"):
+        ms = int(cached_entry["ms"])
+        minutes = float(cached_entry.get("minutes", ms / 60000.0))
+        source = cached_entry.get("source", "cache")
         cached = True
     else:
         ms = None
+        spotify_error = None
 
         try:
             ms = _spotify_fetch_track_length_ms(artist, title, album)
             if ms:
                 source = "spotify"
-        except Exception as e:
-            spotify_error = str(e)
-        else:
-            spotify_error = None
+        except Exception as exc:
+            spotify_error = str(exc)
 
         if not ms:
             try:
                 ms = _mb_fetch_track_length_ms(artist, title, album)
                 if ms:
                     source = "musicbrainz"
-            except Exception as e:
-                mb_error = str(e)
+            except Exception as exc:
                 return {
                     "ok": False,
-                    "error": f"Spotify and MusicBrainz request failed: spotify={spotify_error}, musicbrainz={mb_error}",
+                    "error": (
+                        "Spotify and MusicBrainz request failed: "
+                        f"spotify={spotify_error}, musicbrainz={exc}"
+                    ),
                 }
 
         if not ms:
-            return {
-                "ok": False,
-                "error": "No duration found on Spotify or MusicBrainz",
-            }
+            return {"ok": False, "error": "No duration found on Spotify or MusicBrainz"}
 
         minutes = ms / 60000.0
         cached = False
-
-        cache[cache_key] = {
-            "ms": int(ms),
-            "minutes": float(minutes),
-            "ts": int(time.time()),
-            "artist": artist,
-            "title": title,
-            "album": album,
-            "source": source,
-        }
-
-        db_upsert_duration_cache(
-            artist=artist,
-            title=title,
-            album=album,
-            ms=int(ms),
-            minutes=float(minutes),
-            source=source,
+        upsert_duration_cache(
+            artist, title, album, int(ms), float(minutes), source
         )
-        
-    listen_seconds = ms / 1000.0
 
-    db_add_listening_seconds(listen_seconds)
-    db_update_song_duration(
-        artist=artist,
-        title=title,
-        duration_ms=int(ms),
-        duration_minutes=round(minutes, 2),
-        duration_source=source,
+    total_seconds = add_listening_seconds(ms / 1000.0)
+    update_song_duration(
+        artist,
+        title,
+        album,
+        int(ms),
+        round(minutes, 2),
+        source,
     )
-
-    stats["listening"]["total_seconds"] = (
-        float(stats["listening"]["total_seconds"]) + listen_seconds
-    )
-    songs = stats.setdefault("songs", {})
-    entry = songs.get(song_key) or {
-        "artist": artist,
-        "title": title,
-        "album": album,
-        "count": 0,
-    }
-
-    entry["duration_ms"] = int(ms)
-    entry["duration_minutes"] = round(minutes, 2)
-    entry["duration_source"] = source
-
-    songs[song_key] = entry
-
-    _save_stats(stats)
-
-    total_minutes = stats["listening"]["total_seconds"] / 60.0
 
     return {
         "ok": True,
         "minutes": round(minutes, 2),
         "cached": cached,
         "source": source,
-        "total_minutes": round(total_minutes, 2),
+        "total_minutes": round(total_seconds / 60.0, 2),
     }
+
 
 def add_measured_listen_time_seconds(
     artist: str,
@@ -420,49 +324,25 @@ def add_measured_listen_time_seconds(
     seconds: float,
 ) -> dict:
     seconds = max(0.0, float(seconds))
-
     if seconds < 10:
         return {"ok": False, "error": "Measured listen time too short"}
 
-    db_add_listening_seconds(seconds)
-    db_update_song_duration(
-        artist=artist,
-        title=title,
-        duration_ms=int(seconds * 1000),
-        duration_minutes=round(seconds / 60.0, 2),
-        duration_source="measured_timer",
+    total_seconds = add_listening_seconds(seconds)
+    update_song_duration(
+        artist,
+        title,
+        album,
+        int(seconds * 1000),
+        round(seconds / 60.0, 2),
+        "measured_timer",
+        measured_listen_seconds=round(seconds, 2),
     )
-    db_add_measured_seconds_to_song(artist, title, seconds)
-
-    stats = _load_stats()
-    stats.setdefault("listening", {})
-    stats["listening"].setdefault("total_seconds", 0.0)
-
-    stats["listening"]["total_seconds"] = (
-        float(stats["listening"]["total_seconds"]) + seconds
-    )
-
-    song_key = f"{artist} – {title}"
-    songs = stats.setdefault("songs", {})
-    entry = songs.get(song_key) or {
-        "artist": artist,
-        "title": title,
-        "album": album,
-        "count": 0,
-    }
-
-    entry["duration_ms"] = int(seconds * 1000)
-    entry["duration_minutes"] = round(seconds / 60.0, 2)
-    entry["duration_source"] = "measured_timer"
-    entry["measured_listen_seconds"] = round(seconds, 2)
-
-    songs[song_key] = entry
-    _save_stats(stats)
 
     return {
         "ok": True,
         "seconds": round(seconds, 2),
         "minutes": round(seconds / 60.0, 2),
         "source": "measured_timer",
-        "total_minutes": round(stats["listening"]["total_seconds"] / 60.0, 2),
+        "total_minutes": round(total_seconds / 60.0, 2),
     }
+

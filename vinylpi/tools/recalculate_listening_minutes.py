@@ -1,9 +1,17 @@
 #!/usr/bin/env python3
 import base64
-import json
 import os
 import time
 from pathlib import Path
+
+from vinylpi.core.stats_db import (
+    clear_duration_cache,
+    get_stats_snapshot,
+    replace_listening_total,
+    update_song_duration,
+    upsert_duration_cache,
+)
+from vinylpi.paths import BASE_DIR, DB_PATH
 
 import requests
 
@@ -27,9 +35,6 @@ def clean_title_for_search(title: str) -> str:
     t = re.sub(r"\s+", " ", t).strip()
     return t
 
-BASE_DIR = Path(__file__).resolve().parents[2]
-STATS_PATH = BASE_DIR / "data" / "stats.json"
-
 MB_URL = "https://musicbrainz.org/ws/2/recording"
 MB_UA = "VinylPi64/1.0 (https://github.com/simontrost/VinylPi64)"
 
@@ -47,18 +52,6 @@ def load_env_file(path: Path):
             continue
         key, value = line.split("=", 1)
         os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
-
-
-def load_stats():
-    return json.loads(STATS_PATH.read_text(encoding="utf-8"))
-
-
-def save_stats(stats):
-    backup = STATS_PATH.with_suffix(".json.backup_before_recalc")
-    if not backup.exists():
-        backup.write_text(json.dumps(stats, indent=4, ensure_ascii=False), encoding="utf-8")
-
-    STATS_PATH.write_text(json.dumps(stats, indent=4, ensure_ascii=False), encoding="utf-8")
 
 
 def spotify_token():
@@ -255,11 +248,11 @@ def main():
     load_env_file(BASE_DIR / "vinylpi.env")
     load_env_file(BASE_DIR / ".env")
 
-    stats = load_stats()
-    stats["durations_cache"] = {}
+    stats = get_stats_snapshot()
+    clear_duration_cache()
     songs = stats.get("songs") or {}
 
-    durations_cache = stats.setdefault("durations_cache", {})
+    durations_cache = {}
     total_seconds = 0.0
 
     print(f"Recalculating listening minutes for {len(songs)} songs...\n")
@@ -291,33 +284,30 @@ def main():
             durations_cache[cache_key] = {
                 "ms": int(ms),
                 "minutes": ms / 60000.0,
-                "ts": int(time.time()),
-                "artist": artist,
-                "title": title,
-                "album": album,
                 "source": source,
             }
+            upsert_duration_cache(
+                artist, title, album, int(ms), ms / 60000.0, source
+            )
 
             print(f"  -> {source}: {round(ms / 60000, 2)} min x {count}")
 
-        entry["duration_ms"] = int(ms)
-        entry["duration_minutes"] = round(ms / 60000.0, 2)
-        entry["duration_source"] = source
-
+        update_song_duration(
+            artist, title, album, int(ms), round(ms / 60000.0, 2), source
+        )
         total_seconds += (ms / 1000.0) * count
 
         time.sleep(0.15)
 
-    stats.setdefault("listening", {})
-    stats["listening"]["total_seconds"] = float(total_seconds)
-    stats["listening"]["recalculated_at"] = int(time.time())
-    stats["listening"]["recalculated_from_song_counts"] = True
-
-    save_stats(stats)
+    replace_listening_total(
+        total_seconds,
+        recalculated_at=int(time.time()),
+        recalculated_from_song_counts=True,
+    )
 
     print("\nDone.")
     print(f"New total: {round(total_seconds / 60.0, 2)} minutes")
-    print(f"Backup created next to stats.json if it did not already exist.")
+    print(f"Database updated: {DB_PATH}")
 
 
 if __name__ == "__main__":

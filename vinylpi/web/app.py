@@ -4,6 +4,7 @@ from vinylpi.paths import BASE_DIR
 load_dotenv("vinylpi.env")
 
 from flask import Flask
+from vinylpi.core.storage import initialize_storage
 from vinylpi.paths import WEBAPP_DIR
 from .routes.pages import pages_bp
 from .routes.status_api import status_bp
@@ -16,6 +17,7 @@ from .routes.genius_api import genius_bp
 from .routes.ha_api import bp as ha_api_bp
 from .routes.shazam_api import shazam_bp
 def create_app() -> Flask:
+    initialize_storage()
     app = Flask(
         __name__,
         static_folder=str(WEBAPP_DIR),

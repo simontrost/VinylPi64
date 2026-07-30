@@ -1,5 +1,6 @@
 import time
 from vinylpi.core.audio_capture import record_sample
+from vinylpi.core.storage import initialize_storage
 from vinylpi.core.recognition import recognize_song
 from vinylpi.web.services.config import read_config
 from vinylpi.config.config_watcher import maybe_log_config_reload
@@ -16,6 +17,7 @@ from vinylpi.core.loop_logic import (
 )
 
 def main_loop():
+    initialize_storage()
     cfg = LoopConfig.from_config(read_config())
     if cfg.debug_log:
         print(f"\nStarting to loop VinylPi64 (every {cfg.delay}s)\n")

@@ -1,11 +1,13 @@
-import json
 from flask import Blueprint, jsonify
-from vinylpi.paths import STATUS_PATH
+
+from vinylpi.core.stats_db import get_current_status
 
 status_bp = Blueprint("status_api", __name__)
 
+
 @status_bp.get("/api/status")
 def api_status():
-    if STATUS_PATH.exists():
-        return jsonify(json.loads(STATUS_PATH.read_text(encoding="utf-8")))
-    return jsonify({"ok": False, "status": None}), 200
+    status = get_current_status()
+    if status is None:
+        return jsonify({"ok": False, "status": None}), 200
+    return jsonify(status)

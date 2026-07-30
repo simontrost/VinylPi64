@@ -1,8 +1,9 @@
 import os
 import time
+
 import requests
 
-from vinylpi.core.stats_db import upsert_tag_cache as db_upsert_tag_cache
+from vinylpi.core.stats_db import get_cached_tags, upsert_tag_cache
 
 LASTFM_URL = "https://ws.audioscrobbler.com/2.0/"
 
@@ -33,42 +34,42 @@ def fetch_lastfm_track_tags(artist: str, title: str) -> list[dict]:
         "autocorrect": 1,
     }
 
-    r = requests.get(LASTFM_URL, params=params, timeout=10)
-    r.raise_for_status()
-
-    data = r.json()
-    raw_tags = ((data.get("toptags") or {}).get("tag") or [])
+    response = requests.get(LASTFM_URL, params=params, timeout=10)
+    response.raise_for_status()
+    raw_tags = ((response.json().get("toptags") or {}).get("tag") or [])
 
     tags = []
     for tag in raw_tags[:8]:
         name = (tag.get("name") or "").strip().lower()
         count = int(tag.get("count") or 0)
-
         if not name or name in BLACKLIST:
             continue
-
-        tags.append({
-            "name": name,
-            "count": count,
-        })
-
+        tags.append({"name": name, "count": count})
     return tags
 
 
-def get_cached_or_fetch_tags(stats: dict, artist: str, title: str) -> list[dict]:
-    cache = stats.setdefault("tag_cache", {})
-    key = f"{artist} – {title}".casefold()
+def get_cached_or_fetch_tags(*args) -> list[dict]:
+    """Read genre tags from SQLite and fetch/store them when missing.
 
-    cached = cache.get(key)
-    if isinstance(cached, dict) and isinstance(cached.get("tags"), list):
-        return cached["tags"]
+    Accepts both the old ``(stats, artist, title)`` and the new
+    ``(artist, title)`` call shape for compatibility.
+    """
+    if len(args) == 3:
+        _, artist, title = args
+    elif len(args) == 2:
+        artist, title = args
+    else:
+        raise TypeError("Expected (artist, title) or (stats, artist, title)")
+
+    cached = get_cached_tags(artist, title)
+    if cached is not None:
+        return cached
 
     try:
         tags = fetch_lastfm_track_tags(artist, title)
-    except Exception as e:
-        print(f"Last.fm tags failed for {artist} – {title}: {e}")
+    except Exception as exc:
+        print(f"Last.fm tags failed for {artist} – {title}: {exc}")
         tags = []
 
-    cache[key] = {"artist": artist, "title": title, "tags": tags, "ts": int(time.time())}
-    db_upsert_tag_cache(artist, title, tags)
+    upsert_tag_cache(artist, title, tags, fetched_at=int(time.time()))
     return tags
