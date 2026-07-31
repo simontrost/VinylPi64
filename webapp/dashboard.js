@@ -11,6 +11,9 @@ const CURRENT_TRACK = {
 
 let statusInterval = null;
 let recognizerInterval = null;
+let currentTrackKey = "";
+let lyricsAbortController = null;
+let trackInfoAbortController = null;
 
 function setText(id, value) {
     const element = document.getElementById(id);
@@ -25,6 +28,42 @@ function formatDuration(durationMs) {
     const minutes = Math.floor(totalSeconds / 60);
     const seconds = String(totalSeconds % 60).padStart(2, "0");
     return `${minutes}:${seconds}`;
+}
+
+function getTrackKey(track = CURRENT_TRACK) {
+    const trackId = String(track.trackId || track.track_id || "").trim();
+    if (trackId) return `id:${trackId}`;
+
+    const artist = String(track.artist || "").trim().toLocaleLowerCase();
+    const title = String(track.title || "").trim().toLocaleLowerCase();
+    return artist || title ? `text:${artist}|${title}` : "";
+}
+
+function resetTrackDependentUI() {
+    lyricsAbortController?.abort();
+    lyricsAbortController = null;
+
+    trackInfoAbortController?.abort();
+    trackInfoAbortController = null;
+
+    const lyricsBox = document.getElementById("lyrics-box");
+    if (lyricsBox) {
+        lyricsBox.textContent = "";
+        lyricsBox.classList.add("hidden", "collapsed");
+    }
+
+    const lyricsToggle = document.getElementById("btn-lyrics-toggle");
+    if (lyricsToggle) {
+        lyricsToggle.classList.add("hidden");
+        lyricsToggle.textContent = "More";
+    }
+
+    document.getElementById("lyrics-card")?.classList.remove("expanded");
+    closeTrackInfoDrawer();
+
+    const infoContent = document.getElementById("track-info-content");
+    if (infoContent) infoContent.textContent = "No data loaded.";
+    setText("track-info-heading", "Track Info");
 }
 
 function updateCurrentTrack(status) {
@@ -55,7 +94,17 @@ function renderEmptyStatus(message = "No recognized song yet") {
 }
 
 function renderStatus(status) {
+    const nextTrackKey = getTrackKey({
+        artist: status.artist,
+        title: status.title,
+        track_id: status.track_id,
+    });
+    const trackChanged = Boolean(currentTrackKey && nextTrackKey && currentTrackKey !== nextTrackKey);
+
+    if (trackChanged) resetTrackDependentUI();
+
     updateCurrentTrack(status);
+    currentTrackKey = getTrackKey();
 
     setText("song-artist", CURRENT_TRACK.artist || "Unknown artist");
     setText("song-title", CURRENT_TRACK.title || "Unknown title");
@@ -154,17 +203,24 @@ async function loadLyrics() {
 
     const artist = CURRENT_TRACK.artist.trim();
     const title = CURRENT_TRACK.title.trim();
+    const requestedTrackKey = getTrackKey();
     if (!artist || !title) {
         box.textContent = "No track information available.";
         return;
     }
 
+    lyricsAbortController?.abort();
+    const controller = new AbortController();
+    lyricsAbortController = controller;
+
     try {
         const response = await fetch(
             `/api/lyrics?artist=${encodeURIComponent(artist)}&title=${encodeURIComponent(title)}`,
-            { cache: "no-store" },
+            { cache: "no-store", signal: controller.signal },
         );
         const result = await response.json();
+
+        if (requestedTrackKey !== getTrackKey()) return;
 
         if (!response.ok || !result.ok || !result.lyrics) {
             box.textContent = "No lyrics found. Opening Genius search…";
@@ -180,8 +236,11 @@ async function loadLyrics() {
         toggleButton.classList.remove("hidden");
         toggleButton.textContent = "More";
     } catch (error) {
+        if (error.name === "AbortError") return;
         console.error(error);
-        box.textContent = "Error loading lyrics.";
+        if (requestedTrackKey === getTrackKey()) box.textContent = "Error loading lyrics.";
+    } finally {
+        if (lyricsAbortController === controller) lyricsAbortController = null;
     }
 }
 
@@ -297,6 +356,7 @@ function renderTrackInfo(data = {}) {
 
 async function showTrackInfo() {
     const content = document.getElementById("track-info-content");
+    const requestedTrackKey = getTrackKey();
     openTrackInfoDrawer();
     if (content) content.textContent = "Loading Shazam info…";
 
@@ -305,23 +365,34 @@ async function showTrackInfo() {
         return;
     }
 
+    trackInfoAbortController?.abort();
+    const controller = new AbortController();
+    trackInfoAbortController = controller;
+
     try {
         const params = new URLSearchParams();
         if (CURRENT_TRACK.trackId) params.set("track_id", CURRENT_TRACK.trackId);
         if (CURRENT_TRACK.artistId) params.set("artist_id", CURRENT_TRACK.artistId);
 
-        const response = await fetch(`/api/shazam/info?${params.toString()}`, { cache: "no-store" });
+        const response = await fetch(`/api/shazam/info?${params.toString()}`, {
+            cache: "no-store",
+            signal: controller.signal,
+        });
         const data = await response.json();
+        if (requestedTrackKey !== getTrackKey()) return;
         renderTrackInfo(response.ok && data.ok ? data : {});
     } catch (error) {
+        if (error.name === "AbortError") return;
         console.error(error);
-        renderTrackInfo();
+        if (requestedTrackKey === getTrackKey()) renderTrackInfo();
+    } finally {
+        if (trackInfoAbortController === controller) trackInfoAbortController = null;
     }
 }
 
 function startPolling() {
-    if (!statusInterval) statusInterval = window.setInterval(loadStatus, 15000);
-    if (!recognizerInterval) recognizerInterval = window.setInterval(loadRecognizerStatus, 15000);
+    if (!statusInterval) statusInterval = window.setInterval(loadStatus, 2000);
+    if (!recognizerInterval) recognizerInterval = window.setInterval(loadRecognizerStatus, 5000);
 }
 
 function stopPolling() {
