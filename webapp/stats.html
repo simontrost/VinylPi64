@@ -33,33 +33,26 @@
             <img src="logo.png" class="header-logo" alt="VinylPi logo">
         </header>
 
-        <section class="stats-section" aria-live="polite">
-            <div class="stats-overview-grid">
-                <article class="stats-minutes-card">
-                    <div class="stats-kicker">Listening time</div>
-                    <div class="stats-value-row">
-                        <strong id="stats-minutes" class="stats-minutes-value">—</strong>
-                        <span class="stats-unit">minutes</span>
-                    </div>
-                    <div class="stats-description">Calculated from confirmed recognitions.</div>
-                </article>
+        <section class="page-intro">
+            <div class="stats-minutes-card page-intro-copy">
+                <span class="eyebrow">Listening overview</span>
+                <div class="stats-value-row">
+                    <strong id="stats-minutes" class="stats-minutes-value">—</strong>
+                    <span class="stats-unit">minutes</span>
+                </div>
+                <div class="stats-description">Calculated from confirmed recognitions.</div>
             </div>
+            <div class="page-intro-meta">
+                <div class="card intro-mini"><strong>Top songs, artists & albums</strong><span>Compact rankings for your most played records.</span></div>
+                <div class="card intro-mini"><strong>Genre & cover view</strong><span>Visual stats based on the data that Shazam has filled in.</span></div>
+            </div>
+        </section>
 
+        <section class="stats-section" aria-live="polite">
             <div class="stats-grid">
-                <article class="stats-card">
-                    <h2>Top Songs</h2>
-                    <ul id="stats-songs" class="stats-list"></ul>
-                </article>
-
-                <article class="stats-card">
-                    <h2>Top Artists</h2>
-                    <ul id="stats-artists" class="stats-list"></ul>
-                </article>
-
-                <article class="stats-card">
-                    <h2>Top Albums</h2>
-                    <ul id="stats-albums" class="stats-list"></ul>
-                </article>
+                <article class="stats-card stats-list-card"><h2>Top Songs</h2><ul id="stats-songs" class="stats-list"></ul></article>
+                <article class="stats-card stats-list-card"><h2>Top Artists</h2><ul id="stats-artists" class="stats-list"></ul></article>
+                <article class="stats-card stats-list-card"><h2>Top Albums</h2><ul id="stats-albums" class="stats-list"></ul></article>
             </div>
 
             <div class="stats-visual-grid">
@@ -68,14 +61,14 @@
                         <h2>Top Genres</h2>
                         <span class="stats-source">Shazam</span>
                     </div>
-                    <div id="genre-empty" class="stats-empty hidden">
-                        Genre statistics will appear after songs are recognized again.
-                    </div>
+                    <div id="genre-empty" class="stats-empty hidden">Genre statistics will appear after songs are recognized again.</div>
                     <canvas id="genre-radar" aria-label="Genre radar chart"></canvas>
                 </article>
-
                 <article class="stats-card stats-chart-card album-carousel-card">
-                    <h2>Top Album Covers</h2>
+                    <div class="stats-card-heading">
+                        <h2>Top Album Covers</h2>
+                        <span class="stats-source">Rotating</span>
+                    </div>
                     <div id="album-carousel" class="album-carousel"></div>
                 </article>
             </div>

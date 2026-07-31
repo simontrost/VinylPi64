@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <title>VinylPi Dashboard</title>
@@ -16,10 +15,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <script src="dashboard.js" defer></script>
 </head>
-
-
 <body>
-
     <aside class="sidebar">
         <nav class="nav">
             <a href="index.html" class="active">Dashboard</a>
@@ -31,49 +27,64 @@
     </aside>
 
     <main class="main">
-
         <header class="main-header">
             <div class="header-title pixel-title">Dashboard</div>
             <img src="logo.png" class="header-logo" alt="VinylPi Logo">
         </header>
 
-        <section class="song-section">
-            <div class="song-card">
-                <img id="song-cover" class="song-cover" src="logo.png" alt="Album Cover">
-                <div id="song-artist" class="song-artist">–</div>
-                <div id="song-title" class="song-title">Loading...</div>
-                <div id="song-album" class="song-album"></div>
-                <div id="song-genre" class="song-genre hidden"></div>
-            </div>
-        </section>
-
-        <section class="lyrics-section">
-            <div class="lyrics-card" id="lyrics-card">
-                <pre id="lyrics-box" class="lyrics-box hidden collapsed"></pre>
-
-                <div class="lyrics-footer">
-                    <button id="btn-lyrics" type="button">Lyrics</button>
-                    <button id="btn-track-info" type="button">Info</button>
-                    <button id="btn-lyrics-toggle" type="button" class="hidden">More</button>
+        <section class="dashboard-shell">
+            <section class="song-section">
+                <div class="song-card">
+                    <div class="song-art">
+                        <img id="song-cover" class="song-cover" src="logo.png" alt="Album Cover">
+                    </div>
+                    <div class="song-copy">
+                        <span class="eyebrow">Now playing</span>
+                        <div id="song-artist" class="song-artist">–</div>
+                        <div id="song-title" class="song-title">Loading...</div>
+                        <div id="song-album" class="song-album"></div>
+                        <div id="song-genre" class="song-genre hidden"></div>
+                    </div>
                 </div>
-            </div>
+            </section>
+
+            <section class="dashboard-grid">
+                <div class="lyrics-card" id="lyrics-card">
+                    <div class="dashboard-card-head">
+                        <div>
+                            <span class="eyebrow">Song details</span>
+                            <h2>Lyrics & track info</h2>
+                        </div>
+                    </div>
+                    <pre id="lyrics-box" class="lyrics-box hidden collapsed"></pre>
+                    <div class="lyrics-footer">
+                        <button id="btn-lyrics" type="button">Lyrics</button>
+                        <button id="btn-track-info" type="button">Info</button>
+                        <button id="btn-lyrics-toggle" type="button" class="hidden">More</button>
+                    </div>
+                </div>
+
+                <section class="control-section">
+                    <div class="control-header">
+                        <div>
+                            <span class="eyebrow">Recognition</span>
+                            <h2>Music detection</h2>
+                        </div>
+                        <div id="rec-status-text" class="rec-status-text">Loading status...</div>
+                    </div>
+                    <div class="toggle-row">
+                        <div>
+                            <div class="toggle-label">Recognition loop</div>
+                            <div class="toggle-sub">Start or stop automatic Shazam detection.</div>
+                        </div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="recognizerToggle">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                </section>
+            </section>
         </section>
-
-        <section class="control-section">
-            <div class="control-header">
-                <h2>Music detection</h2>
-                <div id="rec-status-text" class="rec-status-text">Loading status...</div>
-            </div>
-
-            <div class="toggle-row">
-                <span class="toggle-label">Recognition</span>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="recognizerToggle">
-                    <span class="toggle-slider"></span>
-                </label>
-            </div>
-        </section>
-
     </main>
 
     <div id="info-backdrop" class="info-backdrop hidden"></div>
@@ -86,12 +97,7 @@
             </div>
             <button id="btn-track-info-close" type="button" class="track-info-close">×</button>
         </div>
-
-        <div id="track-info-content" class="track-info-content">
-            No data loaded.
-        </div>
+        <div id="track-info-content" class="track-info-content">No data loaded.</div>
     </aside>
-
 </body>
-
 </html>

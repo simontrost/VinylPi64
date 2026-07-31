@@ -1,3 +1,4 @@
+.settings-intro { margin-bottom: 22px; }
 .settings-page-title {
     max-width: 1180px;
     margin: 0 auto 18px;
@@ -488,5 +489,73 @@
     .settings-actions {
         flex-direction: column;
         align-items: stretch;
+    }
+}
+
+
+.settings-card {
+    padding: 0;
+    overflow: hidden;
+}
+
+.settings-card::after {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 4px;
+    background: linear-gradient(180deg, rgba(245,197,66,0.45), rgba(239,45,143,0.55));
+    opacity: 0;
+    transition: opacity 0.18s ease;
+}
+
+.settings-card.is-open::after,
+.settings-card:hover::after {
+    opacity: 1;
+}
+
+.settings-card-header {
+    padding: 20px 22px;
+}
+
+.settings-card-title h2 {
+    font-size: 20px;
+}
+
+.settings-card-title span {
+    font-size: 13px;
+}
+
+.form-group {
+    padding: 18px;
+    border-radius: 16px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.02));
+}
+
+.group-title {
+    margin-bottom: 16px;
+}
+
+.form-row {
+    grid-template-columns: 190px minmax(0, 420px);
+    gap: 18px;
+    margin-bottom: 14px;
+}
+
+.settings-actions {
+    padding: 16px;
+    border-radius: 18px;
+}
+
+.settings-mini-card {
+    padding: 18px;
+}
+
+.settings-note-card p {
+    line-height: 1.6;
+}
+
+@media (max-width: 760px) {
+    .settings-card-header {
+        padding: 18px;
     }
 }

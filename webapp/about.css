@@ -1,16 +1,21 @@
+
 .about-section {
-    max-width: 900px;
+    max-width: 980px;
     margin: 0 auto;
+}
+
+.about-grid {
     display: grid;
-    gap: 16px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px;
 }
 
-.about-section .card {
-    margin-bottom: 0;
+.about-wide-card {
+    grid-column: 1 / -1;
 }
 
-.social-card {
-    margin-top: 0;
+.about-compact-card {
+    min-height: 100%;
 }
 
 .social-links {
@@ -24,9 +29,9 @@
     display: inline-flex;
     align-items: center;
     gap: 9px;
-    padding: 9px 12px;
-    border-radius: 999px;
-    background: #2b2b34;
+    padding: 10px 13px;
+    border-radius: 12px;
+    background: rgba(255,255,255,0.04);
     border: 1px solid var(--border);
     color: var(--text);
     text-decoration: none;
@@ -35,43 +40,14 @@
     transition: background 0.15s ease, border-color 0.15s ease;
 }
 
-.social-item:hover {
-    background: #34343e;
-    border-color: rgba(255, 255, 255, 0.16);
-}
+.social-item:hover { background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.16); }
+.social-icon-circle { width: 26px; height: 26px; border-radius: 50%; background: rgba(239, 45, 143, 0.13); color: var(--pink); display: grid; place-items: center; flex-shrink: 0; }
+.social-icon { width: 16px; height: 16px; display: block; }
+.social-icon path { fill: currentColor; }
+.social-label { white-space: nowrap; }
 
-.social-icon-circle {
-    width: 26px;
-    height: 26px;
-    border-radius: 50%;
-    background: rgba(239, 45, 143, 0.13);
-    color: var(--pink);
-    display: grid;
-    place-items: center;
-    flex-shrink: 0;
-}
-
-.social-icon {
-    width: 16px;
-    height: 16px;
-    display: block;
-}
-
-.social-icon path {
-    fill: currentColor;
-}
-
-.social-label {
-    white-space: nowrap;
-}
-
-@media (max-width: 700px) {
-    .social-links {
-        flex-direction: column;
-        align-items: stretch;
-    }
-
-    .social-item {
-        width: 100%;
-    }
+@media (max-width: 760px) {
+    .about-grid { grid-template-columns: 1fr; }
+    .social-links { flex-direction: column; align-items: stretch; }
+    .social-item { width: 100%; }
 }

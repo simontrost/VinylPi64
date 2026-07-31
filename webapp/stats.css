@@ -1,3 +1,4 @@
+
 .stats-section {
     display: grid;
     gap: 18px;
@@ -5,283 +6,60 @@
     margin: 0 auto;
 }
 
-.stats-overview-grid,
 .stats-grid,
 .stats-visual-grid {
     display: grid;
-    gap: 16px;
+    gap: 18px;
 }
 
-.stats-overview-grid {
-    grid-template-columns: minmax(0, 1fr);
-}
-
-.stats-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    align-items: start;
-}
-
-.stats-visual-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-}
+.stats-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: start; }
+.stats-visual-grid { grid-template-columns: minmax(0, 1fr) minmax(320px, 0.92fr); }
 
 .stats-minutes-card,
-.stats-card {
-    padding: 20px;
-}
-
-.stats-minutes-card {
-    max-width: 420px;
-}
-
-.stats-kicker,
-.stats-description,
-.stats-source {
-    color: var(--muted);
-    font-size: 13px;
-}
-
-.stats-kicker {
-    font-weight: 720;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-}
-
-.stats-value-row {
-    display: flex;
-    align-items: baseline;
-    gap: 10px;
-    margin: 8px 0 6px;
-}
-
-.stats-minutes-value {
-    color: var(--text);
-    font-size: clamp(42px, 7vw, 68px);
-    font-weight: 850;
-    line-height: 1;
-}
-
-.stats-unit {
-    color: var(--yellow);
-    font-size: 15px;
-    font-weight: 750;
-}
-
-.stats-card-heading {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-}
-
-.stats-source {
-    padding: 4px 8px;
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    background: var(--surface-2);
-}
-
-.stats-list {
-    margin: 0;
-    padding: 0;
-    list-style: none;
-}
-
-.stats-item {
-    display: grid;
-    grid-template-columns: 34px minmax(0, 1fr) auto;
-    align-items: center;
-    gap: 10px;
-    min-height: 62px;
-    padding: 9px 0;
-    border-bottom: 1px solid var(--border);
-}
-
-.stats-item:last-of-type {
-    border-bottom: 0;
-}
-
-.stats-rank {
-    color: var(--yellow);
-    font-size: 13px;
-    font-weight: 800;
-}
-
-.stats-text {
-    min-width: 0;
-}
-
-.stats-main,
-.stats-sub {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.stats-main {
-    color: var(--text);
-    font-size: 14px;
-    font-weight: 690;
-}
-
-.stats-sub {
-    margin-top: 3px;
-    color: var(--muted);
-    font-size: 12px;
-}
-
-.stats-badge {
-    padding: 4px 8px;
-    border-radius: 999px;
-    background: var(--surface-2);
-    color: var(--muted);
-    font-size: 12px;
-    white-space: nowrap;
-}
-
-.stats-empty {
-    display: grid;
-    min-height: 90px;
-    place-items: center;
-    color: var(--muted);
-    font-size: 14px;
-    text-align: center;
-}
-
-.stats-chart-card > .stats-empty {
-    min-height: 240px;
-}
-
-.stats-list > .stats-empty {
-    display: list-item;
-    min-height: 0;
-    padding: 14px 0;
-    text-align: left;
-}
-
-.stats-toggle-wrapper {
-    padding-top: 12px;
-    text-align: center;
-}
-
-.stats-toggle {
-    min-height: 36px;
-    padding: 7px 12px;
-    font-size: 12px;
-}
-
-.stats-chart-card {
-    min-height: 350px;
-    overflow: hidden;
-}
-
-.stats-chart-card canvas {
-    width: 100% !important;
-    height: 280px !important;
-    margin-top: 4px;
-}
-
-.album-carousel {
-    position: relative;
-    height: 280px;
-    margin-top: 4px;
-    perspective: 900px;
-}
-
-.album-slide {
-    position: absolute;
-    top: 47%;
-    left: 50%;
-    width: 150px;
-    height: 150px;
-    transform-style: preserve-3d;
-    transition: transform 700ms ease, opacity 700ms ease, filter 700ms ease;
-}
-
-.album-slide img {
-    width: 100%;
-    height: 100%;
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    object-fit: cover;
-    box-shadow: 0 18px 38px rgba(0, 0, 0, 0.48);
-}
-
-.album-slide-title {
-    max-width: 190px;
-    margin: 10px 0 0 50%;
-    overflow: hidden;
-    transform: translateX(-50%);
-    color: var(--muted);
-    font-size: 12px;
-    text-align: center;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    opacity: 0;
-    transition: opacity 500ms ease;
-}
-
-.album-slide.active .album-slide-title {
-    opacity: 1;
-}
-
-.album-slide.side {
-    filter: brightness(0.62);
-}
+.stats-card { padding: 22px; }
+.stats-kicker, .stats-description, .stats-source { color: var(--muted); font-size: 13px; }
+.stats-kicker { font-weight: 720; text-transform: uppercase; letter-spacing: 0.08em; }
+.stats-value-row { display: flex; align-items: baseline; gap: 10px; margin: 4px 0 8px; }
+.stats-minutes-value { color: var(--text); font-size: clamp(42px, 7vw, 72px); font-weight: 850; line-height: 1; }
+.stats-unit { color: var(--yellow); font-size: 15px; font-weight: 750; }
+.stats-card-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.stats-source { padding: 4px 8px; border: 1px solid var(--border); border-radius: 10px; background: rgba(255,255,255,0.04); }
+.stats-list-card h2 { margin-bottom: 6px; }
+.stats-list { margin: 0; padding: 0; list-style: none; }
+.stats-item { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 54px; padding: 9px 0; border-bottom: 1px solid var(--border); }
+.stats-item:last-of-type { border-bottom: 0; }
+.stats-rank { color: var(--yellow); font-size: 13px; font-weight: 800; }
+.stats-text { min-width: 0; }
+.stats-main, .stats-sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stats-main { color: var(--text); font-size: 14px; font-weight: 690; }
+.stats-sub { margin-top: 2px; color: var(--muted); font-size: 12px; }
+.stats-badge { padding: 4px 8px; border-radius: 10px; background: rgba(255,255,255,0.04); color: var(--muted); font-size: 12px; white-space: nowrap; }
+.stats-empty { display: grid; min-height: 90px; place-items: center; color: var(--muted); font-size: 14px; text-align: center; }
+.stats-chart-card > .stats-empty { min-height: 240px; }
+.stats-list > .stats-empty { display: list-item; min-height: 0; padding: 14px 0; text-align: left; }
+.stats-toggle-wrapper { padding-top: 12px; text-align: center; }
+.stats-toggle { min-height: 36px; padding: 7px 12px; font-size: 12px; }
+.stats-chart-card { min-height: 350px; overflow: hidden; }
+.stats-chart-card canvas { width: 100% !important; height: 280px !important; margin-top: 4px; }
+.album-carousel { position: relative; height: 280px; margin-top: 4px; perspective: 900px; }
+.album-slide { position: absolute; top: 47%; left: 50%; width: 150px; height: 150px; transform-style: preserve-3d; transition: transform 700ms ease, opacity 700ms ease, filter 700ms ease; }
+.album-slide img { width: 100%; height: 100%; border: 1px solid var(--border); border-radius: 16px; object-fit: cover; box-shadow: 0 18px 38px rgba(0, 0, 0, 0.48); }
+.album-slide-title { max-width: 190px; margin: 10px 0 0 50%; overflow: hidden; transform: translateX(-50%); color: var(--muted); font-size: 12px; text-align: center; text-overflow: ellipsis; white-space: nowrap; opacity: 0; transition: opacity 500ms ease; }
+.album-slide.active .album-slide-title { opacity: 1; }
+.album-slide.side { filter: brightness(0.62); }
 
 @media (max-width: 980px) {
-    .stats-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .stats-grid .stats-card {
-        min-height: 0;
-    }
-}
-
-@media (max-width: 760px) {
-    .stats-overview-grid,
-    .stats-visual-grid {
-        grid-template-columns: 1fr;
-    }
+    .stats-grid,
+    .stats-visual-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 520px) {
-    .stats-grid {
-        gap: 12px;
-    }
-
-    .stats-grid .stats-card {
-        padding: 16px;
-    }
-
-    .stats-grid .stats-card h2 {
-        margin-bottom: 8px;
-    }
-
-    .stats-item {
-        grid-template-columns: 30px minmax(0, 1fr) auto;
-        gap: 8px;
-        min-height: 54px;
-        padding: 6px 0;
-    }
-
-    .stats-sub {
-        margin-top: 1px;
-    }
-
-    .stats-badge {
-        grid-column: auto;
-        justify-self: end;
-        padding: 4px 7px;
-    }
-
-    .stats-toggle-wrapper {
-        padding-top: 8px;
-    }
-
-    .album-slide {
-        width: 132px;
-        height: 132px;
-    }
+    .stats-grid { gap: 12px; }
+    .stats-grid .stats-card,
+    .stats-visual-grid .stats-card { padding: 18px; }
+    .stats-item { grid-template-columns: 26px minmax(0, 1fr) auto; gap: 8px; min-height: 48px; padding: 6px 0; }
+    .stats-sub { margin-top: 1px; }
+    .stats-badge { padding: 4px 7px; }
+    .stats-toggle-wrapper { padding-top: 8px; }
+    .album-slide { width: 132px; height: 132px; }
 }
