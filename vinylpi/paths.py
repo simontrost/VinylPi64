@@ -6,6 +6,7 @@ DATA_DIR = BASE_DIR / "data"
 CONFIG_PATH = DATA_DIR / "config.json"
 STATS_PATH = DATA_DIR / "stats.json"  # legacy import path
 DB_PATH = DATA_DIR / "vinylpi.db"
+DISPLAY_REFRESH_PATH = DATA_DIR / "display_refresh.request"
 
 STATUS_PATH = DATA_DIR / "status.json"  # legacy path; runtime status is stored in SQLite
 

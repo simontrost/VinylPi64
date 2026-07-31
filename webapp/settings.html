@@ -60,6 +60,23 @@
                                     <div class="form-hint">Seconds per recognition attempt.</div>
                                 </div>
                                 <div class="form-row">
+                                    <label for="adaptiveSampleEnabled">Adaptive sample duration</label>
+                                    <input type="checkbox" id="adaptiveSampleEnabled">
+                                    <div class="form-hint">Use longer recordings after failed recognition attempts.</div>
+                                </div>
+                                <div data-setting-row="adaptive-sample-details">
+                                    <div class="form-row">
+                                        <label for="adaptiveSampleFirstFailure">After first failure</label>
+                                        <input type="number" id="adaptiveSampleFirstFailure" step="0.5" min="0.5" max="30">
+                                        <div class="form-hint">Recording duration in seconds for the next attempt.</div>
+                                    </div>
+                                    <div class="form-row">
+                                        <label for="adaptiveSampleLaterFailures">After further failures</label>
+                                        <input type="number" id="adaptiveSampleLaterFailures" step="0.5" min="0.5" max="30">
+                                        <div class="form-hint">Used from the third attempt onward until a song is recognized.</div>
+                                    </div>
+                                </div>
+                                <div class="form-row">
                                     <label for="audioSampleRate">Sample rate</label>
                                     <input type="number" id="audioSampleRate">
                                 </div>

@@ -18,6 +18,7 @@ from vinylpi.config.runtime import read_config
 _scroll_thread: Optional[threading.Thread] = None
 _scroll_stop_event = threading.Event()
 _pixoo_client: Optional[PixooClient] = None
+_display_lock = threading.RLock()
 
 
 def _get_pixoo() -> PixooClient:
@@ -35,12 +36,13 @@ def _reset_pixoo_client() -> None:
 def stop_scrolling_display() -> None:
     global _scroll_thread, _scroll_stop_event
 
-    if _scroll_thread is not None and _scroll_thread.is_alive():
-        _scroll_stop_event.set()
-        _scroll_thread.join(timeout=3)
+    with _display_lock:
+        if _scroll_thread is not None and _scroll_thread.is_alive():
+            _scroll_stop_event.set()
+            _scroll_thread.join(timeout=3)
 
-    _scroll_thread = None
-    _scroll_stop_event = threading.Event()
+        _scroll_thread = None
+        _scroll_stop_event = threading.Event()
 
 
 def _prepare_base_canvas(cover_img: Image.Image, bg_color: tuple[int, int, int]) -> Image.Image:
@@ -212,15 +214,16 @@ def _scroll_loop(cover_img: Image.Image, artist: str, title: str) -> None:
 def start_scrolling_display(cover_img: Image.Image, artist: str, title: str) -> None:
     global _scroll_thread, _scroll_stop_event
 
-    stop_scrolling_display()
-    _scroll_stop_event = threading.Event()
-    _scroll_thread = threading.Thread(
-        target=_scroll_loop,
-        args=(cover_img, artist, title),
-        name="vinylpi-pixoo-scroll",
-        daemon=True,
-    )
-    _scroll_thread.start()
+    with _display_lock:
+        stop_scrolling_display()
+        _scroll_stop_event = threading.Event()
+        _scroll_thread = threading.Thread(
+            target=_scroll_loop,
+            args=(cover_img, artist, title),
+            name="vinylpi-pixoo-scroll",
+            daemon=True,
+        )
+        _scroll_thread.start()
 
 
 def show_fallback_image() -> None:
@@ -239,17 +242,19 @@ def show_fallback_image() -> None:
         return
 
     size = int(cfg["image"]["canvas_size"])
-    stop_scrolling_display()
 
-    try:
-        fallback_img = Image.open(path).convert("RGB")
-        fallback_resized = fallback_img.resize(
-            (size, size),
-            Image.Resampling.NEAREST,
-        )
-        _get_pixoo().send_frame(fallback_resized)
-        if debug_log:
-            print(f"Fallback image '{path}' sent to Pixoo.")
-    except Exception as exc:
-        _reset_pixoo_client()
-        print(f"Error showing fallback image: {exc}")
+    with _display_lock:
+        stop_scrolling_display()
+
+        try:
+            fallback_img = Image.open(path).convert("RGB")
+            fallback_resized = fallback_img.resize(
+                (size, size),
+                Image.Resampling.NEAREST,
+            )
+            _get_pixoo().send_frame(fallback_resized)
+            if debug_log:
+                print(f"Fallback image '{path}' sent to Pixoo.")
+        except Exception as exc:
+            _reset_pixoo_client()
+            print(f"Error showing fallback image: {exc}")

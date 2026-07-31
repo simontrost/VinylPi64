@@ -559,3 +559,8 @@
         padding: 18px;
     }
 }
+
+.setting-disabled {
+    opacity: 0.45;
+    transition: opacity 0.16s ease;
+}

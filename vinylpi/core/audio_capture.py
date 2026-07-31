@@ -34,14 +34,14 @@ def auto_detect_usb_device() -> int | None:
     return None
 
 
-def record_sample() -> bytes | None:
+def record_sample(seconds_override: float | None = None) -> bytes | None:
     cfg = read_config()
     debug_log = bool(cfg["debug"].get("logs", False))
     audio_cfg = cfg["audio"]
     debug_cfg = cfg["debug"]
 
     sample_rate = int(audio_cfg["sample_rate"])
-    seconds = max(0.5, float(audio_cfg["sample_seconds"]))
+    seconds = max(0.5, float(seconds_override if seconds_override is not None else audio_cfg["sample_seconds"]))
     channels = max(1, int(audio_cfg["channels"]))
     debug_wav_path = str(debug_cfg.get("wav_path") or "")
 

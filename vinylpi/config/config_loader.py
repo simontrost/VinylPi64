@@ -8,7 +8,11 @@ CONFIG_DEFAULTS = {
         "device_name_contains": "USB AUDIO",
         "sample_seconds": 4,
         "sample_rate": 44100,
-        "channels": 1
+        "channels": 1,
+        "adaptive_sample": {
+            "enabled": False,
+            "failure_durations_seconds": [6, 8]
+        }
     },
     "image": {
         "canvas_size": 64,

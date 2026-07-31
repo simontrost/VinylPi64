@@ -45,6 +45,16 @@ function syncAllManualColorStates() {
     syncManualColorState("useDynamicText", "textColor");
 }
 
+function syncAdaptiveSampleState() {
+    const enabled = document.getElementById("adaptiveSampleEnabled")?.checked ?? false;
+    const details = document.querySelector('[data-setting-row="adaptive-sample-details"]');
+    if (!details) return;
+    details.classList.toggle("setting-disabled", !enabled);
+    details.querySelectorAll("input").forEach((input) => {
+        input.disabled = !enabled;
+    });
+}
+
 
 document.addEventListener("DOMContentLoaded", () => {
   const fallbackUploadInput = document.getElementById("fallbackUpload");
@@ -167,6 +177,7 @@ document.addEventListener("DOMContentLoaded", () => {
   ["useDynamicBg", "useDynamicText"].forEach((id) => {
     document.getElementById(id)?.addEventListener("change", syncAllManualColorStates);
   });
+  document.getElementById("adaptiveSampleEnabled")?.addEventListener("change", syncAdaptiveSampleState);
 });
 
 
@@ -194,6 +205,17 @@ async function loadConfig() {
         audio.sample_rate ?? 44100;
     document.getElementById("audioChannels").value =
         audio.channels ?? 1;
+    const adaptiveSample = audio.adaptive_sample || {};
+    const adaptiveDurations = Array.isArray(adaptiveSample.failure_durations_seconds)
+        ? adaptiveSample.failure_durations_seconds
+        : [6, 8];
+    document.getElementById("adaptiveSampleEnabled").checked =
+        !!adaptiveSample.enabled;
+    document.getElementById("adaptiveSampleFirstFailure").value =
+        adaptiveDurations[0] ?? 6;
+    document.getElementById("adaptiveSampleLaterFailures").value =
+        adaptiveDurations[1] ?? adaptiveDurations[0] ?? 8;
+    syncAdaptiveSampleState();
 
     // IMAGE / DISPLAY
     document.getElementById("imageCanvasSize").value =
@@ -296,6 +318,7 @@ document.getElementById("settings-form").addEventListener("submit", async (e) =>
     const cfg = JSON.parse(JSON.stringify(CURRENT_CFG));
 
     cfg.audio = cfg.audio || {};
+    cfg.audio.adaptive_sample = cfg.audio.adaptive_sample || {};
     cfg.image = cfg.image || {};
     cfg.fallback = cfg.fallback || {};
     cfg.divoom = cfg.divoom || {};
@@ -306,6 +329,7 @@ document.getElementById("settings-form").addEventListener("submit", async (e) =>
     cfg.homeassistant = cfg.homeassistant || {};
 
     const audio = cfg.audio;
+    const adaptiveSample = cfg.audio.adaptive_sample;
     const image = cfg.image;
     const fallback = cfg.fallback;
     const divoom = cfg.divoom;
@@ -324,6 +348,12 @@ document.getElementById("settings-form").addEventListener("submit", async (e) =>
         parseInt(document.getElementById("audioSampleRate").value) || 44100;
     audio.channels =
         parseInt(document.getElementById("audioChannels").value) || 1;
+    adaptiveSample.enabled =
+        document.getElementById("adaptiveSampleEnabled").checked;
+    adaptiveSample.failure_durations_seconds = [
+        Math.max(0.5, parseFloat(document.getElementById("adaptiveSampleFirstFailure").value) || 6),
+        Math.max(0.5, parseFloat(document.getElementById("adaptiveSampleLaterFailures").value) || 8),
+    ];
 
     // IMAGE / DISPLAY
     image.canvas_size =
@@ -427,8 +457,11 @@ document.getElementById("settings-form").addEventListener("submit", async (e) =>
             body: JSON.stringify(cfg),
         });
         if (!response.ok) throw new Error(`Save failed: ${response.status}`);
+        const result = await response.json();
         CURRENT_CFG = cfg;
-        showToast("Settings saved.");
+        showToast(result.display_refresh_requested
+            ? "Settings saved. Pixoo display refresh requested."
+            : "Settings saved.");
     } catch (error) {
         console.error(error);
         showToast("Settings could not be saved.", true);

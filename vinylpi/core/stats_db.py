@@ -298,7 +298,7 @@ def write_current_status(data: dict) -> None:
             INSERT INTO current_status (
                 id, artist, title, cover_url, album, genre, bg_color,
                 track_id, artist_id, duration_ms, updated_at
-            ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%s', 'now'))
+            ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
                 artist = excluded.artist,
                 title = excluded.title,
@@ -321,6 +321,7 @@ def write_current_status(data: dict) -> None:
                 data.get("track_id"),
                 data.get("artist_id"),
                 data.get("duration_ms"),
+                int(time.time() * 1000),
             ),
         )
 
@@ -331,7 +332,7 @@ def get_current_status() -> dict | None:
         row = conn.execute(
             """
             SELECT artist, title, cover_url, album, genre, bg_color,
-                   track_id, artist_id, duration_ms
+                   track_id, artist_id, duration_ms, updated_at
             FROM current_status WHERE id = 1
             """
         ).fetchone()

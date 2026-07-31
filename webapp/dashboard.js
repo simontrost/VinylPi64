@@ -14,6 +14,7 @@ let recognizerInterval = null;
 let currentTrackKey = "";
 let lyricsAbortController = null;
 let trackInfoAbortController = null;
+let statusEventSource = null;
 
 function setText(id, value) {
     const element = document.getElementById(id);
@@ -390,16 +391,54 @@ async function showTrackInfo() {
     }
 }
 
-function startPolling() {
+function startStatusFallbackPolling() {
     if (!statusInterval) statusInterval = window.setInterval(loadStatus, 2000);
+}
+
+function stopStatusFallbackPolling() {
+    if (statusInterval) window.clearInterval(statusInterval);
+    statusInterval = null;
+}
+
+function startRecognizerPolling() {
     if (!recognizerInterval) recognizerInterval = window.setInterval(loadRecognizerStatus, 5000);
 }
 
-function stopPolling() {
-    if (statusInterval) window.clearInterval(statusInterval);
+function stopRecognizerPolling() {
     if (recognizerInterval) window.clearInterval(recognizerInterval);
-    statusInterval = null;
     recognizerInterval = null;
+}
+
+function connectStatusEvents() {
+    if (statusEventSource || typeof EventSource === "undefined") {
+        if (typeof EventSource === "undefined") startStatusFallbackPolling();
+        return;
+    }
+
+    statusEventSource = new EventSource("/api/events");
+    statusEventSource.addEventListener("open", () => {
+        stopStatusFallbackPolling();
+    });
+    statusEventSource.addEventListener("status", (event) => {
+        try {
+            const status = JSON.parse(event.data);
+            if (!status || status.status === null || status.error) {
+                renderEmptyStatus();
+                return;
+            }
+            renderStatus(status);
+        } catch (error) {
+            console.error("Invalid status event", error);
+        }
+    });
+    statusEventSource.addEventListener("error", () => {
+        startStatusFallbackPolling();
+    });
+}
+
+function disconnectStatusEvents() {
+    statusEventSource?.close();
+    statusEventSource = null;
 }
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -428,16 +467,20 @@ document.addEventListener("DOMContentLoaded", () => {
 
     loadStatus();
     loadRecognizerStatus();
-    startPolling();
+    connectStatusEvents();
+    startRecognizerPolling();
 });
 
 document.addEventListener("visibilitychange", () => {
     if (document.hidden) {
-        stopPolling();
+        disconnectStatusEvents();
+        stopStatusFallbackPolling();
+        stopRecognizerPolling();
         return;
     }
 
     loadStatus();
     loadRecognizerStatus();
-    startPolling();
+    connectStatusEvents();
+    startRecognizerPolling();
 });

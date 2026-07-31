@@ -4,6 +4,7 @@ import time
 
 from vinylpi.config.config_watcher import maybe_log_config_reload
 from vinylpi.core.audio_capture import record_sample
+from vinylpi.core.display_refresh import start_display_refresh_watcher
 from vinylpi.core.loop_logic import (
     flush_timed_listen_if_needed,
     handle_no_result,
@@ -39,16 +40,18 @@ def main_loop() -> None:
     album_state = AlbumState()
     stats_state = StatsSwitchState()
     timed_listen_state = TimedListenState()
+    start_display_refresh_watcher(debug_log=cfg.debug_log)
 
     while True:
         try:
             cfg_reloaded = maybe_log_config_reload()
             cfg = LoopConfig.from_config(read_config())
 
+            sample_seconds = cfg.sample_seconds_for_failures(display_state.consecutive_failures)
             if cfg.debug_log:
-                print("Recording sample ...")
+                print(f"Recording {sample_seconds:g}s sample ...")
 
-            wav_bytes = record_sample()
+            wav_bytes = record_sample(seconds_override=sample_seconds)
             if not wav_bytes:
                 print("No recording possible, trying again in 5s ...")
                 time.sleep(5)
