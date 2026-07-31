@@ -54,26 +54,64 @@
                                     <label for="audioDeviceName">Device name contains</label>
                                     <input type="text" id="audioDeviceName" placeholder="USB AUDIO">
                                 </div>
-                                <div class="form-row">
-                                    <label for="audioSampleSeconds">Sample duration</label>
-                                    <input type="number" id="audioSampleSeconds" step="0.1" min="1">
-                                    <div class="form-hint">Seconds per recognition attempt.</div>
-                                </div>
-                                <div class="form-row">
-                                    <label for="adaptiveSampleEnabled">Adaptive sample duration</label>
-                                    <input type="checkbox" id="adaptiveSampleEnabled">
-                                    <div class="form-hint">Use longer recordings after failed recognition attempts.</div>
-                                </div>
-                                <div data-setting-row="adaptive-sample-details">
-                                    <div class="form-row">
-                                        <label for="adaptiveSampleFirstFailure">After first failure</label>
-                                        <input type="number" id="adaptiveSampleFirstFailure" step="0.5" min="0.5" max="30">
-                                        <div class="form-hint">Recording duration in seconds for the next attempt.</div>
+                                <div class="adaptive-sample-block">
+                                    <div class="adaptive-sample-header">
+                                        <div>
+                                            <div class="adaptive-sample-title">Adaptive sample duration</div>
+                                            <div class="adaptive-sample-subtitle">Increase the recording length after unsuccessful recognition attempts.</div>
+                                        </div>
+                                        <label class="adaptive-toggle-label" for="adaptiveSampleEnabled">
+                                            <span>Enabled</span>
+                                            <input type="checkbox" id="adaptiveSampleEnabled">
+                                        </label>
                                     </div>
-                                    <div class="form-row">
-                                        <label for="adaptiveSampleLaterFailures">After further failures</label>
-                                        <input type="number" id="adaptiveSampleLaterFailures" step="0.5" min="0.5" max="30">
-                                        <div class="form-hint">Used from the third attempt onward until a song is recognized.</div>
+
+                                    <div class="adaptive-stages" aria-label="Adaptive recording stages">
+                                        <div class="adaptive-stage adaptive-stage-primary">
+                                            <div class="adaptive-stage-index">1</div>
+                                            <div class="adaptive-stage-copy">
+                                                <label for="audioSampleSeconds">Initial attempt</label>
+                                                <span>Used normally and again after a successful recognition.</span>
+                                            </div>
+                                            <div class="adaptive-stage-input">
+                                                <input type="number" id="audioSampleSeconds" step="0.1" min="1">
+                                                <span>sec</span>
+                                            </div>
+                                        </div>
+
+                                        <div class="adaptive-stage-connector" aria-hidden="true">No match</div>
+
+                                        <div data-setting-row="adaptive-sample-details" class="adaptive-stage-details">
+                                            <div class="adaptive-stage">
+                                                <div class="adaptive-stage-index">2</div>
+                                                <div class="adaptive-stage-copy">
+                                                    <label for="adaptiveSampleFirstFailure">Second attempt</label>
+                                                    <span>Used after the first consecutive failure.</span>
+                                                </div>
+                                                <div class="adaptive-stage-input">
+                                                    <input type="number" id="adaptiveSampleFirstFailure" step="0.5" min="0.5" max="30">
+                                                    <span>sec</span>
+                                                </div>
+                                            </div>
+
+                                            <div class="adaptive-stage-connector" aria-hidden="true">No match</div>
+
+                                            <div class="adaptive-stage">
+                                                <div class="adaptive-stage-index">3</div>
+                                                <div class="adaptive-stage-copy">
+                                                    <label for="adaptiveSampleLaterFailures">Further attempts</label>
+                                                    <span>Used from the second consecutive failure onward until a song is recognized.</span>
+                                                </div>
+                                                <div class="adaptive-stage-input">
+                                                    <input type="number" id="adaptiveSampleLaterFailures" step="0.5" min="0.5" max="30">
+                                                    <span>sec</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="adaptive-sample-note">
+                                        A successful recognition resets the next attempt to stage 1. Stage 3 repeats after additional failures.
                                     </div>
                                 </div>
                                 <div class="form-row">
