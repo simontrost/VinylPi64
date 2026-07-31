@@ -40,8 +40,60 @@
 }
 
 #pixooBrightness {
+    --range-value: 50%;
     width: 100%;
-    accent-color: var(--pink);
+    height: 28px;
+    margin: 0;
+    appearance: none;
+    -webkit-appearance: none;
+    border: 0;
+    outline: none;
+    background:
+        linear-gradient(var(--pink), var(--pink)) 0 50% / var(--range-value) 5px no-repeat,
+        linear-gradient(var(--surface-3), var(--surface-3)) 0 50% / 100% 5px no-repeat;
+    border-radius: 999px;
+    cursor: pointer;
+}
+
+#pixooBrightness::-webkit-slider-runnable-track {
+    height: 5px;
+    background: transparent;
+    border: 0;
+    border-radius: 999px;
+}
+
+#pixooBrightness::-webkit-slider-thumb {
+    width: 26px;
+    height: 26px;
+    margin-top: -10.5px;
+    appearance: none;
+    -webkit-appearance: none;
+    border: 0;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.36);
+}
+
+#pixooBrightness::-moz-range-track {
+    height: 5px;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+}
+
+#pixooBrightness::-moz-range-progress {
+    height: 5px;
+    border-radius: 999px;
+    background: var(--pink);
+}
+
+#pixooBrightness::-moz-range-thumb {
+    width: 26px;
+    height: 26px;
+    border: 0;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.36);
 }
 
 .pixoo-slider-value {

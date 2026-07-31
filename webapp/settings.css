@@ -291,6 +291,22 @@
     cursor: pointer;
 }
 
+.color-setting-control {
+    display: inline-flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.color-setting-control input[type="color"]:disabled {
+    cursor: not-allowed;
+    opacity: 0.38;
+    filter: grayscale(0.75);
+}
+
+.color-setting-control input[type="color"]:disabled:hover {
+    border-color: var(--border-strong);
+}
+
 .gallery {
     margin-top: 12px;
     display: grid;
@@ -305,6 +321,26 @@
     text-align: center;
     font-size: 12px;
     background: rgba(255, 255, 255, 0.025);
+    transition: border-color 0.15s ease, background 0.15s ease, transform 0.1s ease;
+}
+
+.gallery-item.selectable {
+    cursor: pointer;
+}
+
+.gallery-item.selectable:hover {
+    border-color: var(--border-strong);
+    background: rgba(255, 255, 255, 0.045);
+}
+
+.gallery-item.selectable:active {
+    transform: translateY(1px);
+}
+
+.gallery-item.selectable:focus-visible {
+    outline: none;
+    border-color: rgba(239, 45, 143, 0.72);
+    box-shadow: 0 0 0 3px rgba(239, 45, 143, 0.16);
 }
 
 .gallery-item.current {
@@ -321,9 +357,21 @@
 }
 
 .gallery-item button {
-    margin: 3px 2px 0;
-    padding: 7px 9px;
+    margin: 7px 0 0;
+    padding: 7px 12px;
     font-size: 12px;
+}
+
+.gallery-item .gallery-delete {
+    width: 100%;
+    color: #fff;
+    background: rgba(239, 68, 68, 0.16);
+    border-color: rgba(239, 68, 68, 0.42);
+}
+
+.gallery-item .gallery-delete:hover {
+    background: rgba(239, 68, 68, 0.26);
+    border-color: rgba(239, 68, 68, 0.62);
 }
 
 .settings-actions {

@@ -98,10 +98,20 @@
 
                             <div class="form-group">
                                 <div class="group-title">Colors</div>
-                                <div class="form-row"><label for="useDynamicBg">Dynamic background</label><input type="checkbox" id="useDynamicBg"></div>
-                                <div class="form-row" data-setting-row="manual-bg"><label for="bgColor">Manual background color</label><input type="color" id="bgColor"></div>
-                                <div class="form-row"><label for="useDynamicText">Dynamic text color</label><input type="checkbox" id="useDynamicText"></div>
-                                <div class="form-row" data-setting-row="manual-text"><label for="textColor">Text color</label><input type="color" id="textColor"></div>
+                                <div class="form-row color-mode-row">
+                                    <label for="useDynamicBg">Background color</label>
+                                    <div class="color-setting-control">
+                                        <input type="checkbox" id="useDynamicBg" aria-label="Use dynamic background color">
+                                        <input type="color" id="bgColor" aria-label="Manual background color">
+                                    </div>
+                                </div>
+                                <div class="form-row color-mode-row">
+                                    <label for="useDynamicText">Text color</label>
+                                    <div class="color-setting-control">
+                                        <input type="checkbox" id="useDynamicText" aria-label="Use dynamic text color">
+                                        <input type="color" id="textColor" aria-label="Manual text color">
+                                    </div>
+                                </div>
                             </div>
 
                             <div class="form-group">

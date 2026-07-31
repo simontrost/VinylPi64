@@ -31,6 +31,20 @@ function hexToRgb(hex) {
     ];
 }
 
+function syncManualColorState(toggleId, colorId) {
+    const toggle = document.getElementById(toggleId);
+    const color = document.getElementById(colorId);
+    if (!toggle || !color) return;
+
+    color.disabled = toggle.checked;
+    color.setAttribute("aria-disabled", String(toggle.checked));
+}
+
+function syncAllManualColorStates() {
+    syncManualColorState("useDynamicBg", "bgColor");
+    syncManualColorState("useDynamicText", "textColor");
+}
+
 
 document.addEventListener("DOMContentLoaded", () => {
   const fallbackUploadInput = document.getElementById("fallbackUpload");
@@ -93,19 +107,31 @@ document.addEventListener("DOMContentLoaded", () => {
         const name = document.createElement("div");
         name.textContent = img.filename;
 
-        const selectBtn = document.createElement("button");
-        selectBtn.type = "button";
-        selectBtn.textContent = "Use";
-        selectBtn.addEventListener("click", () => {
-          fallbackPathInput.value = img.path; 
+        const selectImage = () => {
+          fallbackPathInput.value = img.path;
           document.querySelectorAll(".gallery-item").forEach(el => el.classList.remove("current"));
           item.classList.add("current");
+          showToast(`Fallback image selected: ${img.filename}`);
+        };
+
+        item.classList.add("selectable");
+        item.tabIndex = 0;
+        item.setAttribute("role", "button");
+        item.setAttribute("aria-label", `Use ${img.filename} as fallback image`);
+        item.addEventListener("click", selectImage);
+        item.addEventListener("keydown", (event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            selectImage();
+          }
         });
 
         const deleteBtn = document.createElement("button");
         deleteBtn.type = "button";
+        deleteBtn.className = "gallery-delete";
         deleteBtn.textContent = "Delete";
-        deleteBtn.addEventListener("click", async () => {
+        deleteBtn.addEventListener("click", async (event) => {
+          event.stopPropagation();
           if (!confirm(`"${img.filename}" really delete?`)) return;
           const res = await fetch(`/api/fallback-image/${encodeURIComponent(img.filename)}`, {
             method: "DELETE",
@@ -120,7 +146,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
         item.appendChild(thumbnail);
         item.appendChild(name);
-        item.appendChild(selectBtn);
         item.appendChild(deleteBtn);
         galleryContainer.appendChild(item);
       });
@@ -138,6 +163,10 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
   }
+
+  ["useDynamicBg", "useDynamicText"].forEach((id) => {
+    document.getElementById(id)?.addEventListener("change", syncAllManualColorStates);
+  });
 });
 
 
@@ -193,6 +222,7 @@ async function loadConfig() {
         !!image.use_dynamic_bg;
     document.getElementById("useDynamicText").checked =
         !!image.use_dynamic_text_color;
+    syncAllManualColorStates();
 
     document.getElementById("imagePreviewScale").value =
         image.preview_scale ?? 8;

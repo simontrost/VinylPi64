@@ -246,14 +246,38 @@
     }
 }
 
-@media (max-width: 420px) {
+@media (max-width: 520px) {
+    .stats-grid {
+        gap: 12px;
+    }
+
+    .stats-grid .stats-card {
+        padding: 16px;
+    }
+
+    .stats-grid .stats-card h2 {
+        margin-bottom: 8px;
+    }
+
     .stats-item {
-        grid-template-columns: 30px minmax(0, 1fr);
+        grid-template-columns: 30px minmax(0, 1fr) auto;
+        gap: 8px;
+        min-height: 54px;
+        padding: 6px 0;
+    }
+
+    .stats-sub {
+        margin-top: 1px;
     }
 
     .stats-badge {
-        grid-column: 2;
-        justify-self: start;
+        grid-column: auto;
+        justify-self: end;
+        padding: 4px 7px;
+    }
+
+    .stats-toggle-wrapper {
+        padding-top: 8px;
     }
 
     .album-slide {

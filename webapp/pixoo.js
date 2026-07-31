@@ -29,8 +29,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function setBrightnessUI(value) {
         if (!brightnessSlider || !brightnessValue) return;
-        brightnessSlider.value = value;
-        brightnessValue.textContent = value + "%";
+        const normalized = Math.max(0, Math.min(100, Number(value) || 0));
+        brightnessSlider.value = normalized;
+        brightnessSlider.style.setProperty("--range-value", `${normalized}%`);
+        brightnessValue.textContent = normalized + "%";
     }
 
     function setActiveChannel(channelIndex) {
