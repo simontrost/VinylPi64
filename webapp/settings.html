@@ -101,14 +101,22 @@
                                 <div class="form-row color-mode-row">
                                     <label for="useDynamicBg">Background color</label>
                                     <div class="color-setting-control">
-                                        <input type="checkbox" id="useDynamicBg" aria-label="Use dynamic background color">
+                                        <div class="color-mode-switch" aria-label="Background color mode">
+                                            <span class="color-mode-label color-mode-label-manual">Manual</span>
+                                            <input type="checkbox" id="useDynamicBg" aria-label="Use automatic background color">
+                                            <span class="color-mode-label color-mode-label-auto">Automatic</span>
+                                        </div>
                                         <input type="color" id="bgColor" aria-label="Manual background color">
                                     </div>
                                 </div>
                                 <div class="form-row color-mode-row">
                                     <label for="useDynamicText">Text color</label>
                                     <div class="color-setting-control">
-                                        <input type="checkbox" id="useDynamicText" aria-label="Use dynamic text color">
+                                        <div class="color-mode-switch" aria-label="Text color mode">
+                                            <span class="color-mode-label color-mode-label-manual">Manual</span>
+                                            <input type="checkbox" id="useDynamicText" aria-label="Use automatic text color">
+                                            <span class="color-mode-label color-mode-label-auto">Automatic</span>
+                                        </div>
                                         <input type="color" id="textColor" aria-label="Manual text color">
                                     </div>
                                 </div>

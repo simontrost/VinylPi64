@@ -307,6 +307,44 @@
     border-color: var(--border-strong);
 }
 
+
+.color-setting-control {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 14px 18px;
+}
+
+.color-mode-switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    min-width: 220px;
+}
+
+.color-mode-label {
+    color: var(--muted-2);
+    font-size: 12px;
+    font-weight: 700;
+    transition: color 0.16s ease, opacity 0.16s ease;
+}
+
+.color-mode-switch:has(input:not(:checked)) .color-mode-label-manual,
+.color-mode-switch:has(input:checked) .color-mode-label-auto {
+    color: var(--text);
+}
+
+.color-mode-switch:has(input:not(:checked)) .color-mode-label-auto,
+.color-mode-switch:has(input:checked) .color-mode-label-manual {
+    opacity: 0.6;
+}
+
+.color-mode-row input[type="color"]:disabled {
+    opacity: 0.38;
+    filter: grayscale(0.82);
+    cursor: not-allowed;
+}
+
 .gallery {
     margin-top: 12px;
     display: grid;
@@ -434,6 +472,10 @@
 }
 
 @media (max-width: 760px) {
+    .color-mode-switch {
+        min-width: 0;
+    }
+
     .form-row {
         grid-template-columns: 1fr;
         gap: 7px;
