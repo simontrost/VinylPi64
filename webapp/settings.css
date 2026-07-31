@@ -734,3 +734,26 @@
         width: min(150px, 100%);
     }
 }
+
+/* Clean adaptive duration fields */
+.adaptive-stage-input input[type="number"] {
+    appearance: textfield;
+    -moz-appearance: textfield;
+    height: 44px;
+    padding: 0 40px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    line-height: 44px;
+}
+
+.adaptive-stage-input input[type="number"]::-webkit-outer-spin-button,
+.adaptive-stage-input input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.adaptive-stage-input > span {
+    right: 13px;
+    min-width: 22px;
+    text-align: center;
+}
