@@ -32,6 +32,10 @@ def update_song_stats(
     title: str,
     album: str | None = None,
     cover_url: str | None = None,
+    genre: str | None = None,
+    shazam_track_id: str | None = None,
+    shazam_artist_id: str | None = None,
+    duration_ms: int | None = None,
 ) -> None:
     if not artist or not title:
         return
@@ -44,21 +48,40 @@ def update_song_stats(
         conn.execute(
             """
             INSERT INTO songs (
-                song_key, artist, title, album, cover_url, play_count, updated_at
-            ) VALUES (?, ?, ?, ?, ?, 1, ?)
+                song_key, artist, title, album, cover_url, genre, genre_source,
+                shazam_track_id, shazam_artist_id, play_count, duration_ms,
+                duration_minutes, duration_source, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
             ON CONFLICT(song_key) DO UPDATE SET
                 play_count = songs.play_count + 1,
-                album = CASE
-                    WHEN (songs.album IS NULL OR songs.album = '')
-                         AND excluded.album IS NOT NULL AND excluded.album != ''
-                    THEN excluded.album ELSE songs.album END,
-                cover_url = CASE
-                    WHEN (songs.cover_url IS NULL OR songs.cover_url = '')
-                         AND excluded.cover_url IS NOT NULL AND excluded.cover_url != ''
-                    THEN excluded.cover_url ELSE songs.cover_url END,
+                album = COALESCE(NULLIF(excluded.album, ''), songs.album),
+                cover_url = COALESCE(NULLIF(excluded.cover_url, ''), songs.cover_url),
+                genre = COALESCE(NULLIF(excluded.genre, ''), songs.genre),
+                genre_source = CASE
+                    WHEN excluded.genre IS NOT NULL AND excluded.genre != ''
+                    THEN excluded.genre_source ELSE songs.genre_source END,
+                shazam_track_id = COALESCE(NULLIF(excluded.shazam_track_id, ''), songs.shazam_track_id),
+                shazam_artist_id = COALESCE(NULLIF(excluded.shazam_artist_id, ''), songs.shazam_artist_id),
+                duration_ms = COALESCE(excluded.duration_ms, songs.duration_ms),
+                duration_minutes = COALESCE(excluded.duration_minutes, songs.duration_minutes),
+                duration_source = COALESCE(excluded.duration_source, songs.duration_source),
                 updated_at = excluded.updated_at
             """,
-            (song_key, artist, title, album, cover_url, now),
+            (
+                song_key,
+                artist,
+                title,
+                album,
+                cover_url,
+                genre,
+                "shazam" if genre else None,
+                shazam_track_id,
+                shazam_artist_id,
+                int(duration_ms) if duration_ms else None,
+                round(int(duration_ms) / 60000.0, 2) if duration_ms else None,
+                "shazam" if duration_ms else None,
+                now,
+            ),
         )
         conn.execute(
             """
@@ -273,17 +296,19 @@ def write_current_status(data: dict) -> None:
         conn.execute(
             """
             INSERT INTO current_status (
-                id, artist, title, cover_url, album, bg_color,
-                track_id, artist_id, updated_at
-            ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, strftime('%s', 'now'))
+                id, artist, title, cover_url, album, genre, bg_color,
+                track_id, artist_id, duration_ms, updated_at
+            ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%s', 'now'))
             ON CONFLICT(id) DO UPDATE SET
                 artist = excluded.artist,
                 title = excluded.title,
                 cover_url = excluded.cover_url,
                 album = excluded.album,
+                genre = excluded.genre,
                 bg_color = excluded.bg_color,
                 track_id = excluded.track_id,
                 artist_id = excluded.artist_id,
+                duration_ms = excluded.duration_ms,
                 updated_at = excluded.updated_at
             """,
             (
@@ -291,9 +316,11 @@ def write_current_status(data: dict) -> None:
                 data.get("title"),
                 data.get("cover_url"),
                 data.get("album"),
+                data.get("genre"),
                 data.get("bg_color"),
                 data.get("track_id"),
                 data.get("artist_id"),
+                data.get("duration_ms"),
             ),
         )
 
@@ -303,7 +330,8 @@ def get_current_status() -> dict | None:
     with get_connection() as conn:
         row = conn.execute(
             """
-            SELECT artist, title, cover_url, album, bg_color, track_id, artist_id
+            SELECT artist, title, cover_url, album, genre, bg_color,
+                   track_id, artist_id, duration_ms
             FROM current_status WHERE id = 1
             """
         ).fetchone()
@@ -362,9 +390,9 @@ def get_stats_snapshot() -> dict:
     with get_connection() as conn:
         for row in conn.execute(
             """
-            SELECT song_key, artist, title, album, cover_url, play_count,
-                   duration_ms, duration_minutes, duration_source,
-                   measured_listen_seconds
+            SELECT song_key, artist, title, album, cover_url, genre, genre_source,
+                   shazam_track_id, shazam_artist_id, play_count, duration_ms,
+                   duration_minutes, duration_source, measured_listen_seconds
             FROM songs ORDER BY play_count DESC, artist, title
             """
         ):
@@ -376,6 +404,14 @@ def get_stats_snapshot() -> dict:
             }
             if row["cover_url"] is not None:
                 entry["cover_url"] = row["cover_url"]
+            if row["genre"] is not None:
+                entry["genre"] = row["genre"]
+            if row["genre_source"] is not None:
+                entry["genre_source"] = row["genre_source"]
+            if row["shazam_track_id"] is not None:
+                entry["shazam_track_id"] = row["shazam_track_id"]
+            if row["shazam_artist_id"] is not None:
+                entry["shazam_artist_id"] = row["shazam_artist_id"]
             if row["duration_ms"] is not None:
                 entry["duration_ms"] = int(row["duration_ms"])
             if row["duration_minutes"] is not None:
@@ -454,6 +490,150 @@ def get_stats_snapshot() -> dict:
     return stats
 
 
+
+def get_ranked_stats(limit: int = 10) -> dict[str, Any]:
+    """Return statistics directly from SQL without network lookups."""
+    init_db()
+    limit = max(1, min(int(limit), 100))
+
+    with get_connection() as conn:
+        top_songs = [
+            {
+                "artist": row["artist"],
+                "title": row["title"],
+                "album": row["album"],
+                "genre": row["genre"],
+                "count": int(row["play_count"] or 0),
+                "cover_url": row["cover_url"],
+                "shazam_track_id": row["shazam_track_id"],
+            }
+            for row in conn.execute(
+                """
+                SELECT artist, title, album, genre, play_count, cover_url,
+                       shazam_track_id
+                FROM songs
+                WHERE play_count > 0
+                ORDER BY play_count DESC, artist COLLATE NOCASE, title COLLATE NOCASE
+                LIMIT ?
+                """,
+                (limit,),
+            )
+        ]
+
+        top_artists = [
+            {"name": row["artist"], "count": int(row["play_count"] or 0)}
+            for row in conn.execute(
+                """
+                SELECT artist, play_count
+                FROM artist_totals
+                ORDER BY play_count DESC, artist COLLATE NOCASE
+                LIMIT ?
+                """,
+                (limit,),
+            )
+        ]
+
+        top_albums = [
+            {"name": row["album"], "count": int(row["session_count"] or 0)}
+            for row in conn.execute(
+                """
+                SELECT album, session_count
+                FROM album_sessions
+                ORDER BY session_count DESC, album COLLATE NOCASE
+                LIMIT ?
+                """,
+                (limit,),
+            )
+        ]
+
+        top_genres = [
+            {"name": row["genre"], "count": int(row["weighted_plays"] or 0)}
+            for row in conn.execute(
+                """
+                SELECT genre, SUM(play_count) AS weighted_plays
+                FROM songs
+                WHERE genre IS NOT NULL AND TRIM(genre) != '' AND play_count > 0
+                GROUP BY genre
+                ORDER BY weighted_plays DESC, genre COLLATE NOCASE
+                LIMIT ?
+                """,
+                (limit,),
+            )
+        ]
+
+        top_album_covers = [
+            {
+                "name": row["album"],
+                "count": int(row["session_count"] or 0),
+                "cover_url": row["cover_url"],
+            }
+            for row in conn.execute(
+                """
+                SELECT
+                    sessions.album,
+                    sessions.session_count,
+                    COALESCE(
+                        covers.cover_url,
+                        (
+                            SELECT songs.cover_url
+                            FROM songs
+                            WHERE songs.album = sessions.album
+                              AND songs.cover_url IS NOT NULL
+                              AND TRIM(songs.cover_url) != ''
+                            ORDER BY songs.play_count DESC
+                            LIMIT 1
+                        )
+                    ) AS cover_url
+                FROM album_sessions AS sessions
+                LEFT JOIN album_covers AS covers ON covers.album = sessions.album
+                WHERE COALESCE(
+                    covers.cover_url,
+                    (
+                        SELECT songs.cover_url
+                        FROM songs
+                        WHERE songs.album = sessions.album
+                          AND songs.cover_url IS NOT NULL
+                          AND TRIM(songs.cover_url) != ''
+                        ORDER BY songs.play_count DESC
+                        LIMIT 1
+                    )
+                ) IS NOT NULL
+                ORDER BY sessions.session_count DESC, sessions.album COLLATE NOCASE
+                LIMIT 10
+                """
+            )
+        ]
+
+        listening = conn.execute(
+            "SELECT total_seconds FROM listening_totals WHERE id = 1"
+        ).fetchone()
+
+        metadata = conn.execute(
+            """
+            SELECT
+                COUNT(*) AS songs_total,
+                SUM(CASE WHEN genre IS NOT NULL AND TRIM(genre) != '' THEN 1 ELSE 0 END) AS songs_with_genre,
+                SUM(CASE WHEN shazam_track_id IS NOT NULL AND TRIM(shazam_track_id) != '' THEN 1 ELSE 0 END) AS songs_with_shazam_id
+            FROM songs
+            """
+        ).fetchone()
+
+    total_seconds = float((listening["total_seconds"] if listening else 0.0) or 0.0)
+    return {
+        "top_songs": top_songs,
+        "top_artists": top_artists,
+        "top_albums": top_albums,
+        "top_album_covers": top_album_covers,
+        "top_genres": top_genres,
+        "radar_genres": top_genres[:6],
+        "total_minutes_listened": int(round(total_seconds / 60.0)),
+        "metadata_coverage": {
+            "songs_total": int(metadata["songs_total"] or 0),
+            "songs_with_genre": int(metadata["songs_with_genre"] or 0),
+            "songs_with_shazam_id": int(metadata["songs_with_shazam_id"] or 0),
+        },
+    }
+
 def import_stats_json(
     source: Path | str,
     *,
@@ -506,15 +686,19 @@ def import_stats_json(
             conn.execute(
                 """
                 INSERT INTO songs (
-                    song_key, artist, title, album, cover_url, play_count,
-                    duration_ms, duration_minutes, duration_source,
-                    measured_listen_seconds, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%s', 'now'))
+                    song_key, artist, title, album, cover_url, genre, genre_source,
+                    shazam_track_id, shazam_artist_id, play_count, duration_ms,
+                    duration_minutes, duration_source, measured_listen_seconds, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%s', 'now'))
                 ON CONFLICT(song_key) DO UPDATE SET
                     artist = excluded.artist,
                     title = excluded.title,
                     album = excluded.album,
                     cover_url = excluded.cover_url,
+                    genre = excluded.genre,
+                    genre_source = excluded.genre_source,
+                    shazam_track_id = excluded.shazam_track_id,
+                    shazam_artist_id = excluded.shazam_artist_id,
                     play_count = excluded.play_count,
                     duration_ms = excluded.duration_ms,
                     duration_minutes = excluded.duration_minutes,
@@ -528,6 +712,10 @@ def import_stats_json(
                     title,
                     item.get("album"),
                     item.get("cover_url"),
+                    item.get("genre"),
+                    item.get("genre_source"),
+                    item.get("shazam_track_id"),
+                    item.get("shazam_artist_id"),
                     _as_int(item.get("count"), 0),
                     _as_int(item.get("duration_ms")),
                     _as_float(item.get("duration_minutes")),

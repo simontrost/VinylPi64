@@ -1,11 +1,10 @@
 from io import BytesIO
-from collections import Counter
 import colorsys
 
 import requests
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
-from vinylpi.web.services.config import read_config
+from vinylpi.config.runtime import read_config
 
 def load_image(path_or_url: str) -> Image.Image:
     if not path_or_url:

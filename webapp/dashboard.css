@@ -1,55 +1,55 @@
 :root {
-    --content-max: 1040px;
-    --content-w: min(var(--content-max), 100%);
+    --dashboard-max: 1040px;
 }
 
 .song-section,
 .lyrics-section,
 .control-section {
-    width: var(--content-w);
-    max-width: var(--content-max);
-    margin-left: auto;
-    margin-right: auto;
+    width: min(var(--dashboard-max), 100%);
+    margin-inline: auto;
 }
 
 .song-section {
-    margin-top: 8px;
-    margin-bottom: 18px;
+    margin: 8px auto 18px;
 }
 
 .song-card {
+    display: grid;
+    justify-items: center;
     width: 100%;
     padding: clamp(22px, 4vw, 34px);
-    border-radius: 22px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
     background:
-        linear-gradient(135deg,
+        linear-gradient(
+            135deg,
             color-mix(in srgb, var(--song-bg, #25252d) 80%, #111 20%),
             color-mix(in srgb, var(--song-bg, #25252d) 35%, #151519 65%)
         );
-    border: 1px solid var(--border);
     box-shadow: var(--shadow);
-    display: grid;
-    justify-items: center;
     text-align: center;
     transition: background 0.35s ease;
 }
 
 .song-cover {
     width: min(330px, 68vw);
-    height: min(330px, 68vw);
+    aspect-ratio: 1;
+    margin-bottom: 22px;
+    border: 1px solid var(--border);
     border-radius: 18px;
     object-fit: cover;
-    margin-bottom: 22px;
     box-shadow: 0 18px 36px rgba(0, 0, 0, 0.36);
 }
 
 .song-artist {
-    font-size: 16px;
-    color: var(--muted);
     margin-bottom: 5px;
+    color: var(--muted);
+    font-size: 16px;
 }
 
 .song-title {
+    max-width: 820px;
     font-size: clamp(22px, 3vw, 34px);
     font-weight: 820;
     line-height: 1.15;
@@ -57,41 +57,51 @@
 
 .song-album {
     margin-top: 8px;
-    font-size: 15px;
     color: var(--muted);
+    font-size: 15px;
 }
 
-.lyrics-section {
-    margin-top: 0;
+.song-genre {
+    margin-top: 12px;
+    padding: 5px 10px;
+    border: 1px solid rgba(245, 197, 66, 0.26);
+    border-radius: 999px;
+    background: rgba(245, 197, 66, 0.08);
+    color: var(--yellow);
+    font-size: 12px;
+    font-weight: 720;
 }
 
 .lyrics-card {
+    max-width: 520px;
+    margin-inline: auto;
     padding: 14px;
     box-shadow: none;
-}
-
-.lyrics-card:not(.expanded) {
-    max-width: 520px;
+    transition: max-width 0.2s ease;
 }
 
 .lyrics-card.expanded {
-    max-width: var(--content-max);
+    max-width: var(--dashboard-max);
 }
 
 .lyrics-box {
-    background: #111116;
+    margin: 0;
+    padding: 14px;
     border: 1px solid var(--border);
     border-radius: 14px;
-    padding: 14px;
+    background: #111116;
     color: #eeeeef;
-    white-space: pre-wrap;
-    line-height: 1.45;
+    font-family: inherit;
     font-size: 14px;
+    line-height: 1.5;
+    white-space: pre-wrap;
 }
 
 .lyrics-box.collapsed {
     max-height: 180px;
     overflow: hidden;
+    -webkit-mask-image: linear-gradient(to bottom, #000 70%, transparent 100%);
+    mask-image: linear-gradient(to bottom, #000 70%, transparent 100%);
 }
 
 .lyrics-footer {
@@ -105,10 +115,6 @@
 #btn-track-info,
 #btn-lyrics-toggle {
     min-width: 100px;
-}
-
-#btn-lyrics-toggle {
-    border-color: rgba(239, 45, 143, 0.32);
 }
 
 .control-section {
@@ -129,24 +135,24 @@
 }
 
 .rec-status-text {
-    font-size: 13px;
     padding: 6px 10px;
-    border-radius: 999px;
-    background: #2b2b34;
-    color: var(--muted);
     border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--surface-2);
+    color: var(--muted);
+    font-size: 13px;
 }
 
 .rec-status-running {
-    color: #bbf7d0;
+    border-color: rgba(34, 197, 94, 0.28);
     background: rgba(34, 197, 94, 0.12);
-    border-color: rgba(34, 197, 94, 0.24);
+    color: #bbf7d0;
 }
 
 .rec-status-stopped {
-    color: #fecaca;
+    border-color: rgba(239, 68, 68, 0.28);
     background: rgba(239, 68, 68, 0.13);
-    border-color: rgba(239, 68, 68, 0.24);
+    color: #fecaca;
 }
 
 .toggle-label {
@@ -162,17 +168,17 @@
 }
 
 .toggle-switch input {
-    opacity: 0;
     width: 0;
     height: 0;
+    opacity: 0;
 }
 
 .toggle-slider {
     position: absolute;
     inset: 0;
-    background: #2b2b34;
     border: 1px solid var(--border-strong);
     border-radius: 999px;
+    background: var(--surface-2);
     cursor: pointer;
     transition: background 0.2s ease, border-color 0.2s ease;
 }
@@ -180,18 +186,22 @@
 .toggle-slider::before {
     content: "";
     position: absolute;
+    top: 3px;
+    left: 3px;
     width: 24px;
     height: 24px;
-    left: 3px;
-    top: 3px;
     border-radius: 50%;
     background: #e8e8ea;
     transition: transform 0.2s ease;
 }
 
+.toggle-switch input:focus-visible + .toggle-slider {
+    box-shadow: 0 0 0 3px rgba(239, 45, 143, 0.16);
+}
+
 .toggle-switch input:checked + .toggle-slider {
-    background: rgba(239, 45, 143, 0.75);
     border-color: rgba(239, 45, 143, 0.85);
+    background: rgba(239, 45, 143, 0.75);
 }
 
 .toggle-switch input:checked + .toggle-slider::before {
@@ -201,25 +211,26 @@
 .info-backdrop {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.48);
     z-index: 40;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(2px);
 }
 
 .track-info-drawer {
     position: fixed;
     top: 0;
     right: 0;
-    width: min(430px, 92vw);
-    height: 100vh;
-    background: #17171c;
-    color: var(--text);
     z-index: 50;
-    box-shadow: -18px 0 44px rgba(0, 0, 0, 0.55);
-    transform: translateX(105%);
-    transition: transform 0.25s ease;
+    width: min(430px, 92vw);
+    height: 100dvh;
     padding: 24px;
     overflow-y: auto;
+    transform: translateX(105%);
     border-left: 1px solid var(--border);
+    background: #17171c;
+    box-shadow: -18px 0 44px rgba(0, 0, 0, 0.55);
+    color: var(--text);
+    transition: transform 0.25s ease;
 }
 
 .track-info-drawer.open {
@@ -228,16 +239,16 @@
 
 .track-info-header {
     display: flex;
-    justify-content: space-between;
     align-items: flex-start;
+    justify-content: space-between;
     gap: 16px;
     margin-bottom: 22px;
 }
 
 .track-info-label {
-    font-size: 12px;
-    color: var(--muted);
     margin-bottom: 7px;
+    color: var(--muted);
+    font-size: 12px;
 }
 
 .track-info-header h2 {
@@ -247,24 +258,24 @@
 
 .track-info-close {
     width: 36px;
-    height: 36px;
+    min-height: 36px;
+    padding: 0;
     border-radius: 999px;
     font-size: 22px;
     line-height: 1;
-    padding: 0;
 }
 
 .track-info-content {
     font-size: 14px;
-    line-height: 1.45;
+    line-height: 1.5;
 }
 
 .track-info-block {
-    background: #202027;
+    margin-bottom: 14px;
+    padding: 14px;
     border: 1px solid var(--border);
     border-radius: 14px;
-    padding: 14px;
-    margin-bottom: 14px;
+    background: var(--surface);
 }
 
 .track-info-block h3 {
@@ -274,6 +285,7 @@
 
 .track-info-row {
     margin: 7px 0;
+    overflow-wrap: anywhere;
     color: var(--muted);
 }
 
@@ -293,19 +305,8 @@
     #btn-lyrics,
     #btn-track-info,
     #btn-lyrics-toggle {
-        flex: 1;
         min-width: 0;
+        flex: 1;
         padding-inline: 8px;
     }
-}
-
-
-/* FIX: center lyrics + buttons */
-.lyrics-card {
-    margin-left: auto;
-    margin-right: auto;
-}
-
-.lyrics-footer {
-    justify-content: center !important;
 }

@@ -1,4 +1,19 @@
 let CURRENT_CFG = null;
+let toastTimer = null;
+
+function showToast(message, isError = false) {
+    const toast = document.getElementById("settingsToast");
+    if (!toast) return;
+
+    toast.textContent = message;
+    toast.style.borderColor = isError
+        ? "rgba(239, 68, 68, 0.55)"
+        : "rgba(34, 197, 94, 0.45)";
+    toast.classList.add("show");
+
+    if (toastTimer) window.clearTimeout(toastTimer);
+    toastTimer = window.setTimeout(() => toast.classList.remove("show"), 3200);
+}
 
 function rgbToHex(arr) {
     const [r, g, b] = arr;
@@ -39,16 +54,16 @@ document.addEventListener("DOMContentLoaded", () => {
         const data = await res.json();
         if (data.ok && data.image_path) {
           fallbackPathInput.value = data.image_path;
-          alert("Fallback image updated.");
+          showToast("Fallback image updated.");
           if (!galleryContainer.classList.contains("hidden")) {
             await loadFallbackGallery();
           }
         } else {
-          alert("Upload failed: " + (data.error || "unknown error"));
+          showToast("Upload failed: " + (data.error || "unknown error"), true);
         }
       } catch (err) {
         console.error(err);
-        alert("Upload failed (network error).");
+        showToast("Upload failed (network error).", true);
       }
     });
   }
@@ -97,7 +112,7 @@ document.addEventListener("DOMContentLoaded", () => {
           });
           const out = await res.json();
           if (!out.ok) {
-            alert("Deletion failed: " + (out.error || "unknown error"));
+            showToast("Deletion failed: " + (out.error || "unknown error"), true);
           } else {
             await loadFallbackGallery();
           }
@@ -138,6 +153,7 @@ async function loadConfig() {
     const discovery = divoom.discovery || {};
     const debug = cfg.debug || {};
     const behavior = cfg.behavior || {};
+    const shazam = cfg.shazam || {};
     const homeassistant = cfg.homeassistant || {};
 
     // AUDIO
@@ -221,6 +237,8 @@ async function loadConfig() {
         behavior.loop_delay_seconds ?? 1;
     document.getElementById("behaviorAutoSleep").value =
         behavior.auto_sleep ?? 50;
+    document.getElementById("shazamTimeout").value =
+        shazam.timeout_seconds ?? 15;
 
     // DEBUG
     document.getElementById("debugLogs").checked =
@@ -245,7 +263,7 @@ document.getElementById("settings-form").addEventListener("submit", async (e) =>
     e.preventDefault();
     if (!CURRENT_CFG) return;
 
-    const cfg = CURRENT_CFG;
+    const cfg = JSON.parse(JSON.stringify(CURRENT_CFG));
 
     cfg.audio = cfg.audio || {};
     cfg.image = cfg.image || {};
@@ -254,6 +272,7 @@ document.getElementById("settings-form").addEventListener("submit", async (e) =>
     cfg.divoom.discovery = cfg.divoom.discovery || {};
     cfg.debug = cfg.debug || {};
     cfg.behavior = cfg.behavior || {};
+    cfg.shazam = cfg.shazam || {};
     cfg.homeassistant = cfg.homeassistant || {};
 
     const audio = cfg.audio;
@@ -263,6 +282,7 @@ document.getElementById("settings-form").addEventListener("submit", async (e) =>
     const discovery = cfg.divoom.discovery;
     const debug = cfg.debug;
     const behavior = cfg.behavior;
+    const shazam = cfg.shazam;
     const homeassistant = cfg.homeassistant;
 
     // AUDIO
@@ -346,7 +366,11 @@ document.getElementById("settings-form").addEventListener("submit", async (e) =>
     behavior.loop_delay_seconds =
         parseFloat(document.getElementById("behaviorLoopDelay").value) || 1;
     behavior.auto_sleep =
-        parseInt(document.getElementById("behaviorAutoSleep").value) || 50;
+        Math.max(0, parseInt(document.getElementById("behaviorAutoSleep").value, 10) || 0);
+    shazam.timeout_seconds = Math.min(
+        60,
+        Math.max(5, parseFloat(document.getElementById("shazamTimeout").value) || 15),
+    );
 
     // DEBUG
     debug.logs =
@@ -366,17 +390,25 @@ document.getElementById("settings-form").addEventListener("submit", async (e) =>
     homeassistant.webhook_id =
         document.getElementById("webHookID").value;
 
-    await fetch("/api/config", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(cfg),
-    });
-
-    alert("Saved settings.");
-    
+    try {
+        const response = await fetch("/api/config", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(cfg),
+        });
+        if (!response.ok) throw new Error(`Save failed: ${response.status}`);
+        CURRENT_CFG = cfg;
+        showToast("Settings saved.");
+    } catch (error) {
+        console.error(error);
+        showToast("Settings could not be saved.", true);
+    }
 });
 
-loadConfig();
+loadConfig().catch((error) => {
+    console.error(error);
+    showToast("Configuration could not be loaded.", true);
+});
 
 const resetBtn = document.getElementById("reset-defaults");
 if (resetBtn) {
@@ -390,9 +422,9 @@ if (resetBtn) {
         const data = await res.json().catch(() => ({}));
         if (data.ok) {
             await loadConfig();
-            alert("Settings reset to defaults.");
+            showToast("Settings reset to defaults.");
         } else {
-            alert("Reset failed.");
+            showToast("Reset failed.", true);
         }
     });
 }

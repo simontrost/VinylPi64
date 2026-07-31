@@ -1,6 +1,5 @@
 <!DOCTYPE html>
-<html lang="de">
-
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <title>VinylPi Statistics</title>
@@ -10,21 +9,20 @@
     <link rel="icon" href="/favicon-32x32.png" type="image/png" sizes="32x32">
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180">
     <link rel="manifest" href="/site.webmanifest">
-    <meta name="theme-color" content="#06081A">
+    <meta name="theme-color" content="#151519">
     <link rel="stylesheet" href="base.css">
     <link rel="stylesheet" href="stats.css">
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="stats.js" defer></script>
 </head>
-
 <body>
     <aside class="sidebar">
-        <nav class="nav">
+        <nav class="nav" aria-label="Main navigation">
             <a href="index.html">Dashboard</a>
             <a href="settings.html">Settings</a>
             <a href="pixoo.html">Pixoo</a>
-            <a href="stats.html" class="active">Statistics</a>
+            <a href="stats.html" class="active" aria-current="page">Statistics</a>
             <a href="about.html">About</a>
         </nav>
     </aside>
@@ -32,45 +30,71 @@
     <main class="main">
         <header class="main-header">
             <div class="header-title pixel-title">Statistics</div>
-            <img src="logo.png" class="header-logo" alt="VinylPi Logo">
+            <img src="logo.png" class="header-logo" alt="VinylPi logo">
         </header>
 
-        <section class="stats-section">
-            <div class="stats-minutes-card">
-                <div class="stats-minutes-label">Minutes listened</div>
-                <div id="stats-minutes" class="stats-minutes-value">—</div>
-                <div class="stats-minutes-sub">Based on recognized tracks</div>
+        <section class="stats-section" aria-live="polite">
+            <div class="stats-overview-grid">
+                <article class="stats-minutes-card">
+                    <div class="stats-kicker">Listening time</div>
+                    <div class="stats-value-row">
+                        <strong id="stats-minutes" class="stats-minutes-value">—</strong>
+                        <span class="stats-unit">minutes</span>
+                    </div>
+                    <div class="stats-description">Calculated from confirmed recognitions.</div>
+                </article>
+
+                <article class="stats-card metadata-card">
+                    <div class="stats-kicker">Shazam metadata</div>
+                    <div class="metadata-grid">
+                        <div>
+                            <strong id="metadata-genres">—</strong>
+                            <span>with genre</span>
+                        </div>
+                        <div>
+                            <strong id="metadata-shazam-ids">—</strong>
+                            <span>with Shazam ID</span>
+                        </div>
+                    </div>
+                    <div id="metadata-note" class="stats-description">New recognitions add this data automatically.</div>
+                </article>
             </div>
+
             <div class="stats-grid">
-                <div class="stats-card">
+                <article class="stats-card">
                     <h2>Top Songs</h2>
                     <ul id="stats-songs" class="stats-list"></ul>
-                </div>
+                </article>
 
-                <div class="stats-card">
+                <article class="stats-card">
                     <h2>Top Artists</h2>
                     <ul id="stats-artists" class="stats-list"></ul>
-                </div>
+                </article>
 
-                <div class="stats-card">
+                <article class="stats-card">
                     <h2>Top Albums</h2>
                     <ul id="stats-albums" class="stats-list"></ul>
-                </div>
+                </article>
             </div>
 
             <div class="stats-visual-grid">
-                <div class="stats-card stats-chart-card">
-                    <h2>Top Genres</h2>
-                    <canvas id="genre-radar"></canvas>
-                </div>
+                <article class="stats-card stats-chart-card">
+                    <div class="stats-card-heading">
+                        <h2>Top Genres</h2>
+                        <span class="stats-source">Shazam</span>
+                    </div>
+                    <div id="genre-empty" class="stats-empty hidden">
+                        Genre statistics will appear after songs are recognized again.
+                    </div>
+                    <canvas id="genre-radar" aria-label="Genre radar chart"></canvas>
+                </article>
 
-                <div class="stats-card stats-chart-card album-carousel-card">
-                    <h2>Top Albums</h2>
+                <article class="stats-card stats-chart-card album-carousel-card">
+                    <h2>Top Album Covers</h2>
                     <div id="album-carousel" class="album-carousel"></div>
-                </div>
+                </article>
             </div>
         </section>
     </main>
 </body>
-
 </html>

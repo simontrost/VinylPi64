@@ -1,318 +1,152 @@
-import asyncio
-import threading
-import time
-from typing import Optional, Tuple
+from __future__ import annotations
 
-from shazamio import Shazam
+import re
+from typing import Any
 
-from vinylpi.web.services.config import read_config
-
-from vinylpi.core.image_utils import (
-    load_image,
-    dynamic_bg_color,
-    _get_font_for_config,
-    text_size,
-    dynamic_text_color,
-)
-from vinylpi.integrations.divoom_api import PixooClient, PixooError
-from PIL import Image, ImageDraw
-
-_scroll_thread: Optional[threading.Thread] = None
-_scroll_stop_event = threading.Event()
-
-_shazam: Optional[Shazam] = None
-_pixoo_client: Optional[PixooClient] = None
+from vinylpi.core.genre_tags import normalize_genre
+from vinylpi.core.image_utils import load_image
+from vinylpi.core.models import RecognizedTrack
+from vinylpi.integrations.shazam_client import recognize_audio
+from vinylpi.config.runtime import read_config
 
 
-def _get_shazam() -> Shazam:
-    global _shazam
-    if _shazam is None:
-        _shazam = Shazam()
-    return _shazam
+def _first_text(value: object) -> str | None:
+    text = str(value or "").strip()
+    return text or None
 
 
-def _get_pixoo() -> PixooClient:
-    global _pixoo_client
-    if _pixoo_client is None:
-        _pixoo_client = PixooClient()
-    return _pixoo_client
+def _extract_album(track: dict[str, Any]) -> str | None:
+    for section in track.get("sections") or []:
+        if section.get("type") != "SONG":
+            continue
+        for item in section.get("metadata") or []:
+            if str(item.get("title") or "").casefold() == "album":
+                return _first_text(item.get("text"))
+    return None
 
 
-def _stop_scroll_thread():
-    global _scroll_thread, _scroll_stop_event
+def _parse_duration_text(value: object) -> int | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
 
-    if _scroll_thread is not None and _scroll_thread.is_alive():
-        _scroll_stop_event.set()
-        _scroll_thread.join()
+    if text.isdigit():
+        number = int(text)
+        if 30_000 <= number <= 30 * 60_000:
+            return number
 
-    _scroll_thread = None
-    _scroll_stop_event = threading.Event()
+    match = re.fullmatch(r"(?:(\d+):)?(\d{1,2}):(\d{2})", text)
+    if match:
+        hours = int(match.group(1) or 0)
+        minutes = int(match.group(2))
+        seconds = int(match.group(3))
+        return ((hours * 60 + minutes) * 60 + seconds) * 1000
 
-async def _recognize_async(wav_bytes: bytes):
-    CONFIG = read_config()
-    debug_log = CONFIG["debug"]["logs"]
+    match = re.fullmatch(r"(\d{1,2}):(\d{2})", text)
+    if match:
+        return (int(match.group(1)) * 60 + int(match.group(2))) * 1000
+
+    return None
+
+
+def _valid_duration(value: object) -> int | None:
+    try:
+        duration = int(float(value))
+    except (TypeError, ValueError):
+        return None
+    if 30_000 <= duration <= 30 * 60_000:
+        return duration
+    return None
+
+
+def _extract_duration_ms(track: dict[str, Any]) -> int | None:
+    """Use duration data when Shazam includes it; many responses omit it."""
+    direct_candidates = (
+        track.get("durationInMillis"),
+        track.get("duration_ms"),
+        track.get("durationMillis"),
+        (track.get("attributes") or {}).get("durationInMillis"),
+    )
+    for candidate in direct_candidates:
+        duration = _valid_duration(candidate)
+        if duration:
+            return duration
+
+    for section in track.get("sections") or []:
+        for item in section.get("metadata") or []:
+            label = str(item.get("title") or "").casefold()
+            if label in {"duration", "length", "track length"}:
+                duration = _parse_duration_text(item.get("text"))
+                if duration:
+                    return duration
+    return None
+
+
+def _extract_genre(track: dict[str, Any]) -> str | None:
+    genres = track.get("genres")
+    if isinstance(genres, dict):
+        return normalize_genre(genres.get("primary") or genres.get("secondary"))
+    return normalize_genre(genres)
+
+
+def _extract_artist_id(track: dict[str, Any]) -> str | None:
+    for artist in track.get("artists") or []:
+        artist_id = artist.get("adamid") or artist.get("id")
+        if artist_id is not None:
+            return str(artist_id)
+    return None
+
+
+def _recognize(wav_bytes: bytes) -> RecognizedTrack | None:
+    cfg = read_config()
+    debug_log = bool((cfg.get("debug") or {}).get("logs", False))
+    timeout_seconds = float((cfg.get("shazam") or {}).get("timeout_seconds", 15))
+
     if debug_log:
-        print("Starting Shazam-recognition ...")
+        print("Starting Shazam recognition ...")
 
-    shazam = _get_shazam()
-
-    shazam_cfg = CONFIG.get("shazam", {})
-    timeout_s = shazam_cfg.get("timeout_seconds", 15)
-    result = await asyncio.wait_for(shazam.recognize(wav_bytes), timeout=timeout_s)
-
+    result = recognize_audio(wav_bytes, timeout_seconds=timeout_seconds)
     track = result.get("track") or {}
-    title = track.get("title") or "UNKNOWN"
-    artist = track.get("subtitle") or "UNKNOWN"
+    if not isinstance(track, dict) or not track:
+        return None
+
+    title = _first_text(track.get("title")) or "UNKNOWN"
+    artist = _first_text(track.get("subtitle")) or "UNKNOWN"
     images = track.get("images") or {}
-    cover_url = images.get("coverart")
-
-    track_id = track.get("key")
-
-    artist_id = None
-    artists = track.get("artists") or []
-    if artists:
-        artist_id = artists[0].get("adamid")
-
-    album = None
-    sections = track.get("sections") or []
-    for sec in sections:
-        if sec.get("type") == "SONG":
-            for md in sec.get("metadata", []):
-                if md.get("title") == "Album":
-                    album = md.get("text")
-                    break
-            if album:
-                break
-
-    if debug_log:
-        print(f"Detected: {artist} – {title}")
-        print(f"Album: {album}")
-        print(f"Cover-URL: {cover_url}")
+    if not isinstance(images, dict):
+        images = {}
+    cover_url = _first_text(images.get("coverart") or images.get("coverarthq"))
 
     if not cover_url:
         if debug_log:
             print("No cover image found in Shazam response.")
         return None
 
-    cover_img = load_image(cover_url)
-    return artist, title, cover_img, album, cover_url, track_id, artist_id
-
-def recognize_song(wav_bytes: bytes,) -> Optional[Tuple[str, str, Image.Image, str | None, str | None]]:
-    try:
-        return asyncio.run(_recognize_async(wav_bytes))
-    except Exception as e:
-        print(f"Error while detecting: {e}")
-        return None
-
-
-
-def _prepare_base_canvas(cover_img: Image.Image, bg_color) -> Image.Image:
-    CONFIG = read_config()
-    img_cfg = CONFIG["image"]
-    CANVAS_SIZE = img_cfg["canvas_size"]
-    COVER_SIZE = img_cfg["cover_size"]
-    TOP_MARGIN = img_cfg["top_margin"]
-
-    canvas = Image.new("RGB", (CANVAS_SIZE, CANVAS_SIZE), bg_color)
-
-    w, h = cover_img.size
-    side = min(w, h)
-    left = (w - side) // 2
-    top = (h - side) // 2
-    cover_square = cover_img.crop((left, top, left + side, top + side))
-    cover_resized = cover_square.resize((COVER_SIZE, COVER_SIZE), Image.Resampling.BILINEAR)
-
-    x_cover = (CANVAS_SIZE - COVER_SIZE) // 2
-    y_cover = TOP_MARGIN
-    canvas.paste(cover_resized, (x_cover, y_cover))
-
-    return canvas
-
-def _prepare_scroll_resources(cover_img: Image.Image, artist: str, title: str):
-    CONFIG = read_config()
-    img_cfg = CONFIG["image"]
-    CANVAS_SIZE = img_cfg["canvas_size"]
-    GAP_BETWEEN_LINES = img_cfg["line_spacing_margin"]
-    GAP_BETWEEN_COVER_AND_BAND = img_cfg["margin_image_text"]
-    TOP_MARGIN = img_cfg["top_margin"]
-    COVER_SIZE = img_cfg["cover_size"]
-
-    if img_cfg.get("uppercase", False):
-        artist = artist.upper()
-        title = title.upper()
-
-    use_dynamic_bg = img_cfg.get("use_dynamic_bg", True)
-    if use_dynamic_bg:
-        bg_color = dynamic_bg_color(cover_img)
-    else:
-        bg_color = tuple(img_cfg["manual_bg_color"])
-
-    base_canvas = _prepare_base_canvas(cover_img, bg_color)
-
-    font, glyph_h = _get_font_for_config()
-    w1, _ = text_size(artist, font)
-    w2, _ = text_size(title, font)
-
-    if img_cfg.get("use_dynamic_text_color", False):
-        TEXT_COLOR = dynamic_text_color(bg_color)
-    else:
-        TEXT_COLOR = tuple(img_cfg["text_color"])
-
-
-    y_band = TOP_MARGIN + COVER_SIZE + GAP_BETWEEN_COVER_AND_BAND
-    y_title = y_band + glyph_h + GAP_BETWEEN_LINES
-
-    return {
-        "artist": artist,
-        "title": title,
-        "bg_color": bg_color,
-        "base_canvas": base_canvas,
-        "font": font,
-        "glyph_h": glyph_h,
-        "w1": w1,
-        "w2": w2,
-        "y_band": y_band,
-        "y_title": y_title,
-        "TEXT_COLOR": TEXT_COLOR,
-        "CANVAS_SIZE": CANVAS_SIZE,
-    }
-
-
-def _scroll_loop(cover_img: Image.Image, artist: str, title: str):
-    CONFIG = read_config()
-    debug_log = CONFIG["debug"]["logs"]
-    debug_cfg = CONFIG["debug"]
-    img_cfg = CONFIG["image"]
-
-    pixoo = _get_pixoo()
-    first_frame_saved = False
-
-    res = _prepare_scroll_resources(cover_img, artist, title)
-
-    speed_px_per_s = img_cfg.get("marquee_speed", 18)
-    sleep_seconds = img_cfg.get("sleep_seconds", 0.01)
-
-    tick_float = 0.0
-    last_time = time.time()
-
-    w1 = res["w1"]
-    w2 = res["w2"]
-    canvas_size = res["CANVAS_SIZE"]
-
-    both_scroll = (w1 > canvas_size) and (w2 > canvas_size)
-    sync_range = max(w1, w2) + canvas_size if both_scroll else None
-
-    center_spacing_corr = 1
-
-    while not _scroll_stop_event.is_set():
-        now = time.time()
-        dt = now - last_time
-        last_time = now
-
-        tick_float += speed_px_per_s * dt
-        tick = int(tick_float)
-
-        frame = res["base_canvas"].copy()
-        draw = ImageDraw.Draw(frame)
-
-        def compute_x(w_text: int, tick_val: int) -> int:
-            if w_text <= canvas_size:
-                if w_text < canvas_size and center_spacing_corr > 0:
-                    effective_w = max(0, w_text - center_spacing_corr)
-                else:
-                    effective_w = w_text
-                return (canvas_size - effective_w) // 2
-
-            if both_scroll:
-                scroll_range = sync_range
-            else:
-                scroll_range = w_text + canvas_size
-
-            offset = tick_val % scroll_range
-            return canvas_size - offset
-
-        x_band = compute_x(w1, tick)
-        x_title = compute_x(w2, tick)
-
-        draw.text((x_band,  res["y_band"]),  res["artist"], font=res["font"], fill=res["TEXT_COLOR"])
-        draw.text((x_title, res["y_title"]), res["title"],  font=res["font"], fill=res["TEXT_COLOR"])
-
-        if not first_frame_saved:
-            pixoo_frame_path = debug_cfg.get("pixoo_frame_path", "")
-            preview_path = debug_cfg.get("preview_path", "")
-
-            if pixoo_frame_path:
-                frame.save(pixoo_frame_path)
-                if debug_log:
-                    print(f"Finished: {pixoo_frame_path} created.")
-
-            if preview_path:
-                scale = img_cfg["preview_scale"]
-                size = img_cfg["canvas_size"]
-                preview = frame.resize(
-                    (size * scale, size * scale),
-                    Image.Resampling.NEAREST,
-                )
-                preview.save(preview_path)
-                if debug_log:
-                    print(f"Finished: {preview_path} created.")
-
-            first_frame_saved = True
-
-        try:
-            pixoo.send_frame(frame)
-        except PixooError as e:
-            print(f"Pixoo not available or API-error: {e}")
-            break
-
-        if _scroll_stop_event.wait(sleep_seconds):
-            break
-
-
-def start_scrolling_display(cover_img: Image.Image, artist: str, title: str):
-    global _scroll_thread, _scroll_stop_event
-
-    _stop_scroll_thread()
-
-    _scroll_stop_event = threading.Event()
-    _scroll_thread = threading.Thread(
-        target=_scroll_loop,
-        args=(cover_img, artist, title),
-        daemon=True,
+    recognized = RecognizedTrack(
+        artist=artist,
+        title=title,
+        album=_extract_album(track),
+        cover_url=cover_url,
+        cover_image=load_image(cover_url),
+        genre=_extract_genre(track),
+        shazam_track_id=_first_text(track.get("key") or track.get("id")),
+        shazam_artist_id=_extract_artist_id(track),
+        duration_ms=_extract_duration_ms(track),
     )
-    _scroll_thread.start()
+
+    if debug_log:
+        print(f"Detected: {recognized.artist} – {recognized.title}")
+        print(f"Album: {recognized.album}")
+        print(f"Genre: {recognized.genre}")
+        print(f"Shazam track ID: {recognized.shazam_track_id}")
+        print(f"Cover URL: {recognized.cover_url}")
+
+    return recognized
 
 
-def show_fallback_image():
-    CONFIG = read_config()
-    debug_log = CONFIG["debug"]["logs"]
-    fallback_cfg = CONFIG.get("fallback", {})
-    if not fallback_cfg.get("enabled", False):
-        if debug_log:
-            print("Fallback disabled in config, nothing to show.")
-        return
-
-    path = fallback_cfg.get("image_path")
-    if not path:
-        if debug_log:
-            print("Fallback image path not set.")
-        return
-
-    img_cfg = CONFIG["image"]
-    size = img_cfg["canvas_size"]
-
-    _stop_scroll_thread()
-
+def recognize_song(wav_bytes: bytes) -> RecognizedTrack | None:
     try:
-        fallback_img = Image.open(path).convert("RGB")
-        fallback_resized = fallback_img.resize(
-            (size, size),
-            Image.Resampling.NEAREST,
-        )
-
-        pixoo = _get_pixoo()
-        pixoo.send_frame(fallback_resized)
-        if debug_log:
-            print(f"Fallback image '{path}' sent to Pixoo.")
-    except Exception as e:
-        print(f"Error showing fallback image: {e}")
+        return _recognize(wav_bytes)
+    except Exception as exc:
+        print(f"Error while detecting: {exc}")
+        return None

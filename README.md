@@ -120,16 +120,14 @@ If you don't want to use the web interface, you will have to edit the config man
 nano data/config.json
 ```
 Runtime data such as song statistics, caches and the current dashboard status is stored in `data/vinylpi.db`. The configuration remains in `data/config.json` so it can still be edited easily.
-Get an [Spotify API Keyset](https://developer.spotify.com/documentation/web-api) and a [Last FM API key (free)](https://www.last.fm/api) for the statistics webpage and add it to the env:
-```bash
-nano vinylpi.env
-```
+VinylPi reads genre and Shazam identifiers directly from the Shazam recognition result. No Spotify or Last.fm credentials are required. MusicBrainz is used only as a fallback when Shazam does not provide a track duration.
+
 ### 6. Execute
-with active env:
+With the virtual environment active:
 ```bash
 python -m vinylpi.web.dashboard
 ```
-hint: you can start the actual music detection from the webapp: `http://vinylpi.local:8080/`or via `python -m vinylpi.main`
+You can start music detection from the web app at `http://vinylpi.local:8080/` or directly with `python -m vinylpi.main`.
 
 ## Autostart on boot
 

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="en">
 
 <head>
     <meta charset="UTF-8">
@@ -10,7 +10,7 @@
     <link rel="icon" href="/favicon-32x32.png" type="image/png" sizes="32x32">
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180">
     <link rel="manifest" href="/site.webmanifest">
-    <meta name="theme-color" content="#06081A">
+    <meta name="theme-color" content="#151519">
     <link rel="stylesheet" href="base.css">
     <link rel="stylesheet" href="settings.css">
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
@@ -171,8 +171,10 @@
                         <div class="settings-card-content">
                             <div class="form-group">
                                 <div class="group-title">Recognition loop</div>
-                                <div class="form-row"><label for="behaviorLoopDelay">Loop delay</label><input type="number" id="behaviorLoopDelay" step="0.1"></div>
-                                <div class="form-row"><label for="behaviorAutoSleep">Auto sleep iterations</label><input type="number" id="behaviorAutoSleep" step="1"></div>
+                                <div class="form-row"><label for="behaviorLoopDelay">Loop delay</label><input type="number" id="behaviorLoopDelay" min="0.1" step="0.1"></div>
+                                <div class="form-row"><label for="behaviorAutoSleep">Auto sleep iterations</label><input type="number" id="behaviorAutoSleep" min="0" step="1"></div>
+                                <div class="form-row"><label for="shazamTimeout">Shazam timeout</label><input type="number" id="shazamTimeout" min="5" max="60" step="1"></div>
+                                <div class="form-hint">Maximum seconds for one Shazam recognition request.</div>
                             </div>
                         </div>
                     </section>

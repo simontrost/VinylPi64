@@ -36,18 +36,22 @@ def _archive_legacy_file(path: Path) -> None:
 
 
 def _migrate_legacy_statistics_once() -> None:
+    """Import legacy JSON only when the SQLite database is still empty."""
     if get_meta("legacy_json_migration_complete") == "1":
         return
 
     if STATS_PATH.exists():
         source_digest = _sha256(STATS_PATH)
-        imported_digest = get_meta("legacy_stats_sha256")
-        has_statistics = database_has_statistics()
 
-        if not has_statistics or source_digest != imported_digest:
+        if database_has_statistics():
+            print(
+                "Existing SQLite statistics found; preserving them and "
+                "archiving the legacy stats.json without overwriting data."
+            )
+        else:
             summary = import_stats_json(
                 STATS_PATH,
-                replace=has_statistics,
+                replace=False,
                 keep_raw_backup=True,
             )
             print(
@@ -55,6 +59,7 @@ def _migrate_legacy_statistics_once() -> None:
                 f"{summary['songs']} songs, {summary['artists']} artists."
             )
 
+        set_meta("legacy_stats_sha256", source_digest)
         _archive_legacy_file(STATS_PATH)
 
     set_meta("legacy_json_migration_complete", "1")

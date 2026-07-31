@@ -1,5 +1,5 @@
 from vinylpi.paths import CONFIG_PATH
-from vinylpi.web.services.config import read_config
+from vinylpi.config.runtime import read_config
 
 _last_cfg_mtime: float | None = None
 

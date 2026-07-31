@@ -1,25 +1,34 @@
 :root {
+    color-scheme: dark;
     --bg: #151519;
     --bg-soft: #1b1b21;
     --surface: #202027;
-    --surface-2: #25252d;
-    --border: rgba(255, 255, 255, 0.08);
-    --border-strong: rgba(255, 255, 255, 0.14);
+    --surface-2: #282831;
+    --surface-3: #30303a;
+    --border: rgba(255, 255, 255, 0.09);
+    --border-strong: rgba(255, 255, 255, 0.17);
     --text: #f2f2f4;
-    --muted: #a7a7b0;
-    --muted-2: #74747d;
+    --muted: #aaaab4;
+    --muted-2: #777782;
     --pink: #ef2d8f;
     --purple: #7c3aed;
     --yellow: #f5c542;
     --danger: #ef4444;
     --green: #22c55e;
     --sidebar-w: 190px;
+    --radius-sm: 12px;
     --radius: 18px;
+    --radius-lg: 22px;
     --shadow: 0 14px 36px rgba(0, 0, 0, 0.28);
+    --content-max: 1180px;
 }
 
 * {
     box-sizing: border-box;
+}
+
+html {
+    background: var(--bg);
 }
 
 body {
@@ -32,6 +41,11 @@ body {
     color: var(--text);
     font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     font-size: 16px;
+    line-height: 1.5;
+}
+
+img {
+    max-width: 100%;
 }
 
 a {
@@ -41,11 +55,13 @@ a {
 .sidebar {
     position: fixed;
     inset: 0 auto 0 0;
+    z-index: 20;
     width: var(--sidebar-w);
     height: 100vh;
     padding: 22px 14px;
-    background: rgba(13, 13, 17, 0.92);
+    background: rgba(13, 13, 17, 0.94);
     border-right: 1px solid var(--border);
+    backdrop-filter: blur(18px);
 }
 
 .nav {
@@ -59,22 +75,22 @@ a {
     align-items: center;
     min-height: 42px;
     padding: 0 14px;
-    border-radius: 12px;
+    border-radius: var(--radius-sm);
     color: var(--muted);
     text-decoration: none;
     font-size: 15px;
     font-weight: 650;
-    transition: color 0.15s ease, background 0.15s ease;
+    transition: color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
 }
 
 .nav a:hover {
     color: var(--text);
-    background: rgba(255, 255, 255, 0.045);
+    background: rgba(255, 255, 255, 0.05);
 }
 
 .nav a.active {
     color: var(--text);
-    background: rgba(255, 255, 255, 0.075);
+    background: rgba(255, 255, 255, 0.08);
     box-shadow: inset 3px 0 0 var(--pink);
 }
 
@@ -85,8 +101,8 @@ a {
 
 .main {
     margin-left: var(--sidebar-w);
-    padding: 28px clamp(20px, 4vw, 48px);
     min-height: 100vh;
+    padding: 28px clamp(20px, 4vw, 48px) 40px;
 }
 
 .main-header {
@@ -94,22 +110,22 @@ a {
     justify-content: space-between;
     align-items: center;
     gap: 18px;
-    max-width: 1180px;
+    max-width: var(--content-max);
     margin: 0 auto 26px;
 }
 
 .header-title {
-    font-size: clamp(20px, 2vw, 26px);
     color: var(--text);
+    font-size: clamp(20px, 2vw, 26px);
 }
 
 .header-logo {
     width: 64px;
     height: 64px;
-    border-radius: 18px;
-    object-fit: cover;
     border: 1px solid var(--border);
+    border-radius: 18px;
     background: #101014;
+    object-fit: cover;
 }
 
 .card,
@@ -118,15 +134,15 @@ a {
 .stats-minutes-card,
 .control-section,
 .lyrics-card {
-    background: rgba(32, 32, 39, 0.92);
+    background: rgba(32, 32, 39, 0.94);
     border: 1px solid var(--border);
     border-radius: var(--radius);
     box-shadow: var(--shadow);
 }
 
 .card {
-    padding: 20px;
     margin-bottom: 18px;
+    padding: 20px;
 }
 
 .card h2,
@@ -144,25 +160,34 @@ p {
 
 button,
 .btn-primary,
+.btn-danger,
+input,
+select,
+textarea {
+    font: inherit;
+}
+
+button,
+.btn-primary,
 .btn-danger {
     appearance: none;
+    min-height: 42px;
+    padding: 9px 14px;
     border: 1px solid var(--border-strong);
-    border-radius: 12px;
-    background: #2b2b34;
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
     color: var(--text);
-    padding: 10px 14px;
-    font: inherit;
     font-size: 14px;
     font-weight: 720;
     cursor: pointer;
-    transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+    transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease, opacity 0.15s ease;
 }
 
 button:hover,
 .btn-primary:hover,
 .btn-danger:hover {
-    background: #34343e;
-    border-color: rgba(255, 255, 255, 0.2);
+    background: var(--surface-3);
+    border-color: rgba(255, 255, 255, 0.22);
 }
 
 button:active,
@@ -171,16 +196,58 @@ button:active,
     transform: translateY(1px);
 }
 
+button:disabled,
+input:disabled,
+select:disabled,
+textarea:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+}
+
 .btn-primary {
     color: #fff;
-    background: #33333d;
-    border-color: rgba(239, 45, 143, 0.35);
+    background: linear-gradient(135deg, rgba(124, 58, 237, 0.85), rgba(239, 45, 143, 0.78));
+    border-color: rgba(239, 45, 143, 0.45);
 }
 
 .btn-danger {
     color: #fff;
     background: rgba(239, 68, 68, 0.18);
     border-color: rgba(239, 68, 68, 0.4);
+}
+
+input:not([type="checkbox"]):not([type="radio"]),
+select,
+textarea {
+    width: 100%;
+    min-height: 42px;
+    padding: 9px 12px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    outline: none;
+    background: #18181e;
+    color: var(--text);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+textarea {
+    min-height: 110px;
+    resize: vertical;
+}
+
+input::placeholder,
+textarea::placeholder {
+    color: var(--muted-2);
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+    outline: none;
+    border-color: rgba(239, 45, 143, 0.72);
+    box-shadow: 0 0 0 3px rgba(239, 45, 143, 0.16);
 }
 
 .about-link,
@@ -195,6 +262,19 @@ button:active,
     text-decoration: underline;
 }
 
+.status-pill {
+    display: inline-flex;
+    align-items: center;
+    min-height: 30px;
+    padding: 5px 10px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--surface-2);
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 650;
+}
+
 .hidden {
     display: none !important;
 }
@@ -203,13 +283,12 @@ button:active,
     .sidebar {
         position: sticky;
         top: 0;
-        z-index: 20;
         width: 100%;
         height: auto;
         padding: 10px;
+        overflow-x: auto;
         border-right: 0;
         border-bottom: 1px solid var(--border);
-        overflow-x: auto;
     }
 
     .nav {
@@ -218,9 +297,9 @@ button:active,
     }
 
     .nav a {
-        white-space: nowrap;
         min-height: 38px;
         padding: 0 12px;
+        white-space: nowrap;
         font-size: 14px;
     }
 

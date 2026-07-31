@@ -6,9 +6,8 @@ from typing import Optional
 
 import requests
 from PIL import Image
-from pathlib import Path
 
-from vinylpi.web.services.config import read_config
+from vinylpi.config.runtime import read_config
 from vinylpi.integrations.pixoo_discovery import discover_pixoo_ip, _probe_ip
 
 from vinylpi.paths import CLOUD_BASE_URL, CONFIG_PATH

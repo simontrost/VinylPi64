@@ -6,7 +6,7 @@ from pathlib import Path
 
 from vinylpi.paths import DB_PATH
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 _INIT_LOCK = threading.Lock()
 _INITIALIZED_PATHS: set[str] = set()
 
@@ -25,8 +25,153 @@ def get_connection(db_path: Path | str | None = None) -> sqlite3.Connection:
     return conn
 
 
+def _column_names(conn: sqlite3.Connection, table: str) -> set[str]:
+    return {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
+
+
+def _add_column_if_missing(
+    conn: sqlite3.Connection,
+    table: str,
+    column: str,
+    declaration: str,
+) -> None:
+    if column not in _column_names(conn, table):
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {declaration}")
+
+
+def _create_schema(conn: sqlite3.Connection) -> None:
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS songs (
+            song_key TEXT PRIMARY KEY,
+            artist TEXT NOT NULL,
+            title TEXT NOT NULL,
+            album TEXT,
+            cover_url TEXT,
+            genre TEXT,
+            genre_source TEXT,
+            shazam_track_id TEXT,
+            shazam_artist_id TEXT,
+            play_count INTEGER NOT NULL DEFAULT 0 CHECK (play_count >= 0),
+            duration_ms INTEGER,
+            duration_minutes REAL,
+            duration_source TEXT,
+            measured_listen_seconds REAL,
+            created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+            updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS artist_totals (
+            artist TEXT PRIMARY KEY,
+            play_count INTEGER NOT NULL DEFAULT 0 CHECK (play_count >= 0),
+            updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS album_sessions (
+            album TEXT PRIMARY KEY,
+            session_count INTEGER NOT NULL DEFAULT 0 CHECK (session_count >= 0),
+            updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS listening_totals (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            total_seconds REAL NOT NULL DEFAULT 0,
+            recalculated_at INTEGER,
+            recalculated_from_song_counts INTEGER NOT NULL DEFAULT 0,
+            updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS duration_cache (
+            cache_key TEXT PRIMARY KEY,
+            artist TEXT NOT NULL,
+            title TEXT NOT NULL,
+            album TEXT,
+            duration_ms INTEGER NOT NULL,
+            duration_minutes REAL NOT NULL,
+            source TEXT,
+            fetched_at INTEGER
+        );
+
+        CREATE TABLE IF NOT EXISTS tag_cache (
+            cache_key TEXT PRIMARY KEY,
+            artist TEXT NOT NULL,
+            title TEXT NOT NULL,
+            tags_json TEXT NOT NULL DEFAULT '[]',
+            fetched_at INTEGER
+        );
+
+        CREATE TABLE IF NOT EXISTS album_covers (
+            album TEXT PRIMARY KEY,
+            artist TEXT,
+            play_count INTEGER NOT NULL DEFAULT 0,
+            mbid TEXT,
+            cover_url TEXT,
+            updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS current_status (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            artist TEXT,
+            title TEXT,
+            cover_url TEXT,
+            album TEXT,
+            genre TEXT,
+            bg_color TEXT,
+            track_id TEXT,
+            artist_id TEXT,
+            duration_ms INTEGER,
+            updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS meta (
+            key TEXT PRIMARY KEY,
+            value TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS legacy_imports (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            source_name TEXT NOT NULL,
+            source_sha256 TEXT NOT NULL,
+            imported_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+            raw_json TEXT NOT NULL,
+            UNIQUE(source_sha256)
+        );
+
+        INSERT OR IGNORE INTO listening_totals (id, total_seconds)
+        VALUES (1, 0);
+        """
+    )
+
+
+def _migrate_schema(conn: sqlite3.Connection) -> None:
+    """Apply additive migrations without replacing the user's database."""
+    for column, declaration in (
+        ("genre", "TEXT"),
+        ("genre_source", "TEXT"),
+        ("shazam_track_id", "TEXT"),
+        ("shazam_artist_id", "TEXT"),
+    ):
+        _add_column_if_missing(conn, "songs", column, declaration)
+
+    for column, declaration in (
+        ("genre", "TEXT"),
+        ("duration_ms", "INTEGER"),
+    ):
+        _add_column_if_missing(conn, "current_status", column, declaration)
+
+    conn.executescript(
+        """
+        CREATE INDEX IF NOT EXISTS idx_songs_artist ON songs(artist);
+        CREATE INDEX IF NOT EXISTS idx_songs_album ON songs(album);
+        CREATE INDEX IF NOT EXISTS idx_songs_genre ON songs(genre);
+        CREATE INDEX IF NOT EXISTS idx_songs_shazam_track_id ON songs(shazam_track_id);
+        CREATE INDEX IF NOT EXISTS idx_songs_play_count ON songs(play_count DESC);
+        """
+    )
+
+
 def init_db(db_path: Path | str | None = None) -> None:
-    """Create all database tables once per process and database path."""
+    """Create and migrate all database tables once per process."""
     path = Path(db_path) if db_path is not None else DB_PATH
     path_key = str(path.resolve())
     if path_key in _INITIALIZED_PATHS:
@@ -35,111 +180,16 @@ def init_db(db_path: Path | str | None = None) -> None:
     with _INIT_LOCK:
         if path_key in _INITIALIZED_PATHS:
             return
+
         with get_connection(path) as conn:
-            conn.executescript(
-            """
-            CREATE TABLE IF NOT EXISTS songs (
-                song_key TEXT PRIMARY KEY,
-                artist TEXT NOT NULL,
-                title TEXT NOT NULL,
-                album TEXT,
-                cover_url TEXT,
-                play_count INTEGER NOT NULL DEFAULT 0 CHECK (play_count >= 0),
-                duration_ms INTEGER,
-                duration_minutes REAL,
-                duration_source TEXT,
-                measured_listen_seconds REAL,
-                created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
-                updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
-            );
-
-            CREATE INDEX IF NOT EXISTS idx_songs_artist ON songs(artist);
-            CREATE INDEX IF NOT EXISTS idx_songs_album ON songs(album);
-            CREATE INDEX IF NOT EXISTS idx_songs_play_count ON songs(play_count DESC);
-
-            CREATE TABLE IF NOT EXISTS artist_totals (
-                artist TEXT PRIMARY KEY,
-                play_count INTEGER NOT NULL DEFAULT 0 CHECK (play_count >= 0),
-                updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
-            );
-
-            CREATE TABLE IF NOT EXISTS album_sessions (
-                album TEXT PRIMARY KEY,
-                session_count INTEGER NOT NULL DEFAULT 0 CHECK (session_count >= 0),
-                updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
-            );
-
-            CREATE TABLE IF NOT EXISTS listening_totals (
-                id INTEGER PRIMARY KEY CHECK (id = 1),
-                total_seconds REAL NOT NULL DEFAULT 0,
-                recalculated_at INTEGER,
-                recalculated_from_song_counts INTEGER NOT NULL DEFAULT 0,
-                updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
-            );
-
-            CREATE TABLE IF NOT EXISTS duration_cache (
-                cache_key TEXT PRIMARY KEY,
-                artist TEXT NOT NULL,
-                title TEXT NOT NULL,
-                album TEXT,
-                duration_ms INTEGER NOT NULL,
-                duration_minutes REAL NOT NULL,
-                source TEXT,
-                fetched_at INTEGER
-            );
-
-            CREATE TABLE IF NOT EXISTS tag_cache (
-                cache_key TEXT PRIMARY KEY,
-                artist TEXT NOT NULL,
-                title TEXT NOT NULL,
-                tags_json TEXT NOT NULL DEFAULT '[]',
-                fetched_at INTEGER
-            );
-
-            CREATE TABLE IF NOT EXISTS album_covers (
-                album TEXT PRIMARY KEY,
-                artist TEXT,
-                play_count INTEGER NOT NULL DEFAULT 0,
-                mbid TEXT,
-                cover_url TEXT,
-                updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
-            );
-
-            CREATE TABLE IF NOT EXISTS current_status (
-                id INTEGER PRIMARY KEY CHECK (id = 1),
-                artist TEXT,
-                title TEXT,
-                cover_url TEXT,
-                album TEXT,
-                bg_color TEXT,
-                track_id TEXT,
-                artist_id TEXT,
-                updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
-            );
-
-            CREATE TABLE IF NOT EXISTS meta (
-                key TEXT PRIMARY KEY,
-                value TEXT
-            );
-
-            CREATE TABLE IF NOT EXISTS legacy_imports (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                source_name TEXT NOT NULL,
-                source_sha256 TEXT NOT NULL,
-                imported_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
-                raw_json TEXT NOT NULL,
-                UNIQUE(source_sha256)
-            );
-
-            INSERT OR IGNORE INTO listening_totals (id, total_seconds)
-            VALUES (1, 0);
-            """
-            )
+            _create_schema(conn)
+            _migrate_schema(conn)
             conn.execute(
                 "INSERT INTO meta(key, value) VALUES('schema_version', ?) "
                 "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
                 (str(SCHEMA_VERSION),),
             )
+
         _INITIALIZED_PATHS.add(path_key)
 
 

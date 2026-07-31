@@ -1,10 +1,9 @@
-import time
-import requests
-import os
-import base64
-from urllib.parse import quote_plus
-from vinylpi.paths import BASE_DIR, MB_URL, MB_UA
+from __future__ import annotations
+
 import re
+
+import requests
+
 from vinylpi.core.stats_db import (
     add_listening_seconds,
     get_duration_cache,
@@ -14,68 +13,43 @@ from vinylpi.core.stats_db import (
     update_song_stats,
     upsert_duration_cache,
 )
+from vinylpi.paths import MB_UA, MB_URL
+
 
 def _load_stats() -> dict:
     """Compatibility helper returning the former stats.json structure."""
     return get_stats_snapshot()
 
 
-def _update_stats(artist: str, title: str, album: str | None, cover_url: str | None = None) -> None:
-    update_song_stats(artist, title, album, cover_url)
+def _update_stats(
+    artist: str,
+    title: str,
+    album: str | None,
+    cover_url: str | None = None,
+    genre: str | None = None,
+    shazam_track_id: str | None = None,
+    shazam_artist_id: str | None = None,
+    duration_ms: int | None = None,
+) -> None:
+    update_song_stats(
+        artist,
+        title,
+        album,
+        cover_url,
+        genre,
+        shazam_track_id,
+        shazam_artist_id,
+        duration_ms,
+    )
 
 
 def _increment_album_session(album: str) -> None:
     increment_album_session(album)
 
 
-_SPOTIFY_TOKEN_CACHE = {
-    "access_token": None,
-    "expires_at": 0,
-}
-
-
-def _spotify_get_access_token() -> str | None:
-    client_id = os.environ.get("SPOTIFY_CLIENT_ID", "").strip()
-    client_secret = os.environ.get("SPOTIFY_CLIENT_SECRET", "").strip()
-
-    if not client_id or not client_secret:
-        return None
-
-    now = time.time()
-    if _SPOTIFY_TOKEN_CACHE["access_token"] and now < _SPOTIFY_TOKEN_CACHE["expires_at"]:
-        return _SPOTIFY_TOKEN_CACHE["access_token"]
-
-    auth_raw = f"{client_id}:{client_secret}".encode("utf-8")
-    auth_b64 = base64.b64encode(auth_raw).decode("ascii")
-
-    r = requests.post(
-        "https://accounts.spotify.com/api/token",
-        headers={
-            "Authorization": f"Basic {auth_b64}",
-            "Content-Type": "application/x-www-form-urlencoded",
-        },
-        data={"grant_type": "client_credentials"},
-        timeout=10,
-    )
-    r.raise_for_status()
-
-    data = r.json()
-    token = data.get("access_token")
-    expires_in = int(data.get("expires_in", 3600))
-
-    if not token:
-        return None
-
-    _SPOTIFY_TOKEN_CACHE["access_token"] = token
-    _SPOTIFY_TOKEN_CACHE["expires_at"] = now + expires_in - 60
-
-    return token
-
-
 def _clean_title_for_duration_search(title: str) -> str:
-    t = title or ""
-
-    patterns = [
+    text = title or ""
+    for pattern in (
         r"\s*\(feat\.?.*?\)",
         r"\s*\(featuring\s+.*?\)",
         r"\s*\(ft\.?.*?\)",
@@ -85,225 +59,134 @@ def _clean_title_for_duration_search(title: str) -> str:
         r"\s+feat\.?\s+.*$",
         r"\s+featuring\s+.*$",
         r"\s+ft\.?\s+.*$",
-    ]
+    ):
+        text = re.sub(pattern, "", text, flags=re.IGNORECASE)
+    return re.sub(r"\s+", " ", text).strip()
 
-    for pat in patterns:
-        t = re.sub(pat, "", t, flags=re.IGNORECASE)
 
-    t = re.sub(r"\s+", " ", t).strip()
-    return t
-
-def _spotify_fetch_track_length_ms(artist: str, title: str, album: str | None = None) -> int | None:
-    token = _spotify_get_access_token()
-    if not token:
+def _musicbrainz_track_length_ms(
+    artist: str,
+    title: str,
+    album: str | None = None,
+) -> int | None:
+    artist = (artist or "").strip()
+    title = _clean_title_for_duration_search(title)
+    if not artist or not title:
         return None
 
-    a = (artist or "").strip()
-    t_raw = (title or "").strip()
-    t = _clean_title_for_duration_search(t_raw)
-    al = (album or "").strip()
-
-    if not a or not t:
-        return None
-
-    query = f'track:"{t}" artist:"{a}"'
-    if al:
-        query += f' album:"{al}"'
-
-    r = requests.get(
-        "https://api.spotify.com/v1/search",
-        headers={"Authorization": f"Bearer {token}"},
+    response = requests.get(
+        MB_URL,
         params={
-            "q": query,
-            "type": "track",
-            "limit": 10,
+            "query": f'recording:"{title}" AND artist:"{artist}"',
+            "fmt": "json",
+            "limit": 25,
+            "inc": "releases",
         },
+        headers={"User-Agent": MB_UA},
         timeout=10,
     )
-    r.raise_for_status()
-
-    items = (((r.json().get("tracks") or {}).get("items")) or [])
-    if not items:
-        return None
-
-    title_cf = t.casefold()
-    artist_cf = a.casefold()
-    album_cf = al.casefold()
-
-    best_ms = None
-    best_score = -10_000
-
-    for item in items:
-        duration_ms = item.get("duration_ms")
-        if not duration_ms:
-            continue
-
-        score = 0
-
-        item_title = (item.get("name") or "").strip().casefold()
-        if item_title == title_cf:
-            score += 60
-        elif title_cf in item_title or item_title in title_cf:
-            score += 30
-
-        item_artists = item.get("artists") or []
-        artist_names = [
-            (ar.get("name") or "").strip().casefold()
-            for ar in item_artists
-        ]
-
-        if artist_cf in artist_names:
-            score += 60
-        elif any(artist_cf in x or x in artist_cf for x in artist_names if x):
-            score += 25
-
-        item_album = item.get("album") or {}
-        item_album_name = (item_album.get("name") or "").strip().casefold()
-
-        if album_cf:
-            if item_album_name == album_cf:
-                score += 40
-            elif album_cf in item_album_name or item_album_name in album_cf:
-                score += 20
-
-        if item.get("explicit") is True:
-            score += 1
-
-        if duration_ms < 30_000:
-            score -= 50
-        if duration_ms > 30 * 60_000:
-            score -= 50
-
-        if score > best_score:
-            best_score = score
-            best_ms = int(duration_ms)
-
-    return best_ms
-
-def _mb_fetch_track_length_ms(artist: str, title: str, album: str | None = None) -> int | None:
-    a = (artist or "").strip()
-    t = (title or "").strip()
-    if not a or not t:
-        return None
-
-    query = f'recording:"{t}" AND artist:"{a}"'
-
-    params = {
-        "query": query,
-        "fmt": "json",
-        "limit": 25,
-        "inc": "releases",
-    }
-
-    r = requests.get(MB_URL, params=params, headers={"User-Agent": MB_UA}, timeout=10)
-    r.raise_for_status()
-    recs = (r.json().get("recordings") or [])
-    if not recs:
-        return None
+    response.raise_for_status()
+    recordings = response.json().get("recordings") or []
 
     album_cf = (album or "").strip().casefold()
-    title_cf = t.casefold()
-
-    best_len = None
+    title_cf = title.casefold()
+    best_duration = None
     best_score = -10_000
 
-    for rec in recs:
-        length = rec.get("length")
+    for recording in recordings:
+        length = recording.get("length")
         if not length:
             continue
 
         score = 0
-
-        if (rec.get("title") or "").strip().casefold() == title_cf:
+        if str(recording.get("title") or "").strip().casefold() == title_cf:
             score += 50
 
-        dis = (rec.get("disambiguation") or "").casefold()
-        if "live" in dis:
+        if "live" in str(recording.get("disambiguation") or "").casefold():
             score -= 80
 
-        releases = rec.get("releases") or []
+        releases = recording.get("releases") or []
         if releases:
             score += 10
-
-            if any((rel.get("status") or "").casefold() == "official" for rel in releases):
+            if any(str(item.get("status") or "").casefold() == "official" for item in releases):
                 score += 20
-
-            if any((rel.get("status") or "").casefold() == "bootleg" for rel in releases):
+            if any(str(item.get("status") or "").casefold() == "bootleg" for item in releases):
                 score -= 80
 
             if album_cf:
-                for rel in releases:
-                    rel_title = (rel.get("title") or "").strip().casefold()
-                    if rel_title and (rel_title == album_cf or album_cf in rel_title or rel_title in album_cf):
+                for release in releases:
+                    release_title = str(release.get("title") or "").strip().casefold()
+                    if release_title and (
+                        release_title == album_cf
+                        or album_cf in release_title
+                        or release_title in album_cf
+                    ):
                         score += 40
                         break
 
-        if length < 30_000:
-            score -= 50
-        if length > 30 * 60_000:
+        duration = int(length)
+        if duration < 30_000 or duration > 30 * 60_000:
             score -= 50
 
         if score > best_score:
             best_score = score
-            best_len = int(length)
+            best_duration = duration
 
-    return best_len
-
+    return best_duration
 
 
 def add_listen_time_minutes_for_confirmed_song(
     artist: str,
     title: str,
     album: str | None = None,
+    shazam_duration_ms: int | None = None,
 ) -> dict:
+    """Add one full-track duration, preferring Shazam and the local cache."""
     cached_entry = get_duration_cache(artist, title)
-    source = None
 
     if cached_entry and cached_entry.get("ms"):
-        ms = int(cached_entry["ms"])
-        minutes = float(cached_entry.get("minutes", ms / 60000.0))
-        source = cached_entry.get("source", "cache")
+        duration_ms = int(cached_entry["ms"])
+        source = cached_entry.get("source") or "cache"
         cached = True
-    else:
-        ms = None
-        spotify_error = None
-
-        try:
-            ms = _spotify_fetch_track_length_ms(artist, title, album)
-            if ms:
-                source = "spotify"
-        except Exception as exc:
-            spotify_error = str(exc)
-
-        if not ms:
-            try:
-                ms = _mb_fetch_track_length_ms(artist, title, album)
-                if ms:
-                    source = "musicbrainz"
-            except Exception as exc:
-                return {
-                    "ok": False,
-                    "error": (
-                        "Spotify and MusicBrainz request failed: "
-                        f"spotify={spotify_error}, musicbrainz={exc}"
-                    ),
-                }
-
-        if not ms:
-            return {"ok": False, "error": "No duration found on Spotify or MusicBrainz"}
-
-        minutes = ms / 60000.0
+    elif shazam_duration_ms and 30_000 <= int(shazam_duration_ms) <= 30 * 60_000:
+        duration_ms = int(shazam_duration_ms)
+        source = "shazam"
         cached = False
         upsert_duration_cache(
-            artist, title, album, int(ms), float(minutes), source
+            artist,
+            title,
+            album,
+            duration_ms,
+            duration_ms / 60000.0,
+            source,
+        )
+    else:
+        try:
+            duration_ms = _musicbrainz_track_length_ms(artist, title, album)
+        except requests.RequestException as exc:
+            return {"ok": False, "error": f"MusicBrainz request failed: {exc}"}
+
+        if not duration_ms:
+            return {"ok": False, "error": "No duration found in Shazam or MusicBrainz"}
+
+        source = "musicbrainz"
+        cached = False
+        upsert_duration_cache(
+            artist,
+            title,
+            album,
+            int(duration_ms),
+            int(duration_ms) / 60000.0,
+            source,
         )
 
-    total_seconds = add_listening_seconds(ms / 1000.0)
+    minutes = duration_ms / 60000.0
+    total_seconds = add_listening_seconds(duration_ms / 1000.0)
     update_song_duration(
         artist,
         title,
         album,
-        int(ms),
+        duration_ms,
         round(minutes, 2),
         source,
     )
@@ -345,4 +228,3 @@ def add_measured_listen_time_seconds(
         "source": "measured_timer",
         "total_minutes": round(total_seconds / 60.0, 2),
     }
-

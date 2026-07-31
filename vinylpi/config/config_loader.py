@@ -41,6 +41,9 @@ CONFIG_DEFAULTS = {
             "ip_range_end": 199
         }
     },
+    "shazam": {
+        "timeout_seconds": 15
+    },
     "debug": {
         "logs": True,
         "pixoo_frame_path": "",
