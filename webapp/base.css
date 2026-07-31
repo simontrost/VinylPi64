@@ -285,6 +285,10 @@ textarea:focus-visible {
     margin: 0 auto 20px;
 }
 
+.page-intro.page-intro-single {
+    grid-template-columns: 1fr;
+}
+
 .page-intro-copy {
     padding: 24px 26px;
 }
