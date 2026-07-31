@@ -74,24 +74,27 @@ function renderDiscogsStatus(status) {
     const copy = document.getElementById("discogsStatusCopy");
     const connect = document.getElementById("discogsConnect");
     const sync = document.getElementById("discogsSync");
-    const disconnect = document.getElementById("discogsDisconnect");
     const progress = document.getElementById("discogsProgress");
     const progressBar = document.getElementById("discogsProgressBar");
     const progressCopy = document.getElementById("discogsProgressCopy");
 
     if (dot) dot.className = `discogs-status-dot ${connected ? "connected" : ""} ${syncing ? "syncing" : ""}`;
     if (title) {
-        title.textContent = connected
-            ? `Connected${status.username ? ` as ${status.username}` : ""}`
-            : "Not connected";
+        title.textContent = connected && status.username
+            ? `Connected as ${status.username}`
+            : connected
+                ? "Token configured"
+                : "Token not configured";
     }
     if (copy) {
         if (status.last_error) {
             copy.textContent = status.last_error;
-        } else if (connected) {
+        } else if (connected && status.username) {
             copy.textContent = `${formatDiscogsTimestamp(status.last_synced_at)} · ${status.sync_status || "ready"}`;
+        } else if (connected) {
+            copy.textContent = "Token found in vinylpi.env. Check the connection or start a sync.";
         } else {
-            copy.textContent = "Connect your Discogs account to import your collection.";
+            copy.textContent = "Set DISCOGS_API_TOKEN in vinylpi.env and restart VinylPi.";
         }
     }
     const releases = document.getElementById("discogsReleaseCount");
@@ -100,7 +103,6 @@ function renderDiscogsStatus(status) {
     if (tracks) tracks.textContent = String(status.tracks_count || 0);
     if (connect) connect.disabled = syncing;
     if (sync) sync.disabled = !connected || syncing;
-    if (disconnect) disconnect.disabled = !connected || syncing || status.token_source === "environment";
 
     if (progress) progress.classList.toggle("hidden", !syncing);
     if (syncing) {
@@ -128,22 +130,11 @@ async function loadDiscogsStatus() {
 }
 
 async function connectDiscogs() {
-    const tokenInput = document.getElementById("discogsToken");
-    const token = tokenInput?.value.trim() || "";
-    if (!token) {
-        showToast("Paste your Discogs personal access token first.", true);
-        return;
-    }
     try {
-        const response = await fetch("/api/discogs/connect", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ token }),
-        });
+        const response = await fetch("/api/discogs/connect", { method: "POST" });
         const data = await response.json();
         if (!response.ok || !data.ok) throw new Error(data.error || "Connection failed");
-        tokenInput.value = "";
-        showToast(`Discogs connected as ${data.username}.`);
+        showToast(`Discogs token is valid. Connected as ${data.username}.`);
         await loadConfig();
         await loadDiscogsStatus();
     } catch (error) {
@@ -162,21 +153,6 @@ async function startDiscogsSync() {
     } catch (error) {
         console.error(error);
         showToast(error.message || "Discogs synchronization failed.", true);
-    }
-}
-
-async function disconnectDiscogs() {
-    if (!confirm("Disconnect Discogs? The already imported local collection remains cached.")) return;
-    try {
-        const response = await fetch("/api/discogs/disconnect", { method: "POST" });
-        const data = await response.json();
-        if (!response.ok || !data.ok) throw new Error(data.error || "Disconnect failed");
-        showToast("Discogs disconnected. Local collection data was kept.");
-        await loadConfig();
-        await loadDiscogsStatus();
-    } catch (error) {
-        console.error(error);
-        showToast(error.message || "Discogs could not be disconnected.", true);
     }
 }
 
@@ -305,7 +281,6 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("adaptiveSampleEnabled")?.addEventListener("change", syncAdaptiveSampleState);
   document.getElementById("discogsConnect")?.addEventListener("click", connectDiscogs);
   document.getElementById("discogsSync")?.addEventListener("click", startDiscogsSync);
-  document.getElementById("discogsDisconnect")?.addEventListener("click", disconnectDiscogs);
   loadDiscogsStatus();
 });
 

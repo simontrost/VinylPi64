@@ -51,7 +51,6 @@ CONFIG_DEFAULTS = {
     "discogs": {
         "enabled": False,
         "username": "",
-        "token": "",
         "prefer_collection": True,
         "sequence_matching": True,
         "infer_unrecognized_next": True,
@@ -100,5 +99,11 @@ def load_config(path: Path | str | None = None) -> dict:
         pass
     except Exception:
         pass
+
+    # Discogs credentials are environment-only. This also removes a legacy
+    # token from the in-memory config so the next config write cleans it up.
+    discogs = cfg.get("discogs")
+    if isinstance(discogs, dict):
+        discogs.pop("token", None)
 
     return cfg

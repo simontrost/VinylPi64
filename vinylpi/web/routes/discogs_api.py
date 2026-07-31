@@ -1,13 +1,26 @@
 from __future__ import annotations
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify
 
 from vinylpi.config.runtime import read_config, write_config
-from vinylpi.core.discogs_service import SYNC_MANAGER, get_discogs_token
+from vinylpi.core.discogs_service import (
+    DISCOGS_TOKEN_ENV,
+    SYNC_MANAGER,
+    get_discogs_token,
+)
 from vinylpi.integrations.discogs_client import DiscogsClient, DiscogsError
 
 
 discogs_bp = Blueprint("discogs_api", __name__)
+
+
+def _missing_token_response():
+    return jsonify({
+        "ok": False,
+        "error": (
+            f"Set {DISCOGS_TOKEN_ENV}=... in vinylpi.env and restart VinylPi first."
+        ),
+    }), 400
 
 
 @discogs_bp.get("/api/discogs/status")
@@ -17,10 +30,9 @@ def api_discogs_status():
 
 @discogs_bp.post("/api/discogs/connect")
 def api_discogs_connect():
-    data = request.get_json(silent=True) or {}
-    token = str(data.get("token") or "").strip()
+    token = get_discogs_token()
     if not token:
-        return jsonify({"ok": False, "error": "Paste a Discogs personal access token."}), 400
+        return _missing_token_response()
 
     try:
         identity = DiscogsClient(token).identity()
@@ -34,7 +46,6 @@ def api_discogs_connect():
     write_config(
         {
             "discogs": {
-                "token": token,
                 "username": username,
                 "enabled": True,
             }
@@ -43,29 +54,11 @@ def api_discogs_connect():
     return jsonify({"ok": True, "username": username})
 
 
-@discogs_bp.post("/api/discogs/disconnect")
-def api_discogs_disconnect():
-    cfg = read_config(force=True)
-    if get_discogs_token(cfg) and SYNC_MANAGER.status().get("syncing"):
-        return jsonify({"ok": False, "error": "Wait until the current sync has finished."}), 409
-
-    write_config(
-        {
-            "discogs": {
-                "token": "",
-                "username": "",
-                "enabled": False,
-            }
-        }
-    )
-    return jsonify({"ok": True})
-
-
 @discogs_bp.post("/api/discogs/sync")
 def api_discogs_sync():
     cfg = read_config()
     if not get_discogs_token(cfg):
-        return jsonify({"ok": False, "error": "Connect a Discogs account first."}), 400
+        return _missing_token_response()
     if not bool((cfg.get("discogs") or {}).get("enabled", False)):
         write_config({"discogs": {"enabled": True}})
 

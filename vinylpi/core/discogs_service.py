@@ -6,6 +6,9 @@ import threading
 import time
 from typing import Any
 
+from dotenv import load_dotenv
+
+from vinylpi.paths import BASE_DIR
 from vinylpi.config.runtime import read_config, write_config
 from vinylpi.core.discogs_db import (
     delete_releases_not_in,
@@ -20,13 +23,14 @@ from vinylpi.integrations.discogs_client import DiscogsClient, DiscogsError
 
 _SIDE_RE = re.compile(r"^([A-Z]+)", re.IGNORECASE)
 
+DISCOGS_TOKEN_ENV = "DISCOGS_API_TOKEN"
+load_dotenv(BASE_DIR / "vinylpi.env", override=False)
+
 
 def get_discogs_token(cfg: dict[str, Any] | None = None) -> str:
-    env_token = (os.getenv("DISCOGS_TOKEN") or "").strip()
-    if env_token:
-        return env_token
-    config = cfg if cfg is not None else read_config()
-    return str((config.get("discogs") or {}).get("token") or "").strip()
+    """Return the Discogs token exclusively from VinylPi's environment."""
+    del cfg  # Kept in the signature for existing callers.
+    return (os.getenv(DISCOGS_TOKEN_ENV) or "").strip()
 
 
 def _artist_name(value: dict[str, Any]) -> str:
@@ -214,7 +218,7 @@ class DiscogsSyncManager:
             "enabled": bool(discogs_cfg.get("enabled", False)),
             "connected": bool(token),
             "username": discogs_cfg.get("username") or persisted.get("username") or "",
-            "token_source": "environment" if os.getenv("DISCOGS_TOKEN") else ("config" if token else ""),
+            "token_source": "environment" if token else "",
             "releases_count": counts["releases"],
             "tracks_count": counts["tracks"],
             "last_synced_at": persisted.get("last_synced_at"),

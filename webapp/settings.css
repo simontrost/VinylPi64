@@ -848,6 +848,34 @@
     font-size: 11px;
 }
 
+.discogs-env-card {
+    display: grid;
+    gap: 9px;
+    padding: 13px 14px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: rgba(0, 0, 0, 0.13);
+}
+
+.discogs-env-card > span {
+    color: var(--text);
+    font-size: 13px;
+}
+
+.discogs-env-card code {
+    display: block;
+    overflow-x: auto;
+    padding: 10px 12px;
+    border: 1px solid rgba(245, 197, 66, 0.24);
+    border-radius: 9px;
+    color: var(--yellow);
+    background: rgba(10, 10, 15, 0.42);
+    font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+
 .discogs-actions {
     display: flex;
     flex-wrap: wrap;

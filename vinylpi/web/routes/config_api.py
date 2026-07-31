@@ -14,7 +14,7 @@ config_bp = Blueprint("config_api", __name__)
 def _public_config(cfg: dict) -> dict:
     public = deepcopy(cfg)
     discogs = public.setdefault("discogs", {})
-    configured = bool((discogs.get("token") or "").strip() or (os.getenv("DISCOGS_TOKEN") or "").strip())
+    configured = bool((os.getenv("DISCOGS_API_TOKEN") or "").strip())
     discogs.pop("token", None)
     discogs["token_configured"] = configured
     return public

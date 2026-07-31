@@ -258,15 +258,14 @@
 
                             <div class="form-group">
                                 <div class="group-title">Account</div>
-                                <div class="form-row">
-                                    <label for="discogsToken">Personal access token</label>
-                                    <input type="password" id="discogsToken" autocomplete="off" placeholder="Paste token from Discogs settings">
+                                <div class="discogs-env-card">
+                                    <span>Token in <strong>vinylpi.env</strong></span>
+                                    <code>DISCOGS_API_TOKEN=your_personal_access_token</code>
                                 </div>
-                                <div class="form-hint">The token is stored only on VinylPi and is never returned to the browser after saving.</div>
+                                <div class="form-hint">Save the variable in VinylPi64/vinylpi.env and restart VinylPi. The token is read only by the backend and is never entered in or returned to the browser.</div>
                                 <div class="discogs-actions">
-                                    <button type="button" class="btn-primary" id="discogsConnect">Connect account</button>
+                                    <button type="button" class="btn-primary" id="discogsConnect">Check connection</button>
                                     <button type="button" id="discogsSync" disabled>Sync collection</button>
-                                    <button type="button" class="btn-danger" id="discogsDisconnect" disabled>Disconnect</button>
                                 </div>
                                 <div class="discogs-progress hidden" id="discogsProgress" aria-live="polite">
                                     <div class="discogs-progress-track"><span id="discogsProgressBar"></span></div>
