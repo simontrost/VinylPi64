@@ -8,6 +8,7 @@ from vinylpi.core.display_refresh import start_display_refresh_watcher
 from vinylpi.core.discogs_matcher import (
     apply_discogs_match,
     clear_discogs_inference,
+    discogs_transition_ready,
     get_side_flip_prompt,
     infer_expected_next_track,
     should_hold_inferred_track,
@@ -36,7 +37,7 @@ from vinylpi.core.title_variants import is_live_variant
 from vinylpi.config.runtime import read_config
 
 MIN_TRACKS_FOR_ALBUM_SESSION = 2
-MIN_CONSECUTIVE_FOR_SWITCH = 2
+MIN_CONSECUTIVE_FOR_ALBUM_SWITCH = 2
 
 
 def main_loop() -> None:
@@ -156,6 +157,11 @@ def main_loop() -> None:
                 time.sleep(cfg.delay)
                 continue
 
+            transition_ready = discogs_transition_ready(
+                discogs_state,
+                track,
+                debug_log=cfg.debug_log,
+            )
             did_confirm = update_song_stats_on_switch(
                 st=stats_state,
                 song_id=info["song_id"],
@@ -167,11 +173,14 @@ def main_loop() -> None:
                 track_id=info.get("track_id"),
                 artist_id=info.get("artist_id"),
                 duration_ms=info.get("duration_ms"),
-                min_consecutive=MIN_CONSECUTIVE_FOR_SWITCH,
+                min_consecutive=cfg.stats_min_consecutive,
+                repeat_guard_seconds=cfg.stats_repeat_guard_seconds,
+                allow_confirmation=transition_ready,
             )
+            counted_switch = did_confirm and stats_state.last_counted
             listen_result = maybe_add_listen_time(
                 cfg,
-                did_confirm,
+                counted_switch,
                 info["artist"],
                 info["title"],
                 info["album"],
@@ -180,22 +189,30 @@ def main_loop() -> None:
 
             if did_confirm:
                 update_discogs_playback_state(discogs_state, track)
-                start_or_replace_timed_listen(
-                    cfg=cfg,
-                    st=timed_listen_state,
-                    song_id=info["song_id"],
-                    artist=info["artist"],
-                    title=info["title"],
-                    album=info["album"],
-                    needs_timer_fallback=not bool(listen_result.get("ok")),
-                )
+                if stats_state.last_counted:
+                    start_or_replace_timed_listen(
+                        cfg=cfg,
+                        st=timed_listen_state,
+                        song_id=info["song_id"],
+                        artist=info["artist"],
+                        title=info["title"],
+                        album=info["album"],
+                        needs_timer_fallback=not bool(listen_result.get("ok")),
+                    )
+                else:
+                    timed_listen_state = TimedListenState()
+                    if cfg.debug_log:
+                        print(
+                            "Stats guard: confirmed track switch but suppressed a "
+                            "recent duplicate play."
+                        )
 
             update_album_session_on_switch(
                 st=album_state,
                 album=info["album"],
                 title=info["title"],
                 min_tracks=MIN_TRACKS_FOR_ALBUM_SESSION,
-                min_consecutive=MIN_CONSECUTIVE_FOR_SWITCH,
+                min_consecutive=MIN_CONSECUTIVE_FOR_ALBUM_SWITCH,
             )
 
         except Exception as exc:

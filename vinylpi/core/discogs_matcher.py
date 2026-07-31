@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from difflib import SequenceMatcher
+import re
 import time
 from typing import Any
 
@@ -18,6 +19,16 @@ from vinylpi.core.models import RecognizedTrack
 from vinylpi.core.title_variants import canonicalize_title
 
 
+_BRACKETED_VARIANT = re.compile(
+    r"[\[(][^\])]*(?:unplugged|live|acoustic|session|radio|bbc|kexp)[^\])]*[\])]",
+    flags=re.IGNORECASE,
+)
+_TRAILING_VARIANT = re.compile(
+    r"\s+(?:mtv\s+unplugged|unplugged|live|acoustic|session)(?:\s+version)?\s*$",
+    flags=re.IGNORECASE,
+)
+
+
 def _similarity(left: str, right: str) -> float:
     if not left or not right:
         return 0.0
@@ -26,22 +37,91 @@ def _similarity(left: str, right: str) -> float:
     return SequenceMatcher(None, left, right).ratio()
 
 
+def _base_title_norm(value: str | None) -> str:
+    title = canonicalize_title(value or "")
+    title = _BRACKETED_VARIANT.sub("", title)
+    title = _TRAILING_VARIANT.sub("", title)
+    return normalize_text(title)
+
+
+def _variant_tags(*values: str | None) -> set[str]:
+    text = " ".join(str(value or "") for value in values).casefold()
+    tags: set[str] = set()
+    if "unplugged" in text:
+        tags.update({"unplugged", "live"})
+    if "acoustic" in text:
+        tags.update({"acoustic", "live"})
+    if any(marker in text for marker in (" live", "live ", "live at", "concert", "session")):
+        tags.add("live")
+    if "remix" in text:
+        tags.add("remix")
+    if "instrumental" in text:
+        tags.add("instrumental")
+    if "cover" in text:
+        tags.add("cover")
+    return tags
+
+
 def _candidate_key(candidate: dict[str, Any]) -> tuple[int, int]:
     return (int(candidate["release_id"]), int(candidate["track_index"]))
+
+
+def _next_transition_ready(state: DiscogsPlaybackState) -> bool:
+    if state.current_started_at is None:
+        return True
+    elapsed = time.monotonic() - state.current_started_at
+    if state.current_duration_seconds and state.current_duration_seconds > 0:
+        threshold = max(35.0, min(150.0, float(state.current_duration_seconds) * 0.55))
+    else:
+        threshold = 45.0
+    return elapsed >= threshold
 
 
 def _score_candidate(
     candidate: dict[str, Any],
     *,
     title_norm: str,
+    base_title_norm: str,
     artist_norm: str,
     album_norm: str,
+    observed_variant_tags: set[str],
     state: DiscogsPlaybackState,
     sequence_enabled: bool,
-) -> tuple[float, dict[str, float | bool]]:
-    title_similarity = _similarity(title_norm, str(candidate.get("normalized_title") or ""))
+) -> tuple[float, dict[str, Any]]:
+    candidate_title_norm = str(candidate.get("normalized_title") or "")
+    candidate_base_title = _base_title_norm(candidate.get("track_title"))
+    full_title_similarity = _similarity(title_norm, candidate_title_norm)
+    base_title_similarity = _similarity(base_title_norm, candidate_base_title)
+    title_similarity = max(full_title_similarity, base_title_similarity)
     artist_similarity = _similarity(artist_norm, str(candidate.get("normalized_artist") or ""))
     album_similarity = _similarity(album_norm, normalize_text(candidate.get("release_title")))
+
+    candidate_variant_tags = _variant_tags(
+        candidate.get("track_title"),
+        candidate.get("release_title"),
+    )
+    variant_overlap = observed_variant_tags & candidate_variant_tags
+    version_score = 0.0
+    if observed_variant_tags:
+        if "unplugged" in variant_overlap:
+            version_score += 48.0
+        elif "acoustic" in variant_overlap:
+            version_score += 34.0
+        elif "live" in variant_overlap:
+            version_score += 24.0
+
+        for special in ("remix", "instrumental", "cover"):
+            if special in variant_overlap:
+                version_score += 35.0
+
+        live_observed = bool(observed_variant_tags & {"live", "unplugged", "acoustic"})
+        live_candidate = bool(candidate_variant_tags & {"live", "unplugged", "acoustic"})
+        if live_observed and not live_candidate:
+            version_score -= 48.0
+
+        for special in ("remix", "instrumental", "cover"):
+            if special in observed_variant_tags and special not in candidate_variant_tags:
+                version_score -= 55.0
 
     active_release = (
         state.active_release_id is not None
@@ -53,10 +133,12 @@ def _score_candidate(
         and int(candidate["track_index"]) == int(state.current_track_index) + 1
     )
     same_side = bool(active_release and state.current_side and candidate.get("side") == state.current_side)
+    transition_ready = not expected_next or _next_transition_ready(state)
 
     score = title_similarity * 70.0
     score += artist_similarity * 25.0
     score += album_similarity * 10.0
+    score += version_score
     if title_similarity == 1.0:
         score += 25.0
     if artist_similarity == 1.0:
@@ -65,23 +147,31 @@ def _score_candidate(
         score += 22.0
     if same_side:
         score += 5.0
-    if sequence_enabled and expected_next:
+    if sequence_enabled and expected_next and transition_ready:
         score += 42.0
         if title_similarity >= 0.60 and artist_similarity >= 0.45:
             score += 18.0
+    elif expected_next and not transition_ready:
+        # Do not let the expected-next bonus force a premature track switch.
+        score -= 8.0
 
     return score, {
         "title_similarity": title_similarity,
+        "full_title_similarity": full_title_similarity,
+        "base_title_similarity": base_title_similarity,
         "artist_similarity": artist_similarity,
         "album_similarity": album_similarity,
         "active_release": active_release,
         "expected_next": expected_next,
+        "transition_ready": transition_ready,
+        "variant_overlap": bool(variant_overlap),
+        "version_score": version_score,
     }
 
 
 def _is_plausible(
     score: float,
-    metrics: dict[str, float | bool],
+    metrics: dict[str, Any],
     minimum_confidence: float,
 ) -> bool:
     title_similarity = float(metrics["title_similarity"])
@@ -89,11 +179,14 @@ def _is_plausible(
     album_similarity = float(metrics["album_similarity"])
     active_release = bool(metrics["active_release"])
     expected_next = bool(metrics["expected_next"])
-    confidence = min(1.0, score / 140.0)
+    variant_overlap = bool(metrics["variant_overlap"])
+    confidence = min(1.0, max(0.0, score / 140.0))
 
     if confidence < minimum_confidence:
         return False
     if title_similarity >= 0.88 and (artist_similarity >= 0.55 or album_similarity >= 0.75):
+        return True
+    if variant_overlap and title_similarity >= 0.84 and artist_similarity >= 0.55:
         return True
     if active_release and title_similarity >= 0.78 and artist_similarity >= 0.45:
         return True
@@ -116,14 +209,23 @@ def apply_discogs_match(
         return track
 
     title_norm = normalize_text(canonicalize_title(track.title))
+    base_title_norm = _base_title_norm(track.title)
     artist_norm = normalize_artist(track.artist)
     album_norm = normalize_text(track.album)
+    observed_variant_tags = _variant_tags(track.title, track.album)
     if not title_norm:
         return track
 
     candidates: dict[tuple[int, int], dict[str, Any]] = {}
     for candidate in find_exact_title_tracks(title_norm):
         candidates[_candidate_key(candidate)] = candidate
+
+    # Shazam often appends version information to the title while Discogs stores
+    # the plain track title and the version on the release, e.g.
+    # "Nutshell (Unplugged)" on "MTV Unplugged".
+    if base_title_norm and base_title_norm != title_norm:
+        for candidate in find_exact_title_tracks(base_title_norm):
+            candidates[_candidate_key(candidate)] = candidate
 
     sequence_enabled = bool(discogs_cfg.get("sequence_matching", True))
     if sequence_enabled and state.active_release_id is not None:
@@ -139,13 +241,15 @@ def apply_discogs_match(
         minimum_confidence = 0.72
     minimum_confidence = min(0.95, max(0.5, minimum_confidence))
 
-    ranked: list[tuple[float, dict[str, float | bool], dict[str, Any]]] = []
+    ranked: list[tuple[float, dict[str, Any], dict[str, Any]]] = []
     for candidate in candidates.values():
         score, metrics = _score_candidate(
             candidate,
             title_norm=title_norm,
+            base_title_norm=base_title_norm,
             artist_norm=artist_norm,
             album_norm=album_norm,
+            observed_variant_tags=observed_variant_tags,
             state=state,
             sequence_enabled=sequence_enabled,
         )
@@ -161,8 +265,12 @@ def apply_discogs_match(
             )
         return track
 
-    confidence = min(1.0, score / 140.0)
-    source = "sequence" if bool(metrics["expected_next"]) else "collection"
+    confidence = min(1.0, max(0.0, score / 140.0))
+    source = (
+        "sequence"
+        if bool(metrics["expected_next"]) and bool(metrics["transition_ready"])
+        else "collection"
+    )
     original = f"{track.artist} – {track.title} [{track.album or '-'}]"
 
     track.artist = str(best.get("track_artist") or best.get("release_artist") or track.artist)
@@ -197,11 +305,52 @@ def apply_discogs_match(
 
     if debug_log:
         corrected = f"{track.artist} – {track.title} [{track.album or '-'}]"
+        version_note = " version-aware" if metrics.get("variant_overlap") else ""
         print(
-            f"Discogs {source} match ({confidence:.0%}, {best.get('position') or '?'}): "
+            f"Discogs {source}{version_note} match "
+            f"({confidence:.0%}, {best.get('position') or '?'}): "
             f"{original} -> {corrected}"
         )
     return track
+
+
+def discogs_transition_ready(
+    state: DiscogsPlaybackState,
+    track: RecognizedTrack,
+    *,
+    debug_log: bool = False,
+) -> bool:
+    """Protect statistics from premature A4/A5-style Shazam oscillation.
+
+    A direct jump to a non-adjacent or previous track is still allowed. Only the
+    physically expected next track is held until enough of the current track has
+    elapsed. A genuine needle jump therefore becomes countable once it remains
+    stable, while momentary alternating Shazam results do not inflate stats.
+    """
+    if (
+        state.active_release_id is None
+        or state.current_track_index is None
+        or track.discogs_release_id is None
+        or track.discogs_track_index is None
+    ):
+        return True
+    if int(track.discogs_release_id) != int(state.active_release_id):
+        return True
+    if int(track.discogs_track_index) != int(state.current_track_index) + 1:
+        return True
+
+    ready = _next_transition_ready(state)
+    if debug_log and not ready:
+        elapsed = (
+            time.monotonic() - state.current_started_at
+            if state.current_started_at is not None
+            else 0.0
+        )
+        print(
+            "Stats guard: holding expected next Discogs track "
+            f"{track.discogs_position or '?'} after only {elapsed:.0f}s."
+        )
+    return ready
 
 
 def update_discogs_playback_state(

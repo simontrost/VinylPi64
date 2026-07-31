@@ -242,11 +242,28 @@ def update_song_stats_on_switch(
     artist_id: str | None,
     duration_ms: int | None,
     min_consecutive: int,
+    repeat_guard_seconds: float = 120.0,
+    allow_confirmation: bool = True,
 ) -> bool:
+    st.last_counted = False
+
     def confirm() -> None:
+        now = time.monotonic()
+        last_counted_at = st.last_counted_at_by_song.get(song_id)
+        should_count = (
+            last_counted_at is None
+            or repeat_guard_seconds <= 0
+            or (now - last_counted_at) >= repeat_guard_seconds
+        )
+
         st.current_song_id = song_id
         st.candidate_song_id = None
         st.candidate_streak = 0
+        st.last_counted = should_count
+
+        if not should_count:
+            return
+
         _update_stats(
             artist,
             title,
@@ -257,6 +274,7 @@ def update_song_stats_on_switch(
             artist_id,
             duration_ms,
         )
+        st.last_counted_at_by_song[song_id] = now
 
     if st.current_song_id is None:
         if st.candidate_song_id == song_id:
@@ -265,7 +283,7 @@ def update_song_stats_on_switch(
             st.candidate_song_id = song_id
             st.candidate_streak = 1
 
-        if st.candidate_streak >= min_consecutive:
+        if st.candidate_streak >= min_consecutive and allow_confirmation:
             confirm()
             return True
         return False
@@ -282,6 +300,11 @@ def update_song_stats_on_switch(
         st.candidate_streak = 1
 
     if st.candidate_streak >= min_consecutive:
+        if not allow_confirmation:
+            # Keep the candidate armed without allowing an early transition to
+            # inflate statistics. It confirms on the first later safe sample.
+            st.candidate_streak = min_consecutive
+            return False
         confirm()
         return True
     return False

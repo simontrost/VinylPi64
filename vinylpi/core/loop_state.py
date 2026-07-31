@@ -10,6 +10,8 @@ class LoopConfig:
     base_sample_seconds: float = 4.0
     adaptive_sample_enabled: bool = False
     adaptive_failure_durations: tuple[float, ...] = (6.0, 8.0)
+    stats_min_consecutive: int = 3
+    stats_repeat_guard_seconds: float = 120.0
 
     def sample_seconds_for_failures(self, consecutive_failures: int) -> float:
         if not self.adaptive_sample_enabled or consecutive_failures <= 0:
@@ -45,6 +47,8 @@ class LoopConfig:
             base_sample_seconds=max(0.5, float(audio.get("sample_seconds", 4))),
             adaptive_sample_enabled=bool(adaptive.get("enabled", False)),
             adaptive_failure_durations=cleaned_durations or (6.0, 8.0),
+            stats_min_consecutive=max(2, int(behavior.get("stats_min_consecutive", 3))),
+            stats_repeat_guard_seconds=max(0.0, float(behavior.get("stats_repeat_guard_seconds", 120))),
         )
 
 @dataclass
@@ -68,6 +72,8 @@ class StatsSwitchState:
     current_song_id: Optional[tuple[str, str]] = None
     candidate_song_id: Optional[tuple[str, str]] = None
     candidate_streak: int = 0
+    last_counted: bool = False
+    last_counted_at_by_song: dict[tuple[str, str], float] = field(default_factory=dict)
 
 @dataclass
 class TimedListenState:

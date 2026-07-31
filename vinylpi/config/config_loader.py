@@ -70,7 +70,9 @@ CONFIG_DEFAULTS = {
     },
     "behavior": {
         "loop_delay_seconds": 1,
-        "auto_sleep": 30
+        "auto_sleep": 30,
+        "stats_min_consecutive": 3,
+        "stats_repeat_guard_seconds": 120
     },
     "homeassistant": {
         "use_ha": True,
