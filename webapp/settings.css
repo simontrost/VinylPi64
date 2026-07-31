@@ -178,33 +178,68 @@
 .form-row input[type="text"],
 .form-row input[type="number"],
 .pixoo-select {
-    height: 42px;
+    height: 44px;
     width: 100%;
     min-width: 0;
-    padding: 0 12px;
-    border-radius: 11px;
+    padding: 0 14px;
+    border-radius: 12px;
     border: 1px solid var(--border-strong);
-    background: #17171d;
+    background: linear-gradient(180deg, rgba(24, 24, 30, 0.96), rgba(20, 20, 26, 0.96));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
     color: var(--text);
     font-size: 14px;
     outline: none;
 }
 
+.form-row input[type="text"]:hover,
+.form-row input[type="number"]:hover,
+.pixoo-select:hover,
+.form-row input[type="color"]:hover {
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
 .form-row input[type="text"]:focus,
 .form-row input[type="number"]:focus,
-.pixoo-select:focus {
+.pixoo-select:focus,
+.form-row input[type="color"]:focus {
     border-color: rgba(239, 45, 143, 0.7);
     box-shadow: 0 0 0 3px rgba(239, 45, 143, 0.11);
 }
 
+.form-row input[type="number"] {
+    appearance: textfield;
+    -moz-appearance: textfield;
+}
+
+.form-row input[type="number"]::-webkit-outer-spin-button,
+.form-row input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
 .form-row input[type="color"] {
-    width: 58px;
-    height: 40px;
-    border-radius: 11px;
-    border: 1px solid var(--border-strong);
-    background: #17171d;
+    width: 64px;
+    height: 44px;
     padding: 4px;
+    border-radius: 12px;
+    border: 1px solid var(--border-strong);
+    background: linear-gradient(180deg, rgba(24, 24, 30, 0.96), rgba(20, 20, 26, 0.96));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
     cursor: pointer;
+}
+
+.form-row input[type="color"]::-webkit-color-swatch-wrapper {
+    padding: 0;
+}
+
+.form-row input[type="color"]::-webkit-color-swatch {
+    border: 0;
+    border-radius: 8px;
+}
+
+.form-row input[type="color"]::-moz-color-swatch {
+    border: 0;
+    border-radius: 8px;
 }
 
 .form-row input[type="checkbox"] {

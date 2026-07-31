@@ -13,7 +13,7 @@
 }
 
 .stats-overview-grid {
-    grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+    grid-template-columns: minmax(0, 1fr);
 }
 
 .stats-grid {
@@ -28,6 +28,10 @@
 .stats-minutes-card,
 .stats-card {
     padding: 20px;
+}
+
+.stats-minutes-card {
+    max-width: 420px;
 }
 
 .stats-kicker,
@@ -61,41 +65,6 @@
     color: var(--yellow);
     font-size: 15px;
     font-weight: 750;
-}
-
-.metadata-card {
-    display: grid;
-    align-content: center;
-}
-
-.metadata-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
-    margin: 12px 0;
-}
-
-.metadata-grid > div {
-    padding: 12px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    background: rgba(255, 255, 255, 0.025);
-}
-
-.metadata-grid strong,
-.metadata-grid span {
-    display: block;
-}
-
-.metadata-grid strong {
-    margin-bottom: 2px;
-    color: var(--text);
-    font-size: 22px;
-}
-
-.metadata-grid span {
-    color: var(--muted);
-    font-size: 12px;
 }
 
 .stats-card-heading {
@@ -177,6 +146,10 @@
     color: var(--muted);
     font-size: 14px;
     text-align: center;
+}
+
+.stats-chart-card > .stats-empty {
+    min-height: 240px;
 }
 
 .stats-list > .stats-empty {
@@ -270,10 +243,6 @@
     .stats-overview-grid,
     .stats-visual-grid {
         grid-template-columns: 1fr;
-    }
-
-    .metadata-grid {
-        grid-template-columns: 1fr 1fr;
     }
 }
 

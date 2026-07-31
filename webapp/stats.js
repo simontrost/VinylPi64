@@ -67,7 +67,7 @@ function setupExpandableList(listElement, items, renderItem, emptyMessage) {
             const button = document.createElement("button");
             button.type = "button";
             button.className = "stats-toggle";
-            button.textContent = expanded ? "Show less" : `Show all ${items.length}`;
+            button.textContent = expanded ? "Show less" : "Show more";
             button.addEventListener("click", () => {
                 expanded = !expanded;
                 render();
@@ -81,19 +81,6 @@ function setupExpandableList(listElement, items, renderItem, emptyMessage) {
     render();
 }
 
-function renderMetadataCoverage(coverage = {}) {
-    const total = Number(coverage.songs_total) || 0;
-    const withGenre = Number(coverage.songs_with_genre) || 0;
-    const withShazamId = Number(coverage.songs_with_shazam_id) || 0;
-
-    document.getElementById("metadata-genres").textContent = `${withGenre}/${total}`;
-    document.getElementById("metadata-shazam-ids").textContent = `${withShazamId}/${total}`;
-
-    const note = document.getElementById("metadata-note");
-    if (note && total > 0 && (withGenre < total || withShazamId < total)) {
-        note.textContent = "Older songs remain intact and receive metadata when recognized again.";
-    }
-}
 
 function renderGenreChart(genres = []) {
     const canvas = document.getElementById("genre-radar");
@@ -227,7 +214,6 @@ function updateAlbumCarousel() {
 function renderStats(data) {
     const minutes = Number(data.total_minutes_listened) || 0;
     document.getElementById("stats-minutes").textContent = Math.round(minutes).toLocaleString();
-    renderMetadataCoverage(data.metadata_coverage || {});
 
     const songs = Array.isArray(data.top_songs) ? data.top_songs : [];
     const artists = Array.isArray(data.top_artists) ? data.top_artists : [];
