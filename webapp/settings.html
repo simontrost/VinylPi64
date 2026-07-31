@@ -236,6 +236,59 @@
                         </div>
                     </section>
 
+                    <section class="card settings-card" id="section-discogs">
+                        <button class="settings-card-header" type="button" aria-expanded="false">
+                            <span class="settings-card-title"><h2>Discogs Collection</h2><span>Use your own records and their fixed track order to improve recognition</span></span>
+                            <span class="chevron">⌄</span>
+                        </button>
+                        <div class="settings-card-content">
+                            <div class="discogs-status-card" id="discogsStatusCard">
+                                <div class="discogs-status-main">
+                                    <span class="discogs-status-dot" id="discogsStatusDot"></span>
+                                    <div>
+                                        <div class="discogs-status-title" id="discogsStatusTitle">Not connected</div>
+                                        <div class="discogs-status-copy" id="discogsStatusCopy">Connect your Discogs account to import your collection.</div>
+                                    </div>
+                                </div>
+                                <div class="discogs-counts">
+                                    <div><strong id="discogsReleaseCount">0</strong><span>releases</span></div>
+                                    <div><strong id="discogsTrackCount">0</strong><span>tracks</span></div>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <div class="group-title">Account</div>
+                                <div class="form-row">
+                                    <label for="discogsToken">Personal access token</label>
+                                    <input type="password" id="discogsToken" autocomplete="off" placeholder="Paste token from Discogs settings">
+                                </div>
+                                <div class="form-hint">The token is stored only on VinylPi and is never returned to the browser after saving.</div>
+                                <div class="discogs-actions">
+                                    <button type="button" class="btn-primary" id="discogsConnect">Connect account</button>
+                                    <button type="button" id="discogsSync" disabled>Sync collection</button>
+                                    <button type="button" class="btn-danger" id="discogsDisconnect" disabled>Disconnect</button>
+                                </div>
+                                <div class="discogs-progress hidden" id="discogsProgress" aria-live="polite">
+                                    <div class="discogs-progress-track"><span id="discogsProgressBar"></span></div>
+                                    <div class="discogs-progress-copy" id="discogsProgressCopy">Preparing sync…</div>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <div class="group-title">Recognition assistance</div>
+                                <div class="form-row"><label for="discogsEnabled">Use Discogs matching</label><input type="checkbox" id="discogsEnabled"></div>
+                                <div class="form-row"><label for="discogsPreferCollection">Prefer collection matches</label><input type="checkbox" id="discogsPreferCollection"></div>
+                                <div class="form-hint">A matching song from your own collection is preferred over an unrelated edition returned by Shazam.</div>
+                                <div class="form-row"><label for="discogsSequenceMatching">Use record sequence</label><input type="checkbox" id="discogsSequenceMatching"></div>
+                                <div class="form-hint">After a track is confirmed, the next physical track receives a strong match bonus. Needle jumps are still allowed when Shazam clearly identifies another position.</div>
+                                <div class="form-row"><label for="discogsInferNext">Estimate an unrecognized next track</label><input type="checkbox" id="discogsInferNext"></div>
+                                <div class="form-hint">When a track is near its expected end and Shazam repeatedly fails, VinylPi may temporarily show the next track on the same side as a sequence estimate. Estimated tracks are not added to statistics until Shazam confirms them.</div>
+                                <div class="form-row"><label for="discogsVinylOnly">Import vinyl releases only</label><input type="checkbox" id="discogsVinylOnly"></div>
+                                <div class="form-row"><label for="discogsMinConfidence">Minimum confidence</label><input type="number" id="discogsMinConfidence" min="0.5" max="0.95" step="0.01"></div>
+                            </div>
+                        </div>
+                    </section>
+
                     <section class="card settings-card" id="section-behavior">
                         <button class="settings-card-header" type="button" aria-expanded="false">
                             <span class="settings-card-title"><h2>Behavior</h2><span>Loop timing and auto sleep</span></span>
@@ -302,6 +355,7 @@
                             <a href="#section-display">Display</a>
                             <a href="#section-fallback">Fallback</a>
                             <a href="#section-pixoo">Pixoo</a>
+                            <a href="#section-discogs">Discogs</a>
                             <a href="#section-behavior">Behavior</a>
                             <a href="#section-ha">Home Assistant</a>
                             <a href="#section-debug">Debug</a>

@@ -7,6 +7,23 @@ const CURRENT_TRACK = {
     trackId: "",
     artistId: "",
     durationMs: null,
+    discogsReleaseId: null,
+    discogsPosition: "",
+    discogsSide: "",
+    discogsTrackIndex: null,
+    discogsTrackCount: null,
+    discogsSideTrackNumber: null,
+    discogsSideTrackCount: null,
+    discogsMatchSource: "",
+    discogsConfidence: null,
+    discogsCoverUrl: "",
+    discogsYear: null,
+    discogsLabel: "",
+    discogsCatalogNumber: "",
+    discogsExpectedNextTitle: "",
+    discogsExpectedNextArtist: "",
+    discogsExpectedNextPosition: "",
+    discogsExpectedNextSide: "",
 };
 
 let statusInterval = null;
@@ -76,9 +93,71 @@ function updateCurrentTrack(status) {
     CURRENT_TRACK.trackId = status.track_id || "";
     CURRENT_TRACK.artistId = status.artist_id || "";
     CURRENT_TRACK.durationMs = status.duration_ms || null;
+    CURRENT_TRACK.discogsReleaseId = status.discogs_release_id || null;
+    CURRENT_TRACK.discogsPosition = status.discogs_position || "";
+    CURRENT_TRACK.discogsSide = status.discogs_side || "";
+    CURRENT_TRACK.discogsTrackIndex = Number.isInteger(status.discogs_track_index) ? status.discogs_track_index : null;
+    CURRENT_TRACK.discogsTrackCount = status.discogs_track_count || null;
+    CURRENT_TRACK.discogsSideTrackNumber = status.discogs_side_track_number || null;
+    CURRENT_TRACK.discogsSideTrackCount = status.discogs_side_track_count || null;
+    CURRENT_TRACK.discogsMatchSource = status.discogs_match_source || "";
+    CURRENT_TRACK.discogsConfidence = status.discogs_confidence ?? null;
+    CURRENT_TRACK.discogsCoverUrl = status.discogs_cover_url || "";
+    CURRENT_TRACK.discogsYear = status.discogs_year || null;
+    CURRENT_TRACK.discogsLabel = status.discogs_label || "";
+    CURRENT_TRACK.discogsCatalogNumber = status.discogs_catalog_number || "";
+    CURRENT_TRACK.discogsExpectedNextTitle = status.discogs_expected_next_title || "";
+    CURRENT_TRACK.discogsExpectedNextArtist = status.discogs_expected_next_artist || "";
+    CURRENT_TRACK.discogsExpectedNextPosition = status.discogs_expected_next_position || "";
+    CURRENT_TRACK.discogsExpectedNextSide = status.discogs_expected_next_side || "";
+}
+
+function renderDiscogsContext() {
+    const context = document.getElementById("discogs-context");
+    if (!context) return;
+
+    const matched = Boolean(CURRENT_TRACK.discogsReleaseId);
+    context.classList.toggle("hidden", !matched);
+    if (!matched) return;
+
+    const confidence = Number(CURRENT_TRACK.discogsConfidence);
+    const confidenceLabel = Number.isFinite(confidence)
+        ? `${Math.round(confidence * 100)}%`
+        : "";
+    const sourceLabel = CURRENT_TRACK.discogsMatchSource === "sequence_inferred"
+        ? "Sequence estimate"
+        : (CURRENT_TRACK.discogsMatchSource === "sequence" ? "Sequence match" : "Collection match");
+    setText("discogs-match-label", [sourceLabel, confidenceLabel].filter(Boolean).join(" · "));
+    setText("discogs-position", CURRENT_TRACK.discogsPosition || "Collection");
+
+    const progressParts = [];
+    if (CURRENT_TRACK.discogsSide) progressParts.push(`Side ${CURRENT_TRACK.discogsSide}`);
+    if (CURRENT_TRACK.discogsSideTrackNumber && CURRENT_TRACK.discogsSideTrackCount) {
+        progressParts.push(`track ${CURRENT_TRACK.discogsSideTrackNumber} of ${CURRENT_TRACK.discogsSideTrackCount}`);
+    } else if (CURRENT_TRACK.discogsTrackIndex !== null && CURRENT_TRACK.discogsTrackCount) {
+        progressParts.push(`track ${CURRENT_TRACK.discogsTrackIndex + 1} of ${CURRENT_TRACK.discogsTrackCount}`);
+    }
+    setText("discogs-track-progress", progressParts.join(" · "));
+
+    const next = document.getElementById("discogs-next-track");
+    if (!next) return;
+    if (CURRENT_TRACK.discogsExpectedNextTitle) {
+        const nextPosition = CURRENT_TRACK.discogsExpectedNextPosition
+            ? `${CURRENT_TRACK.discogsExpectedNextPosition} · `
+            : "";
+        const sideChange = CURRENT_TRACK.discogsExpectedNextSide
+            && CURRENT_TRACK.discogsSide
+            && CURRENT_TRACK.discogsExpectedNextSide !== CURRENT_TRACK.discogsSide;
+        next.textContent = `${sideChange ? "Next side" : "Next"}: ${nextPosition}${CURRENT_TRACK.discogsExpectedNextTitle}`;
+        next.classList.remove("hidden");
+    } else {
+        next.textContent = "End of release";
+        next.classList.remove("hidden");
+    }
 }
 
 function renderEmptyStatus(message = "No recognized song yet") {
+    setText("now-playing-label", "Now playing");
     setText("song-artist", "");
     setText("song-title", message);
     setText("song-album", "");
@@ -89,6 +168,8 @@ function renderEmptyStatus(message = "No recognized song yet") {
 
     const cover = document.getElementById("song-cover");
     if (cover) cover.src = "/logo.png";
+
+    document.getElementById("discogs-context")?.classList.add("hidden");
 
     const songCard = document.querySelector(".song-card");
     if (songCard) songCard.style.setProperty("--song-bg", "#2b2b34");
@@ -107,6 +188,10 @@ function renderStatus(status) {
     updateCurrentTrack(status);
     currentTrackKey = getTrackKey();
 
+    setText(
+        "now-playing-label",
+        CURRENT_TRACK.discogsMatchSource === "sequence_inferred" ? "Likely playing" : "Now playing",
+    );
     setText("song-artist", CURRENT_TRACK.artist || "Unknown artist");
     setText("song-title", CURRENT_TRACK.title || "Unknown title");
     setText("song-album", CURRENT_TRACK.album);
@@ -116,6 +201,8 @@ function renderStatus(status) {
         genre.textContent = CURRENT_TRACK.genre;
         genre.classList.toggle("hidden", !CURRENT_TRACK.genre);
     }
+
+    renderDiscogsContext();
 
     const cover = document.getElementById("song-cover");
     if (cover) {
@@ -352,7 +439,28 @@ function renderTrackInfo(data = {}) {
     appendInfoRow(artistBlock, "Shazam artist ID", CURRENT_TRACK.artistId);
     appendInfoLink(artistBlock, "Open Shazam artist", artist.url);
 
-    content.replaceChildren(songBlock, artistBlock);
+    const blocks = [songBlock, artistBlock];
+    if (CURRENT_TRACK.discogsReleaseId) {
+        const discogsBlock = createInfoBlock("Discogs collection");
+        appendInfoRow(discogsBlock, "Position", CURRENT_TRACK.discogsPosition);
+        appendInfoRow(discogsBlock, "Side", CURRENT_TRACK.discogsSide);
+        appendInfoRow(discogsBlock, "Year", CURRENT_TRACK.discogsYear);
+        appendInfoRow(discogsBlock, "Label", CURRENT_TRACK.discogsLabel);
+        appendInfoRow(discogsBlock, "Catalog number", CURRENT_TRACK.discogsCatalogNumber);
+        appendInfoRow(
+            discogsBlock,
+            "Match",
+            `${CURRENT_TRACK.discogsMatchSource === "sequence_inferred" ? "Sequence estimate" : (CURRENT_TRACK.discogsMatchSource === "sequence" ? "Record sequence" : "Collection")}${CURRENT_TRACK.discogsConfidence !== null ? ` (${Math.round(Number(CURRENT_TRACK.discogsConfidence) * 100)}%)` : ""}`,
+        );
+        appendInfoLink(
+            discogsBlock,
+            "Open Discogs release",
+            `https://www.discogs.com/release/${CURRENT_TRACK.discogsReleaseId}`,
+        );
+        blocks.push(discogsBlock);
+    }
+
+    content.replaceChildren(...blocks);
 }
 
 async function showTrackInfo() {

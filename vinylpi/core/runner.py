@@ -5,6 +5,13 @@ import time
 from vinylpi.config.config_watcher import maybe_log_config_reload
 from vinylpi.core.audio_capture import record_sample
 from vinylpi.core.display_refresh import start_display_refresh_watcher
+from vinylpi.core.discogs_matcher import (
+    apply_discogs_match,
+    clear_discogs_inference,
+    infer_expected_next_track,
+    should_hold_inferred_track,
+    update_discogs_playback_state,
+)
 from vinylpi.core.loop_logic import (
     flush_timed_listen_if_needed,
     handle_no_result,
@@ -16,6 +23,7 @@ from vinylpi.core.loop_logic import (
 )
 from vinylpi.core.loop_state import (
     AlbumState,
+    DiscogsPlaybackState,
     DisplayState,
     LoopConfig,
     StatsSwitchState,
@@ -40,12 +48,14 @@ def main_loop() -> None:
     album_state = AlbumState()
     stats_state = StatsSwitchState()
     timed_listen_state = TimedListenState()
+    discogs_state = DiscogsPlaybackState()
     start_display_refresh_watcher(debug_log=cfg.debug_log)
 
     while True:
         try:
             cfg_reloaded = maybe_log_config_reload()
-            cfg = LoopConfig.from_config(read_config())
+            raw_cfg = read_config()
+            cfg = LoopConfig.from_config(raw_cfg)
 
             sample_seconds = cfg.sample_seconds_for_failures(display_state.consecutive_failures)
             if cfg.debug_log:
@@ -59,12 +69,43 @@ def main_loop() -> None:
 
             track = recognize_song(wav_bytes)
             if track is None:
+                inferred_track = infer_expected_next_track(
+                    discogs_state,
+                    raw_cfg,
+                    consecutive_failures=display_state.consecutive_failures + 1,
+                    debug_log=cfg.debug_log,
+                )
+                if inferred_track is not None:
+                    flush_timed_listen_if_needed(cfg, timed_listen_state)
+                    timed_listen_state = TimedListenState()
+                    handle_song_result(cfg, display_state, cfg_reloaded, inferred_track)
+                    time.sleep(cfg.delay)
+                    continue
+
+                if should_hold_inferred_track(discogs_state):
+                    display_state.consecutive_failures += 1
+                    if cfg.debug_log:
+                        print(
+                            "No Shazam match; keeping the Discogs sequence estimate "
+                            f"(#{display_state.consecutive_failures})."
+                        )
+                    time.sleep(cfg.delay)
+                    continue
+
                 flush_timed_listen_if_needed(cfg, timed_listen_state)
                 timed_listen_state = TimedListenState()
                 if handle_no_result(cfg, display_state, cfg_reloaded):
                     break
                 time.sleep(cfg.delay)
                 continue
+
+            track = apply_discogs_match(
+                track,
+                discogs_state,
+                raw_cfg,
+                debug_log=cfg.debug_log,
+            )
+            clear_discogs_inference(discogs_state)
 
             album_locked = bool(
                 album_state.current_album_session_counted
@@ -115,6 +156,7 @@ def main_loop() -> None:
             )
 
             if did_confirm:
+                update_discogs_playback_state(discogs_state, track)
                 start_or_replace_timed_listen(
                     cfg=cfg,
                     st=timed_listen_state,

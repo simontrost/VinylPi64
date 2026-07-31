@@ -52,6 +52,7 @@ class DisplayState:
     last_song_id: Optional[tuple[str, str]] = None
     last_song_variant_score: Optional[int] = None
     last_display_was_fallback: bool = False
+    last_display_was_inferred: bool = False
     consecutive_failures: int = 0
 
 @dataclass
@@ -76,3 +77,31 @@ class TimedListenState:
     active_album: Optional[str] = None
     active_started_at: Optional[float] = None
     active_needs_timer_fallback: bool = False
+
+@dataclass
+class DiscogsPlaybackState:
+    active_release_id: Optional[int] = None
+    current_track_index: Optional[int] = None
+    current_side: Optional[str] = None
+    current_position: Optional[str] = None
+    current_started_at: Optional[float] = None
+    current_duration_seconds: Optional[float] = None
+    current_cover_url: Optional[str] = None
+    inferred_track_index: Optional[int] = None
+    inferred_started_at: Optional[float] = None
+    inferred_duration_seconds: Optional[float] = None
+
+    def clear_inference(self) -> None:
+        self.inferred_track_index = None
+        self.inferred_started_at = None
+        self.inferred_duration_seconds = None
+
+    def reset(self) -> None:
+        self.active_release_id = None
+        self.current_track_index = None
+        self.current_side = None
+        self.current_position = None
+        self.current_started_at = None
+        self.current_duration_seconds = None
+        self.current_cover_url = None
+        self.clear_inference()

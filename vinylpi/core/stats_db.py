@@ -297,8 +297,16 @@ def write_current_status(data: dict) -> None:
             """
             INSERT INTO current_status (
                 id, artist, title, cover_url, album, genre, bg_color,
-                track_id, artist_id, duration_ms, updated_at
-            ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                track_id, artist_id, duration_ms, discogs_release_id,
+                discogs_position, discogs_side, discogs_track_index,
+                discogs_track_count, discogs_side_track_number,
+                discogs_side_track_count, discogs_match_source,
+                discogs_confidence, discogs_cover_url, discogs_year,
+                discogs_label, discogs_catalog_number,
+                discogs_expected_next_title, discogs_expected_next_artist,
+                discogs_expected_next_position, discogs_expected_next_side,
+                updated_at
+            ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
                 artist = excluded.artist,
                 title = excluded.title,
@@ -309,6 +317,23 @@ def write_current_status(data: dict) -> None:
                 track_id = excluded.track_id,
                 artist_id = excluded.artist_id,
                 duration_ms = excluded.duration_ms,
+                discogs_release_id = excluded.discogs_release_id,
+                discogs_position = excluded.discogs_position,
+                discogs_side = excluded.discogs_side,
+                discogs_track_index = excluded.discogs_track_index,
+                discogs_track_count = excluded.discogs_track_count,
+                discogs_side_track_number = excluded.discogs_side_track_number,
+                discogs_side_track_count = excluded.discogs_side_track_count,
+                discogs_match_source = excluded.discogs_match_source,
+                discogs_confidence = excluded.discogs_confidence,
+                discogs_cover_url = excluded.discogs_cover_url,
+                discogs_year = excluded.discogs_year,
+                discogs_label = excluded.discogs_label,
+                discogs_catalog_number = excluded.discogs_catalog_number,
+                discogs_expected_next_title = excluded.discogs_expected_next_title,
+                discogs_expected_next_artist = excluded.discogs_expected_next_artist,
+                discogs_expected_next_position = excluded.discogs_expected_next_position,
+                discogs_expected_next_side = excluded.discogs_expected_next_side,
                 updated_at = excluded.updated_at
             """,
             (
@@ -321,6 +346,23 @@ def write_current_status(data: dict) -> None:
                 data.get("track_id"),
                 data.get("artist_id"),
                 data.get("duration_ms"),
+                data.get("discogs_release_id"),
+                data.get("discogs_position"),
+                data.get("discogs_side"),
+                data.get("discogs_track_index"),
+                data.get("discogs_track_count"),
+                data.get("discogs_side_track_number"),
+                data.get("discogs_side_track_count"),
+                data.get("discogs_match_source"),
+                data.get("discogs_confidence"),
+                data.get("discogs_cover_url"),
+                data.get("discogs_year"),
+                data.get("discogs_label"),
+                data.get("discogs_catalog_number"),
+                data.get("discogs_expected_next_title"),
+                data.get("discogs_expected_next_artist"),
+                data.get("discogs_expected_next_position"),
+                data.get("discogs_expected_next_side"),
                 int(time.time() * 1000),
             ),
         )
@@ -332,7 +374,15 @@ def get_current_status() -> dict | None:
         row = conn.execute(
             """
             SELECT artist, title, cover_url, album, genre, bg_color,
-                   track_id, artist_id, duration_ms, updated_at
+                   track_id, artist_id, duration_ms, discogs_release_id,
+                   discogs_position, discogs_side, discogs_track_index,
+                   discogs_track_count, discogs_side_track_number,
+                   discogs_side_track_count, discogs_match_source,
+                   discogs_confidence, discogs_cover_url, discogs_year,
+                   discogs_label, discogs_catalog_number,
+                   discogs_expected_next_title, discogs_expected_next_artist,
+                   discogs_expected_next_position, discogs_expected_next_side,
+                   updated_at
             FROM current_status WHERE id = 1
             """
         ).fetchone()

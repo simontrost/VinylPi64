@@ -119,3 +119,72 @@
     #btn-lyrics, #btn-track-info, #btn-lyrics-toggle { min-width: 0; flex: 1; padding-inline: 8px; }
     .control-header, .toggle-row { align-items: flex-start; }
 }
+
+.discogs-context {
+    margin-top: 16px;
+    padding: 13px 14px;
+    border: 1px solid rgba(245, 197, 66, 0.2);
+    border-radius: 14px;
+    background: rgba(12, 12, 16, 0.24);
+    backdrop-filter: blur(4px);
+}
+
+.discogs-context-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.discogs-collection-badge {
+    display: inline-flex;
+    align-items: center;
+    min-height: 26px;
+    padding: 5px 9px;
+    border: 1px solid rgba(245, 197, 66, 0.28);
+    border-radius: 999px;
+    background: rgba(245, 197, 66, 0.1);
+    color: var(--yellow);
+    font-size: 11px;
+    font-weight: 760;
+    letter-spacing: 0.02em;
+}
+
+.discogs-match-label {
+    color: rgba(255, 255, 255, 0.62);
+    font-size: 11px;
+}
+
+.discogs-track-line {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin-top: 11px;
+}
+
+.discogs-track-line strong {
+    color: var(--text);
+    font-size: 18px;
+}
+
+.discogs-track-line span {
+    color: rgba(255, 255, 255, 0.72);
+    font-size: 13px;
+}
+
+.discogs-next-track {
+    margin-top: 9px;
+    padding-top: 9px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.72);
+    font-size: 12px;
+}
+
+@media (max-width: 520px) {
+    .discogs-context-head,
+    .discogs-track-line {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 6px;
+    }
+}

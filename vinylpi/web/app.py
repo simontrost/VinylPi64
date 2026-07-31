@@ -6,6 +6,7 @@ from flask import Flask
 from vinylpi.core.storage import initialize_storage
 from vinylpi.paths import BASE_DIR, WEBAPP_DIR
 from vinylpi.web.routes.config_api import config_bp
+from vinylpi.web.routes.discogs_api import discogs_bp
 from vinylpi.web.routes.events_api import events_bp
 from vinylpi.web.routes.genius_api import genius_bp
 from vinylpi.web.routes.ha_api import bp as ha_api_bp
@@ -24,6 +25,7 @@ _BLUEPRINTS = (
     status_bp,
     events_bp,
     config_bp,
+    discogs_bp,
     recognizer_bp,
     pixoo_bp,
     stats_bp,

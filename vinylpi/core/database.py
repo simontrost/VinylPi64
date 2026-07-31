@@ -6,7 +6,7 @@ from pathlib import Path
 
 from vinylpi.paths import DB_PATH
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 _INIT_LOCK = threading.Lock()
 _INITIALIZED_PATHS: set[str] = set()
 
@@ -120,8 +120,72 @@ def _create_schema(conn: sqlite3.Connection) -> None:
             track_id TEXT,
             artist_id TEXT,
             duration_ms INTEGER,
+            discogs_release_id INTEGER,
+            discogs_position TEXT,
+            discogs_side TEXT,
+            discogs_track_index INTEGER,
+            discogs_track_count INTEGER,
+            discogs_side_track_number INTEGER,
+            discogs_side_track_count INTEGER,
+            discogs_match_source TEXT,
+            discogs_confidence REAL,
+            discogs_cover_url TEXT,
+            discogs_year INTEGER,
+            discogs_label TEXT,
+            discogs_catalog_number TEXT,
+            discogs_expected_next_title TEXT,
+            discogs_expected_next_artist TEXT,
+            discogs_expected_next_position TEXT,
+            discogs_expected_next_side TEXT,
             updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
         );
+
+        CREATE TABLE IF NOT EXISTS discogs_releases (
+            release_id INTEGER PRIMARY KEY,
+            instance_id INTEGER,
+            folder_id INTEGER,
+            title TEXT NOT NULL,
+            artist TEXT NOT NULL,
+            year INTEGER,
+            country TEXT,
+            label TEXT,
+            catalog_number TEXT,
+            format_text TEXT,
+            thumb_url TEXT,
+            cover_url TEXT,
+            date_added TEXT,
+            details_loaded INTEGER NOT NULL DEFAULT 0,
+            synced_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS discogs_tracks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            release_id INTEGER NOT NULL REFERENCES discogs_releases(release_id) ON DELETE CASCADE,
+            track_index INTEGER NOT NULL,
+            position TEXT,
+            side TEXT,
+            title TEXT NOT NULL,
+            artist TEXT NOT NULL,
+            duration_seconds INTEGER,
+            normalized_title TEXT NOT NULL,
+            normalized_artist TEXT NOT NULL,
+            UNIQUE(release_id, track_index)
+        );
+
+        CREATE TABLE IF NOT EXISTS discogs_sync_state (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            username TEXT,
+            status TEXT NOT NULL DEFAULT 'never',
+            message TEXT,
+            last_error TEXT,
+            releases_count INTEGER NOT NULL DEFAULT 0,
+            tracks_count INTEGER NOT NULL DEFAULT 0,
+            failed_releases INTEGER NOT NULL DEFAULT 0,
+            last_synced_at INTEGER,
+            updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
+        );
+
+        INSERT OR IGNORE INTO discogs_sync_state (id) VALUES (1);
 
         CREATE TABLE IF NOT EXISTS meta (
             key TEXT PRIMARY KEY,
@@ -156,16 +220,84 @@ def _migrate_schema(conn: sqlite3.Connection) -> None:
     for column, declaration in (
         ("genre", "TEXT"),
         ("duration_ms", "INTEGER"),
+        ("discogs_release_id", "INTEGER"),
+        ("discogs_position", "TEXT"),
+        ("discogs_side", "TEXT"),
+        ("discogs_track_index", "INTEGER"),
+        ("discogs_track_count", "INTEGER"),
+        ("discogs_side_track_number", "INTEGER"),
+        ("discogs_side_track_count", "INTEGER"),
+        ("discogs_match_source", "TEXT"),
+        ("discogs_confidence", "REAL"),
+        ("discogs_cover_url", "TEXT"),
+        ("discogs_year", "INTEGER"),
+        ("discogs_label", "TEXT"),
+        ("discogs_catalog_number", "TEXT"),
+        ("discogs_expected_next_title", "TEXT"),
+        ("discogs_expected_next_artist", "TEXT"),
+        ("discogs_expected_next_position", "TEXT"),
+        ("discogs_expected_next_side", "TEXT"),
     ):
         _add_column_if_missing(conn, "current_status", column, declaration)
 
     conn.executescript(
         """
+        CREATE TABLE IF NOT EXISTS discogs_releases (
+            release_id INTEGER PRIMARY KEY,
+            instance_id INTEGER,
+            folder_id INTEGER,
+            title TEXT NOT NULL,
+            artist TEXT NOT NULL,
+            year INTEGER,
+            country TEXT,
+            label TEXT,
+            catalog_number TEXT,
+            format_text TEXT,
+            thumb_url TEXT,
+            cover_url TEXT,
+            date_added TEXT,
+            details_loaded INTEGER NOT NULL DEFAULT 0,
+            synced_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS discogs_tracks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            release_id INTEGER NOT NULL REFERENCES discogs_releases(release_id) ON DELETE CASCADE,
+            track_index INTEGER NOT NULL,
+            position TEXT,
+            side TEXT,
+            title TEXT NOT NULL,
+            artist TEXT NOT NULL,
+            duration_seconds INTEGER,
+            normalized_title TEXT NOT NULL,
+            normalized_artist TEXT NOT NULL,
+            UNIQUE(release_id, track_index)
+        );
+
+        CREATE TABLE IF NOT EXISTS discogs_sync_state (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            username TEXT,
+            status TEXT NOT NULL DEFAULT 'never',
+            message TEXT,
+            last_error TEXT,
+            releases_count INTEGER NOT NULL DEFAULT 0,
+            tracks_count INTEGER NOT NULL DEFAULT 0,
+            failed_releases INTEGER NOT NULL DEFAULT 0,
+            last_synced_at INTEGER,
+            updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
+        );
+
+        INSERT OR IGNORE INTO discogs_sync_state (id) VALUES (1);
+
         CREATE INDEX IF NOT EXISTS idx_songs_artist ON songs(artist);
         CREATE INDEX IF NOT EXISTS idx_songs_album ON songs(album);
         CREATE INDEX IF NOT EXISTS idx_songs_genre ON songs(genre);
         CREATE INDEX IF NOT EXISTS idx_songs_shazam_track_id ON songs(shazam_track_id);
         CREATE INDEX IF NOT EXISTS idx_songs_play_count ON songs(play_count DESC);
+        CREATE INDEX IF NOT EXISTS idx_discogs_tracks_title ON discogs_tracks(normalized_title);
+        CREATE INDEX IF NOT EXISTS idx_discogs_tracks_artist ON discogs_tracks(normalized_artist);
+        CREATE INDEX IF NOT EXISTS idx_discogs_tracks_release ON discogs_tracks(release_id, track_index);
+        CREATE INDEX IF NOT EXISTS idx_discogs_releases_title ON discogs_releases(title);
         """
     )
 

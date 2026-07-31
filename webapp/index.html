@@ -39,11 +39,22 @@
                         <img id="song-cover" class="song-cover" src="logo.png" alt="Album Cover">
                     </div>
                     <div class="song-copy">
-                        <span class="eyebrow">Now playing</span>
+                        <span class="eyebrow" id="now-playing-label">Now playing</span>
                         <div id="song-artist" class="song-artist">–</div>
                         <div id="song-title" class="song-title">Loading...</div>
                         <div id="song-album" class="song-album"></div>
                         <div id="song-genre" class="song-genre hidden"></div>
+                        <div id="discogs-context" class="discogs-context hidden">
+                            <div class="discogs-context-head">
+                                <span class="discogs-collection-badge">In your collection</span>
+                                <span id="discogs-match-label" class="discogs-match-label"></span>
+                            </div>
+                            <div class="discogs-track-line">
+                                <strong id="discogs-position"></strong>
+                                <span id="discogs-track-progress"></span>
+                            </div>
+                            <div id="discogs-next-track" class="discogs-next-track hidden"></div>
+                        </div>
                     </div>
                 </div>
             </section>

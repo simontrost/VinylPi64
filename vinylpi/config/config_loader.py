@@ -48,6 +48,16 @@ CONFIG_DEFAULTS = {
     "shazam": {
         "timeout_seconds": 15
     },
+    "discogs": {
+        "enabled": False,
+        "username": "",
+        "token": "",
+        "prefer_collection": True,
+        "sequence_matching": True,
+        "infer_unrecognized_next": True,
+        "vinyl_only": True,
+        "min_match_confidence": 0.72
+    },
     "debug": {
         "logs": True,
         "pixoo_frame_path": "",

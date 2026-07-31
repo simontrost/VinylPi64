@@ -57,6 +57,7 @@ def handle_no_result(cfg: LoopConfig, disp: DisplayState, cfg_reloaded: bool) ->
                 print("Switching to fallback image.")
         show_fallback_image()
         disp.last_display_was_fallback = True
+        disp.last_display_was_inferred = False
 
     if cfg.auto_sleep > 0 and disp.consecutive_failures >= cfg.auto_sleep:
         print("No song detected for a while, entering sleep mode.")
@@ -71,7 +72,7 @@ def should_update_display(
     score: int,
 ) -> tuple[bool, bool]:
     is_same_song = song_id == disp.last_song_id
-    if is_same_song and disp.last_display_was_fallback:
+    if is_same_song and (disp.last_display_was_fallback or disp.last_display_was_inferred):
         return True, False
     if not is_same_song:
         return True, False
@@ -91,6 +92,23 @@ def _song_info(track: RecognizedTrack, canonical_title: str, score: int) -> dict
         "track_id": track.shazam_track_id,
         "artist_id": track.shazam_artist_id,
         "duration_ms": track.duration_ms,
+        "discogs_release_id": track.discogs_release_id,
+        "discogs_position": track.discogs_position,
+        "discogs_side": track.discogs_side,
+        "discogs_track_index": track.discogs_track_index,
+        "discogs_track_count": track.discogs_track_count,
+        "discogs_side_track_number": track.discogs_side_track_number,
+        "discogs_side_track_count": track.discogs_side_track_count,
+        "discogs_match_source": track.discogs_match_source,
+        "discogs_confidence": track.discogs_confidence,
+        "discogs_cover_url": track.discogs_cover_url,
+        "discogs_year": track.discogs_year,
+        "discogs_label": track.discogs_label,
+        "discogs_catalog_number": track.discogs_catalog_number,
+        "discogs_expected_next_title": track.discogs_expected_next_title,
+        "discogs_expected_next_artist": track.discogs_expected_next_artist,
+        "discogs_expected_next_position": track.discogs_expected_next_position,
+        "discogs_expected_next_side": track.discogs_expected_next_side,
         "song_id": (track.artist.strip().casefold(), canonical_title.casefold()),
         "score": score,
     }
@@ -123,6 +141,7 @@ def handle_song_result(
     should_skip_pixoo = not should_update or (
         is_same_song
         and not disp.last_display_was_fallback
+        and not disp.last_display_was_inferred
         and not cfg_reloaded
         and not better_variant
     )
@@ -153,6 +172,7 @@ def handle_song_result(
     disp.last_song_id = song_id
     disp.last_song_variant_score = score
     disp.last_display_was_fallback = False
+    disp.last_display_was_inferred = track.discogs_match_source == "sequence_inferred"
     write_status(
         track.artist,
         canonical_title,
@@ -163,6 +183,23 @@ def handle_song_result(
         track_id=track.shazam_track_id,
         artist_id=track.shazam_artist_id,
         duration_ms=track.duration_ms,
+        discogs_release_id=track.discogs_release_id,
+        discogs_position=track.discogs_position,
+        discogs_side=track.discogs_side,
+        discogs_track_index=track.discogs_track_index,
+        discogs_track_count=track.discogs_track_count,
+        discogs_side_track_number=track.discogs_side_track_number,
+        discogs_side_track_count=track.discogs_side_track_count,
+        discogs_match_source=track.discogs_match_source,
+        discogs_confidence=track.discogs_confidence,
+        discogs_cover_url=track.discogs_cover_url,
+        discogs_year=track.discogs_year,
+        discogs_label=track.discogs_label,
+        discogs_catalog_number=track.discogs_catalog_number,
+        discogs_expected_next_title=track.discogs_expected_next_title,
+        discogs_expected_next_artist=track.discogs_expected_next_artist,
+        discogs_expected_next_position=track.discogs_expected_next_position,
+        discogs_expected_next_side=track.discogs_expected_next_side,
     )
 
     info["did_update_display"] = True

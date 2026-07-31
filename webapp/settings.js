@@ -1,5 +1,6 @@
 let CURRENT_CFG = null;
 let toastTimer = null;
+let discogsStatusTimer = null;
 
 function showToast(message, isError = false) {
     const toast = document.getElementById("settingsToast");
@@ -53,6 +54,130 @@ function syncAdaptiveSampleState() {
     details.querySelectorAll("input").forEach((input) => {
         input.disabled = !enabled;
     });
+}
+
+
+function formatDiscogsTimestamp(value) {
+    const seconds = Number(value);
+    if (!Number.isFinite(seconds) || seconds <= 0) return "Never synced";
+    return new Intl.DateTimeFormat(undefined, {
+        dateStyle: "medium",
+        timeStyle: "short",
+    }).format(new Date(seconds * 1000));
+}
+
+function renderDiscogsStatus(status) {
+    const connected = !!status.connected;
+    const syncing = !!status.syncing;
+    const dot = document.getElementById("discogsStatusDot");
+    const title = document.getElementById("discogsStatusTitle");
+    const copy = document.getElementById("discogsStatusCopy");
+    const connect = document.getElementById("discogsConnect");
+    const sync = document.getElementById("discogsSync");
+    const disconnect = document.getElementById("discogsDisconnect");
+    const progress = document.getElementById("discogsProgress");
+    const progressBar = document.getElementById("discogsProgressBar");
+    const progressCopy = document.getElementById("discogsProgressCopy");
+
+    if (dot) dot.className = `discogs-status-dot ${connected ? "connected" : ""} ${syncing ? "syncing" : ""}`;
+    if (title) {
+        title.textContent = connected
+            ? `Connected${status.username ? ` as ${status.username}` : ""}`
+            : "Not connected";
+    }
+    if (copy) {
+        if (status.last_error) {
+            copy.textContent = status.last_error;
+        } else if (connected) {
+            copy.textContent = `${formatDiscogsTimestamp(status.last_synced_at)} · ${status.sync_status || "ready"}`;
+        } else {
+            copy.textContent = "Connect your Discogs account to import your collection.";
+        }
+    }
+    const releases = document.getElementById("discogsReleaseCount");
+    const tracks = document.getElementById("discogsTrackCount");
+    if (releases) releases.textContent = String(status.releases_count || 0);
+    if (tracks) tracks.textContent = String(status.tracks_count || 0);
+    if (connect) connect.disabled = syncing;
+    if (sync) sync.disabled = !connected || syncing;
+    if (disconnect) disconnect.disabled = !connected || syncing || status.token_source === "environment";
+
+    if (progress) progress.classList.toggle("hidden", !syncing);
+    if (syncing) {
+        const current = Number(status.current || 0);
+        const total = Number(status.total || 0);
+        const percent = total > 0 ? Math.min(100, Math.round((current / total) * 100)) : 4;
+        if (progressBar) progressBar.style.width = `${percent}%`;
+        if (progressCopy) progressCopy.textContent = status.message || "Synchronizing collection…";
+    }
+}
+
+async function loadDiscogsStatus() {
+    try {
+        const response = await fetch("/api/discogs/status", { cache: "no-store" });
+        const status = await response.json();
+        if (!response.ok || !status.ok) throw new Error(status.error || "Discogs status failed");
+        renderDiscogsStatus(status);
+        if (discogsStatusTimer) window.clearTimeout(discogsStatusTimer);
+        discogsStatusTimer = window.setTimeout(loadDiscogsStatus, status.syncing ? 1000 : 8000);
+    } catch (error) {
+        console.error(error);
+        if (discogsStatusTimer) window.clearTimeout(discogsStatusTimer);
+        discogsStatusTimer = window.setTimeout(loadDiscogsStatus, 10000);
+    }
+}
+
+async function connectDiscogs() {
+    const tokenInput = document.getElementById("discogsToken");
+    const token = tokenInput?.value.trim() || "";
+    if (!token) {
+        showToast("Paste your Discogs personal access token first.", true);
+        return;
+    }
+    try {
+        const response = await fetch("/api/discogs/connect", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ token }),
+        });
+        const data = await response.json();
+        if (!response.ok || !data.ok) throw new Error(data.error || "Connection failed");
+        tokenInput.value = "";
+        showToast(`Discogs connected as ${data.username}.`);
+        await loadConfig();
+        await loadDiscogsStatus();
+    } catch (error) {
+        console.error(error);
+        showToast(error.message || "Discogs connection failed.", true);
+    }
+}
+
+async function startDiscogsSync() {
+    try {
+        const response = await fetch("/api/discogs/sync", { method: "POST" });
+        const data = await response.json();
+        if (!response.ok || !data.ok) throw new Error(data.error || "Sync could not start");
+        showToast(data.started === false ? data.message : "Discogs synchronization started.");
+        await loadDiscogsStatus();
+    } catch (error) {
+        console.error(error);
+        showToast(error.message || "Discogs synchronization failed.", true);
+    }
+}
+
+async function disconnectDiscogs() {
+    if (!confirm("Disconnect Discogs? The already imported local collection remains cached.")) return;
+    try {
+        const response = await fetch("/api/discogs/disconnect", { method: "POST" });
+        const data = await response.json();
+        if (!response.ok || !data.ok) throw new Error(data.error || "Disconnect failed");
+        showToast("Discogs disconnected. Local collection data was kept.");
+        await loadConfig();
+        await loadDiscogsStatus();
+    } catch (error) {
+        console.error(error);
+        showToast(error.message || "Discogs could not be disconnected.", true);
+    }
 }
 
 
@@ -178,6 +303,10 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById(id)?.addEventListener("change", syncAllManualColorStates);
   });
   document.getElementById("adaptiveSampleEnabled")?.addEventListener("change", syncAdaptiveSampleState);
+  document.getElementById("discogsConnect")?.addEventListener("click", connectDiscogs);
+  document.getElementById("discogsSync")?.addEventListener("click", startDiscogsSync);
+  document.getElementById("discogsDisconnect")?.addEventListener("click", disconnectDiscogs);
+  loadDiscogsStatus();
 });
 
 
@@ -194,6 +323,7 @@ async function loadConfig() {
     const debug = cfg.debug || {};
     const behavior = cfg.behavior || {};
     const shazam = cfg.shazam || {};
+    const discogs = cfg.discogs || {};
     const homeassistant = cfg.homeassistant || {};
 
     // AUDIO
@@ -284,6 +414,14 @@ async function loadConfig() {
     document.getElementById("ipRangeEnd").value =
         discovery.ip_range_end ?? 199;
 
+    // DISCOGS
+    document.getElementById("discogsEnabled").checked = !!discogs.enabled;
+    document.getElementById("discogsPreferCollection").checked = discogs.prefer_collection !== false;
+    document.getElementById("discogsSequenceMatching").checked = discogs.sequence_matching !== false;
+    document.getElementById("discogsInferNext").checked = discogs.infer_unrecognized_next !== false;
+    document.getElementById("discogsVinylOnly").checked = discogs.vinyl_only !== false;
+    document.getElementById("discogsMinConfidence").value = discogs.min_match_confidence ?? 0.72;
+
     // BEHAVIOR
     document.getElementById("behaviorLoopDelay").value =
         behavior.loop_delay_seconds ?? 1;
@@ -326,6 +464,7 @@ document.getElementById("settings-form").addEventListener("submit", async (e) =>
     cfg.debug = cfg.debug || {};
     cfg.behavior = cfg.behavior || {};
     cfg.shazam = cfg.shazam || {};
+    cfg.discogs = cfg.discogs || {};
     cfg.homeassistant = cfg.homeassistant || {};
 
     const audio = cfg.audio;
@@ -337,6 +476,7 @@ document.getElementById("settings-form").addEventListener("submit", async (e) =>
     const debug = cfg.debug;
     const behavior = cfg.behavior;
     const shazam = cfg.shazam;
+    const discogs = cfg.discogs;
     const homeassistant = cfg.homeassistant;
 
     // AUDIO
@@ -421,6 +561,17 @@ document.getElementById("settings-form").addEventListener("submit", async (e) =>
         parseInt(document.getElementById("ipRangeStart").value) || 100;
     discovery.ip_range_end =
         parseInt(document.getElementById("ipRangeEnd").value) || 199;
+
+    // DISCOGS
+    discogs.enabled = document.getElementById("discogsEnabled").checked;
+    discogs.prefer_collection = document.getElementById("discogsPreferCollection").checked;
+    discogs.sequence_matching = document.getElementById("discogsSequenceMatching").checked;
+    discogs.infer_unrecognized_next = document.getElementById("discogsInferNext").checked;
+    discogs.vinyl_only = document.getElementById("discogsVinylOnly").checked;
+    discogs.min_match_confidence = Math.min(
+        0.95,
+        Math.max(0.5, parseFloat(document.getElementById("discogsMinConfidence").value) || 0.72),
+    );
 
     // BEHAVIOR
     behavior.loop_delay_seconds =
