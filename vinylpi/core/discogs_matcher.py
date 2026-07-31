@@ -15,6 +15,7 @@ from vinylpi.core.discogs_db import (
 )
 from vinylpi.core.image_utils import load_image
 from vinylpi.core.loop_state import DiscogsPlaybackState
+from vinylpi.core.stats_db import get_current_status
 from vinylpi.core.models import RecognizedTrack
 from vinylpi.core.title_variants import canonicalize_title
 
@@ -399,48 +400,83 @@ def get_side_flip_prompt(
     consecutive_failures: int,
     debug_log: bool = False,
 ) -> dict[str, Any] | None:
+    """Return a turn-record prompt when the normal fallback is actually due.
+
+    This deliberately does not require a known track duration. Shazam and many
+    Discogs releases omit durations, while the fixed A -> B / C -> D order is
+    still reliable once the configured fallback failure threshold is reached.
+    """
     discogs_cfg = config.get("discogs") or {}
     if not bool(discogs_cfg.get("enabled", False)):
         return None
-    if consecutive_failures < 1:
-        return None
-    if (
-        state.active_release_id is None
-        or state.current_track_index is None
-        or state.current_started_at is None
-        or not state.current_duration_seconds
-    ):
+
+    fallback_cfg = config.get("fallback") or {}
+    try:
+        allowed_failures = max(1, int(fallback_cfg.get("allowed_failures", 3)))
+    except (TypeError, ValueError):
+        allowed_failures = 3
+    if consecutive_failures < allowed_failures:
         return None
 
-    next_track = get_next_track(state.active_release_id, state.current_track_index)
-    if not next_track:
-        return None
+    # Primary source: the in-memory playback state used by sequence matching.
+    if state.active_release_id is not None and state.current_track_index is not None:
+        next_track = get_next_track(state.active_release_id, state.current_track_index)
+        if next_track and _is_turn_record_transition(state.current_side, next_track.get("side")):
+            prompt = {
+                "from_side": state.current_side,
+                "to_side": next_track.get("side"),
+                "next_title": next_track.get("track_title"),
+                "next_artist": next_track.get("track_artist"),
+                "next_position": next_track.get("position"),
+                "release_id": state.active_release_id,
+            }
+            if debug_log:
+                print(
+                    "Discogs side-flip prompt: "
+                    f"{state.current_side or '?'} -> {next_track.get('side') or '?'} "
+                    f"({next_track.get('position') or '?'})"
+                )
+            return prompt
 
-    next_side = next_track.get("side")
-    current_side = state.current_side
-    if not _is_turn_record_transition(current_side, next_side):
-        return None
+    # Safety net: the dashboard status may already show the newly confirmed
+    # final track while the statistics/sequence guard still holds the previous
+    # in-memory position. Only trust it for the same active release.
+    try:
+        status = get_current_status() or {}
+    except Exception:
+        status = {}
 
-    elapsed = time.monotonic() - state.current_started_at
-    threshold = max(30.0, float(state.current_duration_seconds) * 0.72)
-    if elapsed < threshold:
-        return None
+    status_release_id = status.get("discogs_release_id")
+    same_active_release = (
+        state.active_release_id is not None
+        and status_release_id is not None
+        and int(status_release_id) == int(state.active_release_id)
+    )
+    current_side = status.get("discogs_side")
+    next_side = status.get("discogs_expected_next_side")
+    if same_active_release and _is_turn_record_transition(current_side, next_side):
+        prompt = {
+            "from_side": current_side,
+            "to_side": next_side,
+            "next_title": status.get("discogs_expected_next_title"),
+            "next_artist": status.get("discogs_expected_next_artist"),
+            "next_position": status.get("discogs_expected_next_position"),
+            "release_id": int(status_release_id),
+        }
+        if debug_log:
+            print(
+                "Discogs side-flip prompt from current status: "
+                f"{current_side or '?'} -> {next_side or '?'} "
+                f"({status.get('discogs_expected_next_position') or '?'})"
+            )
+        return prompt
 
-    prompt = {
-        "from_side": current_side,
-        "to_side": next_side,
-        "next_title": next_track.get("track_title"),
-        "next_artist": next_track.get("track_artist"),
-        "next_position": next_track.get("position"),
-        "release_id": state.active_release_id,
-    }
     if debug_log:
         print(
-            "Discogs side-flip prompt: "
-            f"{current_side or '?'} -> {next_side or '?'} "
-            f"({next_track.get('position') or '?'})"
+            "Discogs side-flip prompt not applicable: no paired next side "
+            "for the current confirmed release position."
         )
-    return prompt
+    return None
 
 def infer_expected_next_track(
     state: DiscogsPlaybackState,
