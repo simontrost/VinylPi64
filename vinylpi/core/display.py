@@ -226,6 +226,67 @@ def start_scrolling_display(cover_img: Image.Image, artist: str, title: str) -> 
         _scroll_thread.start()
 
 
+def _send_static_frame(frame: Image.Image, *, debug_label: str | None = None) -> None:
+    cfg = read_config()
+    debug_log = bool(cfg["debug"]["logs"])
+
+    with _display_lock:
+        stop_scrolling_display()
+        try:
+            _get_pixoo().send_frame(frame)
+            if debug_log and debug_label:
+                print(debug_label)
+        except Exception as exc:
+            _reset_pixoo_client()
+            print(f"Error showing static Pixoo image: {exc}")
+
+
+def _generate_side_flip_prompt_frame(
+    next_side: str | None,
+    *,
+    next_position: str | None = None,
+) -> Image.Image:
+    cfg = read_config()
+    size = int(cfg["image"]["canvas_size"])
+    img = Image.new("RGB", (size, size), (20, 16, 28))
+    draw = ImageDraw.Draw(img)
+
+    accent = (245, 197, 66)
+    pink = (223, 55, 144)
+    text = (250, 247, 242)
+    muted = (164, 156, 176)
+    vinyl_fill = (11, 11, 14)
+    vinyl_outline = (76, 72, 91)
+
+    draw.rounded_rectangle((1, 1, size - 2, size - 2), radius=8, outline=(66, 56, 80), width=1)
+    draw.ellipse((5, 9, 31, 35), fill=vinyl_fill, outline=vinyl_outline, width=1)
+    draw.ellipse((10, 14, 26, 30), outline=(110, 100, 120), width=1)
+    draw.ellipse((16, 20, 20, 24), fill=accent)
+    draw.arc((10, 3, 34, 27), 320, 80, fill=pink, width=2)
+    draw.polygon([(33, 6), (39, 9), (34, 13)], fill=pink)
+
+    font, _ = _get_font_for_config()
+    label_one = "TURN"
+    label_two = "RECORD"
+    side_text = f"SIDE {str(next_side or '?').upper()}"
+    pos_text = (str(next_position or "").strip().upper() or side_text)
+
+    draw.text((37, 10), label_one, font=font, fill=text)
+    draw.text((37, 18), label_two, font=font, fill=text)
+    draw.text((7, 44), side_text, font=font, fill=accent)
+    if pos_text and pos_text != side_text:
+        draw.text((7, 52), pos_text, font=font, fill=muted)
+    else:
+        draw.text((7, 52), "FLIP TO CONTINUE", font=font, fill=muted)
+    return img
+
+
+def show_side_flip_prompt(next_side: str | None, *, next_position: str | None = None) -> None:
+    frame = _generate_side_flip_prompt_frame(next_side, next_position=next_position)
+    label = f"Side-flip prompt for side {next_side or '?'} sent to Pixoo."
+    _send_static_frame(frame, debug_label=label)
+
+
 def show_fallback_image() -> None:
     cfg = read_config()
     debug_log = bool(cfg["debug"]["logs"])
@@ -243,18 +304,13 @@ def show_fallback_image() -> None:
 
     size = int(cfg["image"]["canvas_size"])
 
-    with _display_lock:
-        stop_scrolling_display()
-
-        try:
-            fallback_img = Image.open(path).convert("RGB")
-            fallback_resized = fallback_img.resize(
-                (size, size),
-                Image.Resampling.NEAREST,
-            )
-            _get_pixoo().send_frame(fallback_resized)
-            if debug_log:
-                print(f"Fallback image '{path}' sent to Pixoo.")
-        except Exception as exc:
-            _reset_pixoo_client()
-            print(f"Error showing fallback image: {exc}")
+    try:
+        fallback_img = Image.open(path).convert("RGB")
+        fallback_resized = fallback_img.resize(
+            (size, size),
+            Image.Resampling.NEAREST,
+        )
+        _send_static_frame(fallback_resized, debug_label=f"Fallback image '{path}' sent to Pixoo.")
+    except Exception as exc:
+        _reset_pixoo_client()
+        print(f"Error showing fallback image: {exc}")

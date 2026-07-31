@@ -227,6 +227,72 @@ def clear_discogs_inference(state: DiscogsPlaybackState) -> None:
     state.clear_inference()
 
 
+
+def _side_letter_index(side: str | None) -> int | None:
+    value = str(side or "").strip().upper()
+    if len(value) != 1 or not ("A" <= value <= "Z"):
+        return None
+    return ord(value) - ord("A") + 1
+
+
+def _is_turn_record_transition(current_side: str | None, next_side: str | None) -> bool:
+    current_index = _side_letter_index(current_side)
+    next_index = _side_letter_index(next_side)
+    if current_index is None or next_index is None:
+        return False
+    return next_index == current_index + 1 and (current_index % 2 == 1)
+
+
+def get_side_flip_prompt(
+    state: DiscogsPlaybackState,
+    config: dict[str, Any],
+    *,
+    consecutive_failures: int,
+    debug_log: bool = False,
+) -> dict[str, Any] | None:
+    discogs_cfg = config.get("discogs") or {}
+    if not bool(discogs_cfg.get("enabled", False)):
+        return None
+    if consecutive_failures < 1:
+        return None
+    if (
+        state.active_release_id is None
+        or state.current_track_index is None
+        or state.current_started_at is None
+        or not state.current_duration_seconds
+    ):
+        return None
+
+    next_track = get_next_track(state.active_release_id, state.current_track_index)
+    if not next_track:
+        return None
+
+    next_side = next_track.get("side")
+    current_side = state.current_side
+    if not _is_turn_record_transition(current_side, next_side):
+        return None
+
+    elapsed = time.monotonic() - state.current_started_at
+    threshold = max(30.0, float(state.current_duration_seconds) * 0.72)
+    if elapsed < threshold:
+        return None
+
+    prompt = {
+        "from_side": current_side,
+        "to_side": next_side,
+        "next_title": next_track.get("track_title"),
+        "next_artist": next_track.get("track_artist"),
+        "next_position": next_track.get("position"),
+        "release_id": state.active_release_id,
+    }
+    if debug_log:
+        print(
+            "Discogs side-flip prompt: "
+            f"{current_side or '?'} -> {next_side or '?'} "
+            f"({next_track.get('position') or '?'})"
+        )
+    return prompt
+
 def infer_expected_next_track(
     state: DiscogsPlaybackState,
     config: dict[str, Any],

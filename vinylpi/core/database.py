@@ -137,6 +137,11 @@ def _create_schema(conn: sqlite3.Connection) -> None:
             discogs_expected_next_artist TEXT,
             discogs_expected_next_position TEXT,
             discogs_expected_next_side TEXT,
+            side_flip_prompt_active INTEGER NOT NULL DEFAULT 0,
+            side_flip_from_side TEXT,
+            side_flip_to_side TEXT,
+            side_flip_next_title TEXT,
+            side_flip_next_position TEXT,
             updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
         );
 
@@ -237,6 +242,11 @@ def _migrate_schema(conn: sqlite3.Connection) -> None:
         ("discogs_expected_next_artist", "TEXT"),
         ("discogs_expected_next_position", "TEXT"),
         ("discogs_expected_next_side", "TEXT"),
+        ("side_flip_prompt_active", "INTEGER NOT NULL DEFAULT 0"),
+        ("side_flip_from_side", "TEXT"),
+        ("side_flip_to_side", "TEXT"),
+        ("side_flip_next_title", "TEXT"),
+        ("side_flip_next_position", "TEXT"),
     ):
         _add_column_if_missing(conn, "current_status", column, declaration)
 

@@ -305,8 +305,9 @@ def write_current_status(data: dict) -> None:
                 discogs_label, discogs_catalog_number,
                 discogs_expected_next_title, discogs_expected_next_artist,
                 discogs_expected_next_position, discogs_expected_next_side,
-                updated_at
-            ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                side_flip_prompt_active, side_flip_from_side, side_flip_to_side,
+                side_flip_next_title, side_flip_next_position, updated_at
+            ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
                 artist = excluded.artist,
                 title = excluded.title,
@@ -334,6 +335,11 @@ def write_current_status(data: dict) -> None:
                 discogs_expected_next_artist = excluded.discogs_expected_next_artist,
                 discogs_expected_next_position = excluded.discogs_expected_next_position,
                 discogs_expected_next_side = excluded.discogs_expected_next_side,
+                side_flip_prompt_active = excluded.side_flip_prompt_active,
+                side_flip_from_side = excluded.side_flip_from_side,
+                side_flip_to_side = excluded.side_flip_to_side,
+                side_flip_next_title = excluded.side_flip_next_title,
+                side_flip_next_position = excluded.side_flip_next_position,
                 updated_at = excluded.updated_at
             """,
             (
@@ -363,6 +369,11 @@ def write_current_status(data: dict) -> None:
                 data.get("discogs_expected_next_artist"),
                 data.get("discogs_expected_next_position"),
                 data.get("discogs_expected_next_side"),
+                1 if data.get("side_flip_prompt_active") else 0,
+                data.get("side_flip_from_side"),
+                data.get("side_flip_to_side"),
+                data.get("side_flip_next_title"),
+                data.get("side_flip_next_position"),
                 int(time.time() * 1000),
             ),
         )
@@ -382,7 +393,8 @@ def get_current_status() -> dict | None:
                    discogs_label, discogs_catalog_number,
                    discogs_expected_next_title, discogs_expected_next_artist,
                    discogs_expected_next_position, discogs_expected_next_side,
-                   updated_at
+                   side_flip_prompt_active, side_flip_from_side, side_flip_to_side,
+                   side_flip_next_title, side_flip_next_position, updated_at
             FROM current_status WHERE id = 1
             """
         ).fetchone()

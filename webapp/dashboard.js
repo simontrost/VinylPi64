@@ -24,6 +24,11 @@ const CURRENT_TRACK = {
     discogsExpectedNextArtist: "",
     discogsExpectedNextPosition: "",
     discogsExpectedNextSide: "",
+    sideFlipPromptActive: false,
+    sideFlipFromSide: "",
+    sideFlipToSide: "",
+    sideFlipNextTitle: "",
+    sideFlipNextPosition: "",
 };
 
 let statusInterval = null;
@@ -110,6 +115,11 @@ function updateCurrentTrack(status) {
     CURRENT_TRACK.discogsExpectedNextArtist = status.discogs_expected_next_artist || "";
     CURRENT_TRACK.discogsExpectedNextPosition = status.discogs_expected_next_position || "";
     CURRENT_TRACK.discogsExpectedNextSide = status.discogs_expected_next_side || "";
+    CURRENT_TRACK.sideFlipPromptActive = Boolean(status.side_flip_prompt_active);
+    CURRENT_TRACK.sideFlipFromSide = status.side_flip_from_side || "";
+    CURRENT_TRACK.sideFlipToSide = status.side_flip_to_side || "";
+    CURRENT_TRACK.sideFlipNextTitle = status.side_flip_next_title || "";
+    CURRENT_TRACK.sideFlipNextPosition = status.side_flip_next_position || "";
 }
 
 function renderDiscogsContext() {
@@ -154,6 +164,27 @@ function renderDiscogsContext() {
         next.textContent = "End of release";
         next.classList.remove("hidden");
     }
+
+    renderSideFlipPrompt();
+}
+
+function renderSideFlipPrompt() {
+    const box = document.getElementById("discogs-side-flip");
+    if (!box) return;
+
+    const active = Boolean(CURRENT_TRACK.sideFlipPromptActive);
+    box.classList.toggle("hidden", !active);
+    if (!active) return;
+
+    const fromSide = CURRENT_TRACK.sideFlipFromSide ? `Side ${CURRENT_TRACK.sideFlipFromSide}` : "Current side";
+    const toSide = CURRENT_TRACK.sideFlipToSide ? `side ${CURRENT_TRACK.sideFlipToSide}` : "the next side";
+    setText("discogs-side-flip-heading", `${fromSide} finished`);
+
+    const nextParts = [];
+    if (CURRENT_TRACK.sideFlipNextPosition) nextParts.push(CURRENT_TRACK.sideFlipNextPosition);
+    if (CURRENT_TRACK.sideFlipNextTitle) nextParts.push(CURRENT_TRACK.sideFlipNextTitle);
+    const nextText = nextParts.length ? ` Next: ${nextParts.join(" · ")}.` : "";
+    setText("discogs-side-flip-detail", `Turn the record to ${toSide} to continue.${nextText}`);
 }
 
 function renderEmptyStatus(message = "No recognized song yet") {
@@ -170,6 +201,7 @@ function renderEmptyStatus(message = "No recognized song yet") {
     if (cover) cover.src = "/logo.png";
 
     document.getElementById("discogs-context")?.classList.add("hidden");
+    document.getElementById("discogs-side-flip")?.classList.add("hidden");
 
     const songCard = document.querySelector(".song-card");
     if (songCard) songCard.style.setProperty("--song-bg", "#2b2b34");

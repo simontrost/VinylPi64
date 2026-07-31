@@ -3,7 +3,7 @@ from __future__ import annotations
 import time
 from typing import Any
 
-from vinylpi.core.display import show_fallback_image, start_scrolling_display
+from vinylpi.core.display import show_fallback_image, show_side_flip_prompt, start_scrolling_display
 from vinylpi.core.image_utils import dynamic_bg_color
 from vinylpi.core.loop_state import AlbumState, DisplayState, LoopConfig, StatsSwitchState
 from vinylpi.core.models import RecognizedTrack
@@ -13,7 +13,7 @@ from vinylpi.core.statistics import (
     add_listen_time_minutes_for_confirmed_song,
     add_measured_listen_time_seconds,
 )
-from vinylpi.core.status import write_status
+from vinylpi.core.status import clear_side_flip_prompt, write_side_flip_prompt, write_status
 from vinylpi.core.title_variants import canonicalize_title, variant_score
 from vinylpi.integrations.home_assistant import send_rgb
 
@@ -40,7 +40,13 @@ def log_pixoo_update_reason(
         print("New song detected, updating Pixoo.")
 
 
-def handle_no_result(cfg: LoopConfig, disp: DisplayState, cfg_reloaded: bool) -> bool:
+def handle_no_result(
+    cfg: LoopConfig,
+    disp: DisplayState,
+    cfg_reloaded: bool,
+    *,
+    side_flip_prompt: dict[str, Any] | None = None,
+) -> bool:
     disp.consecutive_failures += 1
     if cfg.debug_log:
         print(f"No song detected (#{disp.consecutive_failures} in a row).")
@@ -53,9 +59,26 @@ def handle_no_result(cfg: LoopConfig, disp: DisplayState, cfg_reloaded: bool) ->
         if cfg.debug_log:
             if cfg_reloaded and disp.last_display_was_fallback:
                 print("Config changed while in fallback, refreshing fallback image.")
+            elif side_flip_prompt:
+                print("Switching to side-flip prompt image.")
             else:
                 print("Switching to fallback image.")
-        show_fallback_image()
+
+        if side_flip_prompt:
+            show_side_flip_prompt(
+                side_flip_prompt.get("to_side"),
+                next_position=side_flip_prompt.get("next_position"),
+            )
+            write_side_flip_prompt(
+                from_side=side_flip_prompt.get("from_side"),
+                to_side=side_flip_prompt.get("to_side"),
+                next_title=side_flip_prompt.get("next_title"),
+                next_position=side_flip_prompt.get("next_position"),
+            )
+        else:
+            clear_side_flip_prompt()
+            show_fallback_image()
+
         disp.last_display_was_fallback = True
         disp.last_display_was_inferred = False
 

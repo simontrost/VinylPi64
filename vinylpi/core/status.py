@@ -1,4 +1,6 @@
-from vinylpi.core.stats_db import write_current_status
+from __future__ import annotations
+
+from vinylpi.core.stats_db import get_current_status, write_current_status
 
 
 def write_status(
@@ -28,6 +30,11 @@ def write_status(
     discogs_expected_next_artist: str | None = None,
     discogs_expected_next_position: str | None = None,
     discogs_expected_next_side: str | None = None,
+    side_flip_prompt_active: bool = False,
+    side_flip_from_side: str | None = None,
+    side_flip_to_side: str | None = None,
+    side_flip_next_title: str | None = None,
+    side_flip_next_position: str | None = None,
 ) -> None:
     try:
         write_current_status(
@@ -58,7 +65,64 @@ def write_status(
                 "discogs_expected_next_artist": discogs_expected_next_artist,
                 "discogs_expected_next_position": discogs_expected_next_position,
                 "discogs_expected_next_side": discogs_expected_next_side,
+                "side_flip_prompt_active": side_flip_prompt_active,
+                "side_flip_from_side": side_flip_from_side,
+                "side_flip_to_side": side_flip_to_side,
+                "side_flip_next_title": side_flip_next_title,
+                "side_flip_next_position": side_flip_next_position,
             }
         )
     except Exception as exc:
         print(f"Could not write status to database: {exc}")
+
+
+def write_side_flip_prompt(
+    *,
+    from_side: str | None,
+    to_side: str | None,
+    next_title: str | None,
+    next_position: str | None,
+) -> None:
+    try:
+        current = get_current_status() or {}
+        current.update(
+            {
+                "side_flip_prompt_active": True,
+                "side_flip_from_side": from_side,
+                "side_flip_to_side": to_side,
+                "side_flip_next_title": next_title,
+                "side_flip_next_position": next_position,
+            }
+        )
+        write_current_status(current)
+    except Exception as exc:
+        print(f"Could not write side-flip prompt status: {exc}")
+
+
+def clear_side_flip_prompt() -> None:
+    try:
+        current = get_current_status()
+        if not current:
+            return
+        if not current.get("side_flip_prompt_active") and not any(
+            current.get(key)
+            for key in (
+                "side_flip_from_side",
+                "side_flip_to_side",
+                "side_flip_next_title",
+                "side_flip_next_position",
+            )
+        ):
+            return
+        current.update(
+            {
+                "side_flip_prompt_active": False,
+                "side_flip_from_side": None,
+                "side_flip_to_side": None,
+                "side_flip_next_title": None,
+                "side_flip_next_position": None,
+            }
+        )
+        write_current_status(current)
+    except Exception as exc:
+        print(f"Could not clear side-flip prompt status: {exc}")

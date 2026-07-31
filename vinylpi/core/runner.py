@@ -8,6 +8,7 @@ from vinylpi.core.display_refresh import start_display_refresh_watcher
 from vinylpi.core.discogs_matcher import (
     apply_discogs_match,
     clear_discogs_inference,
+    get_side_flip_prompt,
     infer_expected_next_track,
     should_hold_inferred_track,
     update_discogs_playback_state,
@@ -94,7 +95,18 @@ def main_loop() -> None:
 
                 flush_timed_listen_if_needed(cfg, timed_listen_state)
                 timed_listen_state = TimedListenState()
-                if handle_no_result(cfg, display_state, cfg_reloaded):
+                side_flip_prompt = get_side_flip_prompt(
+                    discogs_state,
+                    raw_cfg,
+                    consecutive_failures=display_state.consecutive_failures + 1,
+                    debug_log=cfg.debug_log,
+                )
+                if handle_no_result(
+                    cfg,
+                    display_state,
+                    cfg_reloaded,
+                    side_flip_prompt=side_flip_prompt,
+                ):
                     break
                 time.sleep(cfg.delay)
                 continue
@@ -123,7 +135,18 @@ def main_loop() -> None:
                             f"detected album='{track.album}', "
                             f"locked album='{locked_album}', title='{track.title}'"
                         )
-                    if handle_no_result(cfg, display_state, cfg_reloaded):
+                    side_flip_prompt = get_side_flip_prompt(
+                        discogs_state,
+                        raw_cfg,
+                        consecutive_failures=display_state.consecutive_failures + 1,
+                        debug_log=cfg.debug_log,
+                    )
+                    if handle_no_result(
+                        cfg,
+                        display_state,
+                        cfg_reloaded,
+                        side_flip_prompt=side_flip_prompt,
+                    ):
                         break
                     time.sleep(cfg.delay)
                     continue
