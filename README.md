@@ -1,318 +1,283 @@
 # VinylPi64
+
 <p align="center">
-
-  <!-- Hardware & Platform -->
-  <img src="https://img.shields.io/badge/platform-Raspberry%20Pi%20Zero%202%20W-red" />
-  
-  <!-- Software -->
-  <img src="https://img.shields.io/badge/python-3.11+-yellow" />
-
-  <!-- License -->
-  <img src="https://img.shields.io/badge/license-CC--BY--NC%204.0-blue" />
-  
+  <img src="https://img.shields.io/badge/platform-Raspberry%20Pi%20Zero%202%20W-red" alt="Platform: Raspberry Pi Zero 2 W">
+  <img src="https://img.shields.io/badge/python-3.11%2B-yellow" alt="Python 3.11+">
+  <img src="https://img.shields.io/badge/license-CC--BY--NC%204.0-blue" alt="License: CC BY-NC 4.0">
 </p>
 
-VinylPi is a Raspberry Pi project that listens to audio from a turntable, identifies the currently playing song using **ShazamIO**, fetches album metadata and artwork, generates a **64×64 pixel frame**, and displays it on a **Divoom Pixoo**. It also features a webapp with a dashboard and settings.
+VinylPi64 listens to audio from a turntable, identifies the current song with **ShazamIO**, builds a custom **64×64 pixel frame**, and displays it on a **Divoom Pixoo-64**. A local web app provides controls, settings, lyrics, device management, and listening statistics.
 
 <p align="left">
-  <img src="assets/readme/Logo.png" width="400" alt="VinylPi Logo">
+  <img src="assets/readme/Logo.png" width="400" alt="VinylPi64 logo">
 </p>
-
-**Important: Hardware-specific implementation**
-
-I built this project specifically for my own hardware setup:
-
-- [Raspberry Pi Zero 2 W](https://www.raspberrypi.com/products/raspberry-pi-zero-2-w/)  
-- [Audio-Technica AT-LP120XUSB](https://www.audio-technica.com/en-us/at-lp120xusb)
-- [Divoom Pixoo-64](https://divoom.com/products/pixoo-64)
-
-If you use different hardware, you will most likely have to modify parts of the code, like:
-- **turntable without USB**: you will need a soundcard or USB microphone on your pi
-- **other pixel display**: you need to modify the Divoom API calls
 
 ## Features
 
-- Auto-detects USB audio device  
-- USB audio capture from turntable  
-- Automatic music recognition using **ShazamIO**  
-- Album cover retrieval  
-- Custom **64×64 pixel renderer**  
-  - centered album cover 
-  - custom pixel font 
-  - dynamic/manual background and text font
-  - marquee text for long titles/bands
-  - fallback image
-- Send results to pixel diplay
-- local WebApp:
-  - dashboard with current song, lyrics and switch (on/off)
-  - settings: configure vinylpi
-  - pixoo: configure your divoom pixoo
-  - statistics: keeps track of your listened minutes, songs, artists, genres and albums in SQLite
-  - about: support me :)  
-- Home Assistant Integration
----
+- Automatic song recognition from a USB audio source
+- Album artwork, artist, title, album, genre, and Shazam metadata
+- Custom Pixoo renderer with:
+  - dynamic or manual background and text colors
+  - configurable cover size, typography, spacing, and marquee text
+  - fallback images
+- Local web app with:
+  - live dashboard updates
+  - lyrics and track information
+  - recognition controls
+  - Pixoo brightness, channels, discovery, reboot, and community GIFs
+  - statistics for listening time, songs, artists, albums, genres, and covers
+- SQLite storage for songs, statistics, caches, and runtime state
+- Configurable adaptive sample duration after failed recognitions
+- Optional Home Assistant color-sync integration
 
-## Example Output
+## Hardware
 
-### Preview
+This project was built and tested with:
+
+- Raspberry Pi Zero 2 W
+- Audio-Technica AT-LP120XUSB
+- Divoom Pixoo-64
+
+Other hardware can work as well, but may require adjustments. A turntable without USB output needs a compatible USB audio interface, and another display type requires a different display integration.
+
+## Screenshots
+
+### Generated Pixoo frame
 
 <p align="left">
-  <img src="assets/readme/preview.png" width="600" alt="Preview results">
+  <img src="assets/readme/preview.png" width="600" alt="Generated Pixoo frame">
 </p>
 
-### Setup
+### Hardware setup
 
 <p align="left">
-  <img src="assets/readme/example.jpeg" height="600" alt="Preview results">
+  <img src="assets/readme/example.jpeg" height="600" alt="VinylPi64 hardware setup">
 </p>
 
-### WebApp Mobile
+### Web app
 
-| <img src="assets/readme/webapp_dashboard_mobile.jpeg" height="600" /> | <img src="assets/readme/webapp_pixoo_mobile.jpeg" height="600" /> |
+| Mobile | Mobile |
+|---|---|
+| <img src="assets/readme/webapp_dashboard_mobile.jpeg" height="600" alt="Dashboard on mobile"> | <img src="assets/readme/webapp_pixoo_mobile.jpeg" height="600" alt="Pixoo controls on mobile"> |
 
-### WebApp Desktop
+| Desktop | Desktop |
+|---|---|
+| <img src="assets/readme/webapp_statistics_desktop.png" width="600" alt="Statistics page"> | <img src="assets/readme/webapp_settings_desktop.png" width="600" alt="Settings page"> |
 
-| <img src="assets/readme/webapp_statistics_desktop.png" width="600" /> | <img src="assets/readme/webapp_settings_desktop.png" width="600" /> |
+## Quick setup
 
+### 1. Install system packages
 
-## Installation
-
-
-### 0. Install OS on the Raspberry Pi
-
-- I recommend using **Raspberry Pi OS Lite (64-bit)** for best performance (again I am using the Raspberry Pi zero 2 w). 
-- Flash it using the official [**Raspberry Pi Imager**](https://www.raspberrypi.com/software/).
-- Enable SSH during flashing.  
-- Boot the Pi and connect via SSH:
+On Raspberry Pi OS or another Debian-based system:
 
 ```bash
-ssh user@hostname
+sudo apt update
+sudo apt install -y git python3-venv python3-dev ffmpeg libportaudio2
 ```
-### 1. Clone the repository
+
+### 2. Clone and install
+
 ```bash
 git clone https://github.com/simontrost/VinylPi64.git
 cd VinylPi64
-```
-hint: you might need to `sudo apt install git` first
-
-### 2. Create and activate a virtual environment
-```bash
 python3 -m venv venv
 source venv/bin/activate
-```
-hint: you might need to `sudo apt install -y python3-venv python3-dev` first
-
-### 3. Install dependencies
-```bash
+python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
-hint: you might need to `pip install --upgrade pip` first
-### 4. Check for your audio device:
-```
+
+### 3. Check the audio source
+
+```bash
 arecord -l
 ```
-eg:  `0 USB AUDIO CODEC: Audio (hw:0,0), ALSA (2 in, 2 out)`  
-hint: you might also want to get ffmpeg `sudo apt install ffmpeg`
 
-### 5. Configuration:
-If you don't want to use the web interface, you will have to edit the config manually
-```bash
-nano data/config.json
-```
-Runtime data such as song statistics, caches and the current dashboard status is stored in `data/vinylpi.db`. The configuration remains in `data/config.json` so it can still be edited easily.
-VinylPi reads genre and Shazam identifiers directly from the Shazam recognition result. No Spotify or Last.fm credentials are required. MusicBrainz is used only as a fallback when Shazam does not provide a track duration.
+Make sure your USB turntable or audio interface appears in the list. The device name can later be selected in the web settings.
 
-### 6. Execute
-With the virtual environment active:
+### 4. Start the web app
+
 ```bash
+source venv/bin/activate
 python -m vinylpi.web.dashboard
 ```
-You can start music detection from the web app at `http://vinylpi.local:8080/` or directly with `python -m vinylpi.main`.
 
-## Autostart on boot
+Open:
 
-### 1. Create service file:
-create a file: 
+```text
+http://<device-ip>:8080/
+```
+
+On many local networks, this may also work:
+
+```text
+http://vinylpi.local:8080/
+```
+
+The recognizer can be started and stopped from the dashboard. It can also be launched directly with:
+
+```bash
+python -m vinylpi.main
+```
+
+## Configuration
+
+Most options can be changed from the **Settings** page. This includes:
+
+- audio device, sample rate, channels, and recording duration
+- adaptive recording durations after failed recognitions
+- Pixoo layout, colors, text, cover size, and scrolling
+- fallback images
+- Pixoo discovery and network values
+- recognition timing
+- Home Assistant integration
+- debug settings
+
+The configuration is stored in:
+
+```text
+data/config.json
+```
+
+Runtime data is stored in:
+
+```text
+data/vinylpi.db
+```
+
+This database contains song history, play counts, listening statistics, caches, and the current dashboard state.
+
+## Optional: start on boot
+
+Create a systemd service:
+
 ```bash
 sudo nano /etc/systemd/system/vinylpi.service
 ```
-with the following content and adjust the username and paths
 
-```bash
+Example:
+
+```ini
 [Unit]
-Description=VinylPi Dashboard
+Description=VinylPi64
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 User=pi
 WorkingDirectory=/home/pi/VinylPi64
-#EnvironmentFile=/home/pi/vinylpi.env
-#ExecStart=/home/pi/VinylPi64/venv/bin/gunicorn --bind 0.0.0.0:5000 vinylpi.dashboard:app
-ExecStart=/home/pi/VinylPi64/venv/bin/python3 -m vinylpi.web.dashboard
+ExecStart=/home/pi/VinylPi64/venv/bin/python -m vinylpi.web.dashboard
 Restart=on-failure
+RestartSec=3
 
 [Install]
 WantedBy=multi-user.target
 ```
 
-Save and exit. You can decide if you really nead a gunicorn server, for my purpose it's not really needed.  
-If you do want to use gunicorn, make sure you install it via `pip install gunicorn`.  
-If you want to use the home assistant integration, you will need to set your API token in `vinylpi.env`.
+Adjust the username and paths, then enable the service:
 
-### 2. Activate
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable vinylpi.service
-sudo systemctl start vinylpi.service
+sudo systemctl enable --now vinylpi.service
 ```
-hint: check with `sudo systemctl status vinylpi.service` (should be "active (running)")
 
-### 3. Logs
-if something is not working check
+Useful commands:
+
 ```bash
+sudo systemctl status vinylpi.service
 journalctl -u vinylpi.service -f
 ```
 
-## Home Assistant Integration
-I made a simple Home Assistant integration, that let's you switch the pixoo itself and the music detection off and on. It also features color sync mode.
-You can enable/disable HA integration it in the config. If turned on and correctrly configured, everytime a new song gets detected, the smart lights in your home change color according to the album cover.
+## Optional: API token
 
-### 1. VinylPi Configuration
-In the config, set `"use_ha": true` and configure the IP of your HA. 
+Local API endpoints can be protected with an environment variable:
 
-### 2. Home Assistant configuration
-In the `configuration.yaml` of your HA you will need something like this:
-```sh
-# Loads default set of integrations. Do not remove.
-default_config:
-
-# Load frontend themes from the themes folder
-frontend:
-  themes: !include_dir_merge_named themes
-
-automation: !include automations.yaml
-script: !include scripts.yaml
-scene: !include scenes.yaml
-
-sensor:
-  - platform: rest
-    name: VinylPi Pixoo Liked Gifs
-    resource: "http://vinylpi.local:8080/api/pixoo/liked-gifs"
-    method: GET
-    headers:
-      X-Api-Token: !secret vinylpi_api_token
-    value_template: "{{ value_json.ok }}"
-    json_attributes:
-      - gifs
-    scan_interval: 3600
-
-
-rest_command:
-  vinylpi_pixoo_play_remote:
-    url: "http://vinylpi.local:8080/api/pixoo/play-remote"
-    method: POST
-    headers:
-      Content-Type: application/json
-      X-Api-Token: !secret vinylpi_api_token
-    payload: >
-      {"file_id":"{{ file_id }}"}
-
-  vinylpi_music_mode_on:
-    url: "http://vinylpi.local:8080/api/ha/music_mode/on"
-    method: POST
-    headers:
-      X-Api-Token: !secret vinylpi_api_token
-
-  vinylpi_music_mode_off:
-    url: "http://vinylpi.local:8080/api/ha/music_mode/off"
-    method: POST
-    headers:
-      X-Api-Token: !secret vinylpi_api_token
-
-  vinylpi_pixoo_off:
-    url: "http://vinylpi.local:8080/api/ha/off"
-    method: POST
-    headers:
-      X-Api-Token: !secret vinylpi_api_token
-
-  vinylpi_pixoo_on:
-    url: "http://vinylpi.local:8080/api/ha/on"
-    method: POST
-    headers:
-      X-Api-Token: !secret vinylpi_api_token
+```bash
+VINYLPI_API_TOKEN=replace_with_a_long_random_value
 ```
-### 3. API Token
-It's just a hobby project (local) so if you don't care, comment it out. Otherwise:
 
-In the `secrets.yaml` of you HA, set:
+Store it in `vinylpi.env` and keep that file private.
+
+## Optional: Home Assistant
+
+VinylPi64 can send the dominant album-cover color to a Home Assistant webhook whenever a new song is recognized.
+
+Enable the integration in the Settings page and provide:
+
+- Home Assistant base URL
+- webhook ID
+
+Example Home Assistant automation:
+
 ```yaml
-vinylpi_api_token: "your_api_token"
-```
-and in your vinylpi.env set:
-```sh
-VINYLPI_API_TOKEN=your_api_token
-```
-
-### 4. Home Assistant Script
-This part really depends on what lights you have available in your HA Setup. If you have Lamps that can take RGB values as input, it could look like this:
-
-automation:
-```yaml
-alias: Vinylpi Sync
-description: ""
+alias: VinylPi Color Sync
 triggers:
   - trigger: webhook
+    webhook_id: vinylpi_cover_color
     allowed_methods:
       - POST
       - PUT
     local_only: true
-    webhook_id: vinylpi_cover_color
 conditions:
   - condition: state
     entity_id: input_boolean.vinylpi_color_sync
-    state:
-      - "on"
+    state: "on"
 actions:
-  - action: script.vinylpi_color_setter
-    data:
-      r: "{{ trigger.json.r }}"
-      g: "{{ trigger.json.g }}"
-      b: "{{ trigger.json.b }}"
-mode: single
-```
-
-and script:
-```yaml
-alias: VinylPi Color Setter
-mode: queued
-fields:
-  r:
-    description: Red 0-255
-    example: 120
-  g:
-    description: Green 0-255
-    example: 20
-  b:
-    description: Blue 0-255
-    example: 200
-sequence:
   - action: light.turn_on
     target:
       entity_id:
         - light.lamp1
         - light.lamp2
-        - light.lamp3
     data:
       rgb_color:
-        - "{{ r | int }}"
-        - "{{ g | int }}"
-        - "{{ b | int }}"
-description: ""
+        - "{{ trigger.json.r | int }}"
+        - "{{ trigger.json.g | int }}"
+        - "{{ trigger.json.b | int }}"
+mode: restart
+```
+
+Additional local API endpoints can be used for Pixoo power, music mode, and remote GIF playback.
+
+## Recognition notes
+
+Recognition is based on recorded audio samples rather than a continuous stream. A normal attempt uses the configured base duration. When adaptive sampling is enabled, VinylPi64 can automatically use longer recordings after failed attempts and return to the base duration after a successful recognition.
+
+Recognition quality depends on the audio level, the selected passage, background noise, and Shazam's result. Quiet intros, live versions, heavy surface noise, or very short samples can reduce accuracy.
+
+## Troubleshooting
+
+### Audio device not found
+
+```bash
+arecord -l
+```
+
+Verify that the configured device-name filter matches the listed USB device.
+
+### Web app starts, but recognition does not
+
+Check the service logs or run the recognizer manually:
+
+```bash
+python -m vinylpi.main
+```
+
+### Pixoo does not respond
+
+- confirm that the Pixoo and VinylPi are on the same network
+- use device discovery in the Pixoo page
+- verify the saved IP address
+- reboot the Pixoo from the web app
+
+### Service fails after an update
+
+```bash
+source venv/bin/activate
+pip install -r requirements.txt
+sudo systemctl restart vinylpi.service
 ```
 
 ## License
-Creative Commons Attribution–NonCommercial 4.0
 
-Full license text:
-https://creativecommons.org/licenses/by-nc/4.0/legalcode.txt
+VinylPi64 is licensed under the Creative Commons Attribution–NonCommercial 4.0 International license.
+
+See [LICENSE](LICENSE) for the full license text.
