@@ -199,7 +199,12 @@
                             <div class="form-group">
                                 <div class="group-title">Fallback image</div>
                                 <div class="form-row"><label for="fallbackEnabled">Fallback enabled</label><input type="checkbox" id="fallbackEnabled"></div>
-                                <div class="form-row"><label for="fallbackImage">Fallback image path</label><input type="text" id="fallbackImage" placeholder="assets/fallback.png"></div>
+                                <div class="form-row"><label for="fallbackImage">Fallback image path</label><input type="text" id="fallbackImage" placeholder="assets/fallback/fallback.png"></div>
+                                <div class="form-row">
+                                    <label for="sideFlipImage">Turn-record image path</label>
+                                    <input type="text" id="sideFlipImage" placeholder="assets/fallback/turn_record.png">
+                                    <div class="form-hint">Used only when an A → B or C → D side flip is expected.</div>
+                                </div>
                                 <div class="form-row"><label for="fallbackUpload">Upload image</label><input type="file" id="fallbackUpload" accept="image/png,image/jpeg"></div>
                                 <div class="form-row"><label for="fallbackAllowedFailures">Allowed failures</label><input type="number" id="fallbackAllowedFailures" min="0"></div>
                                 <div class="form-row"><label>Gallery</label><button type="button" id="openFallbackGallery">Open gallery</button></div>

@@ -281,8 +281,52 @@ def _generate_side_flip_prompt_frame(
     return img
 
 
+def _load_side_flip_prompt_frame(
+    next_side: str | None,
+    *,
+    next_position: str | None = None,
+) -> Image.Image:
+    cfg = read_config()
+    size = int(cfg["image"]["canvas_size"])
+    fallback_cfg = cfg.get("fallback") or {}
+    path = str(fallback_cfg.get("side_flip_image_path") or "").strip()
+
+    if path:
+        try:
+            frame = Image.open(path).convert("RGB")
+            if frame.size != (size, size):
+                frame = frame.resize((size, size), Image.Resampling.NEAREST)
+
+            # The bundled asset contains a bottom badge. Repaint its center so
+            # the same image can be used for A -> B and C -> D transitions.
+            draw = ImageDraw.Draw(frame)
+            badge_left = max(1, int(size * 0.245))
+            badge_top = max(1, int(size * 0.82))
+            badge_right = min(size - 2, int(size * 0.755))
+            badge_bottom = min(size - 2, int(size * 0.955))
+            draw.rectangle(
+                (badge_left, badge_top, badge_right, badge_bottom),
+                fill=(10, 8, 17),
+            )
+
+            font, _ = _get_font_for_config()
+            side_label = f"SIDE {str(next_side or '?').upper()}"
+            bbox = draw.textbbox((0, 0), side_label, font=font)
+            text_width = bbox[2] - bbox[0]
+            text_height = bbox[3] - bbox[1]
+            x = max(1, (size - text_width) // 2)
+            y = badge_top + max(0, (badge_bottom - badge_top - text_height) // 2) - bbox[1]
+            draw.text((x, y), side_label, font=font, fill=(245, 197, 66))
+            return frame
+        except Exception as exc:
+            if bool(cfg["debug"]["logs"]):
+                print(f"Could not load side-flip image '{path}': {exc}; using generated prompt.")
+
+    return _generate_side_flip_prompt_frame(next_side, next_position=next_position)
+
+
 def show_side_flip_prompt(next_side: str | None, *, next_position: str | None = None) -> None:
-    frame = _generate_side_flip_prompt_frame(next_side, next_position=next_position)
+    frame = _load_side_flip_prompt_frame(next_side, next_position=next_position)
     label = f"Side-flip prompt for side {next_side or '?'} sent to Pixoo."
     _send_static_frame(frame, debug_label=label)
 

@@ -363,6 +363,8 @@ async function loadConfig() {
         !!fallback.enabled;
     document.getElementById("fallbackImage").value =
         fallback.image_path || "";
+    document.getElementById("sideFlipImage").value =
+        fallback.side_flip_image_path || "assets/fallback/turn_record.png";
     document.getElementById("fallbackAllowedFailures").value =
         fallback.allowed_failures ?? 3;
 
@@ -510,6 +512,8 @@ document.getElementById("settings-form").addEventListener("submit", async (e) =>
         document.getElementById("fallbackEnabled").checked;
     fallback.image_path =
         document.getElementById("fallbackImage").value;
+    fallback.side_flip_image_path =
+        document.getElementById("sideFlipImage").value || "assets/fallback/turn_record.png";
     fallback.allowed_failures =
         parseInt(document.getElementById("fallbackAllowedFailures").value) || 3;
 
