@@ -58,11 +58,11 @@ Other hardware can work as well, but may require adjustments. A turntable withou
 
 | Mobile | Mobile |
 |---|---|
-| <img src="assets/readme/webapp_dashboard_mobile.jpeg" height="600" alt="Dashboard on mobile"> | <img src="assets/readme/webapp_pixoo_mobile.jpeg" height="600" alt="Pixoo controls on mobile"> |
+| <img src="assets/readme/mobile_pixoo.PNG" height="600" alt="Dashboard on mobile"> | <img src="assets/readme/mobile_settings.PNG" height="600" alt="Pixoo controls on mobile"> |
 
 | Desktop | Desktop |
 |---|---|
-| <img src="assets/readme/webapp_statistics_desktop.png" width="600" alt="Statistics page"> | <img src="assets/readme/webapp_settings_desktop.png" width="600" alt="Settings page"> |
+| <img src="assets/readme/desktop_dashboard.png" width="600" alt="Statistics page"> | <img src="assets/readme/desktop_statistics.png" width="600" alt="Settings page"> |
 
 ## Quick setup
 

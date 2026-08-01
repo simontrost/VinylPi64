@@ -8,8 +8,7 @@ from PIL import Image, ImageDraw
 
 from vinylpi.core.image_utils import (
     _get_font_for_config,
-    dynamic_bg_color,
-    dynamic_text_color,
+    resolve_display_colors,
     text_size,
 )
 from vinylpi.integrations.divoom_api import PixooClient, PixooError
@@ -80,20 +79,12 @@ def _prepare_scroll_resources(cover_img: Image.Image, artist: str, title: str) -
         artist = artist.upper()
         title = title.upper()
 
-    if img_cfg.get("use_dynamic_bg", True):
-        bg_color = dynamic_bg_color(cover_img)
-    else:
-        bg_color = tuple(img_cfg["manual_bg_color"])
+    bg_color, text_color = resolve_display_colors(cover_img, img_cfg)
 
     base_canvas = _prepare_base_canvas(cover_img, bg_color)
     font, glyph_height = _get_font_for_config()
     artist_width, _ = text_size(artist, font)
     title_width, _ = text_size(title, font)
-
-    if img_cfg.get("use_dynamic_text_color", False):
-        text_color = dynamic_text_color(bg_color)
-    else:
-        text_color = tuple(img_cfg["text_color"])
 
     artist_y = top_margin + cover_size + gap_after_cover
     title_y = artist_y + glyph_height + gap_between_lines

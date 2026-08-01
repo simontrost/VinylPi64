@@ -147,6 +147,41 @@ def dynamic_bg_color(cover_img: Image.Image, num_colors: int = 8) -> tuple[int, 
 
     return (r, g, b)
 
+
+
+def resolve_display_colors(
+    cover_img: Image.Image,
+    img_cfg: dict,
+    *,
+    bg_color: tuple[int, int, int] | None = None,
+) -> tuple[tuple[int, int, int], tuple[int, int, int]]:
+    """Resolve background/text colors while preserving manual selections.
+
+    Normal automatic mode uses the dominant cover color as background and a
+    black/white contrast color as text. In inverted automatic mode the cover
+    color becomes the text color, while the automatic background becomes
+    black or white for contrast. Manual colors are never swapped or changed.
+    """
+    use_dynamic_bg = bool(img_cfg.get("use_dynamic_bg", True))
+    use_dynamic_text = bool(img_cfg.get("use_dynamic_text_color", False))
+    invert_dynamic = bool(img_cfg.get("invert_dynamic_colors", False))
+
+    cover_color = dynamic_bg_color(cover_img)
+
+    if bg_color is not None:
+        resolved_bg = tuple(bg_color)
+    elif use_dynamic_bg:
+        resolved_bg = dynamic_text_color(cover_color) if invert_dynamic else cover_color
+    else:
+        resolved_bg = tuple(img_cfg.get("manual_bg_color", [0, 0, 0]))
+
+    if use_dynamic_text:
+        resolved_text = cover_color if invert_dynamic else dynamic_text_color(resolved_bg)
+    else:
+        resolved_text = tuple(img_cfg.get("text_color", [255, 255, 255]))
+
+    return resolved_bg, resolved_text
+
 def build_static_frame(
     cover_img: Image.Image,
     artist: str,
@@ -162,22 +197,11 @@ def build_static_frame(
     TOP_MARGIN = img_cfg["top_margin"]
     GAP_BETWEEN_COVER_AND_BAND = img_cfg["margin_image_text"]
     GAP_BETWEEN_LINES = img_cfg["line_spacing_margin"]
-    USE_DYNAMIC_BG = img_cfg.get("use_dynamic_bg", True)
-
-    USE_DYNAMIC_BG = img_cfg.get("use_dynamic_bg", True)
-    USE_DYNAMIC_TEXT = img_cfg.get("use_dynamic_text_color", False)
-
-    if bg_color is None:
-        if USE_DYNAMIC_BG:
-            bg_color = dynamic_bg_color(cover_img)
-        else:
-            bg_color = tuple(img_cfg["manual_bg_color"])
-
-    if USE_DYNAMIC_TEXT:
-        TEXT_COLOR = dynamic_text_color(bg_color)
-    else:
-        TEXT_COLOR = tuple(img_cfg["text_color"])
-
+    bg_color, TEXT_COLOR = resolve_display_colors(
+        cover_img,
+        img_cfg,
+        bg_color=bg_color,
+    )
 
     canvas = Image.new("RGB", (CANVAS_SIZE, CANVAS_SIZE), bg_color)
 

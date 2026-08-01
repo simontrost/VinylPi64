@@ -25,6 +25,7 @@ CONFIG_DEFAULTS = {
         "use_dynamic_bg": True,
         "manual_bg_color": [0, 0, 0],
         "use_dynamic_text_color": True,
+        "invert_dynamic_colors": False,
         "text_color": [255, 255, 255],
         "uppercase": True,
         "preview_scale": 8,

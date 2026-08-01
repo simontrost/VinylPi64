@@ -1014,3 +1014,25 @@
         min-width: 56px;
     }
 }
+
+
+.color-invert-row {
+    align-items: center;
+}
+
+.color-invert-row .form-hint {
+    grid-column: 2;
+    margin-top: -4px;
+}
+
+@media (max-width: 760px) {
+    .color-invert-row {
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 10px 16px;
+    }
+
+    .color-invert-row .form-hint {
+        grid-column: 1 / -1;
+        margin-top: 0;
+    }
+}

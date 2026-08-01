@@ -349,6 +349,8 @@ async function loadConfig() {
         !!image.use_dynamic_bg;
     document.getElementById("useDynamicText").checked =
         !!image.use_dynamic_text_color;
+    document.getElementById("invertDynamicColors").checked =
+        !!image.invert_dynamic_colors;
     syncAllManualColorStates();
 
     document.getElementById("imagePreviewScale").value =
@@ -499,6 +501,8 @@ document.getElementById("settings-form").addEventListener("submit", async (e) =>
         document.getElementById("useDynamicBg").checked;
     image.use_dynamic_text_color =
         document.getElementById("useDynamicText").checked;
+    image.invert_dynamic_colors =
+        document.getElementById("invertDynamicColors").checked;
 
     image.preview_scale =
         parseInt(document.getElementById("imagePreviewScale").value) || 8;
