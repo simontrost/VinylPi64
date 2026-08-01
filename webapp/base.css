@@ -60,7 +60,7 @@ a { color: inherit; }
 .nav {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 10px;
 }
 
 .nav a {
@@ -68,8 +68,8 @@ a { color: inherit; }
     display: flex;
     align-items: center;
     gap: 10px;
-    min-height: 46px;
-    padding: 0 14px;
+    min-height: 52px;
+    padding: 0 14px 3px;
     border: 1px solid transparent;
     border-radius: 14px;
     color: var(--muted);
@@ -122,26 +122,38 @@ a { color: inherit; }
     position: absolute;
     right: 12px;
     left: 12px;
-    bottom: 6px;
-    height: 4px;
+    bottom: 5px;
+    height: 3px;
     border-radius: 999px;
     background: var(--pink);
 }
 
 .nav a.nav-center {
-    gap: 12px;
+    gap: 10px;
 }
 
 .nav-orb {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 40px;
-    height: 40px;
-    border-radius: 14px;
-    background: rgba(255,255,255,0.06);
-    border: 1px solid rgba(255,255,255,0.08);
+    width: 22px;
+    height: 22px;
+    border-radius: 0;
+    background: transparent;
+    border: 0;
+    color: currentColor;
     flex: 0 0 auto;
+}
+
+.nav-orb svg {
+    display: block;
+    width: 20px;
+    height: 20px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.9;
+    stroke-linecap: round;
+    stroke-linejoin: round;
 }
 
 .pixel-title {
@@ -390,7 +402,7 @@ textarea:focus-visible {
         z-index: 40;
         width: 100%;
         height: auto;
-        padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+        padding: 11px 10px calc(10px + env(safe-area-inset-bottom));
         overflow: visible;
         border-right: 0;
         border-top: 1px solid var(--border);
@@ -401,17 +413,24 @@ textarea:focus-visible {
     }
 
     .nav {
-        flex-direction: row;
-        align-items: flex-end;
-        justify-content: space-between;
-        gap: 6px;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 88px minmax(0, 1fr) minmax(0, 1fr);
+        align-items: end;
+        gap: 0;
+        width: 100%;
     }
 
+    .nav a[href="settings.html"] { order: 1; }
+    .nav a[href="pixoo.html"] { order: 2; }
+    .nav a[href="index.html"] { order: 3; }
+    .nav a[href="stats.html"] { order: 4; }
+    .nav a[href="about.html"] { order: 5; }
+
     .nav a {
-        flex: 1 1 0;
+        width: 100%;
         min-width: 0;
-        min-height: auto;
-        padding: 4px 2px 2px;
+        min-height: 58px;
+        padding: 5px 1px 1px;
         border: 0;
         border-radius: 16px;
         background: transparent;
@@ -421,7 +440,7 @@ textarea:focus-visible {
         flex-direction: column;
         justify-content: flex-end;
         align-items: center;
-        gap: 5px;
+        gap: 4px;
         text-align: center;
     }
 
@@ -457,15 +476,16 @@ textarea:focus-visible {
     }
 
     .nav a.nav-center {
-        flex: 0 0 84px;
-        gap: 2px;
-        margin-top: -30px;
+        width: 88px;
+        gap: 3px;
+        margin-top: -34px;
+        justify-self: center;
         color: var(--text);
     }
 
     .nav-center .nav-orb {
-        width: 72px;
-        height: 72px;
+        width: 74px;
+        height: 74px;
         border-radius: 50%;
         background: linear-gradient(180deg, #f1b476, #dda367);
         border: 1px solid rgba(255,255,255,0.16);
