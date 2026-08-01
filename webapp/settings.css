@@ -931,3 +931,86 @@
         width: 100%;
     }
 }
+
+/* Mobile color controls: keep labels, mode toggle and swatch inside the card. */
+@media (max-width: 760px) {
+    .settings-card-content {
+        padding-inline: 14px;
+    }
+
+    .form-group {
+        padding: 14px;
+    }
+
+    .form-row,
+    .color-mode-row {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 9px;
+    }
+
+    .color-setting-control {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 64px;
+        align-items: center;
+        width: 100%;
+        gap: 12px;
+    }
+
+    .color-mode-switch {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 52px minmax(0, 1fr);
+        align-items: center;
+        width: 100%;
+        min-width: 0;
+        gap: 8px;
+    }
+
+    .color-mode-label {
+        min-width: 0;
+        font-size: 12px;
+        white-space: nowrap;
+    }
+
+    .color-mode-label-manual {
+        text-align: right;
+    }
+
+    .color-mode-label-auto {
+        text-align: left;
+    }
+
+    .color-mode-switch input[type="checkbox"] {
+        width: 52px;
+        min-width: 52px;
+        justify-self: center;
+    }
+
+    .color-setting-control input[type="color"] {
+        width: 64px;
+        min-width: 64px;
+        height: 52px;
+        justify-self: end;
+    }
+}
+
+@media (max-width: 390px) {
+    .color-setting-control {
+        grid-template-columns: minmax(0, 1fr) 56px;
+        gap: 8px;
+    }
+
+    .color-mode-switch {
+        grid-template-columns: minmax(0, 1fr) 48px minmax(0, 1fr);
+        gap: 6px;
+    }
+
+    .color-mode-switch input[type="checkbox"] {
+        width: 48px;
+        min-width: 48px;
+    }
+
+    .color-setting-control input[type="color"] {
+        width: 56px;
+        min-width: 56px;
+    }
+}
