@@ -402,11 +402,12 @@ textarea:focus-visible {
         z-index: 40;
         width: 100%;
         height: auto;
-        padding: 11px 10px calc(10px + env(safe-area-inset-bottom));
+        padding: 4px 10px calc(15px + env(safe-area-inset-bottom));
         overflow: visible;
         border-right: 0;
         border-top: 1px solid var(--border);
         border-bottom: 0;
+        border-radius: 24px 24px 0 0;
         background: rgba(11, 11, 15, 0.97);
         backdrop-filter: blur(18px);
         box-shadow: 0 -12px 32px rgba(0, 0, 0, 0.28);
@@ -418,6 +419,7 @@ textarea:focus-visible {
         align-items: end;
         gap: 0;
         width: 100%;
+        min-height: 72px;
     }
 
     .nav a[href="settings.html"] { order: 1; }
@@ -429,8 +431,8 @@ textarea:focus-visible {
     .nav a {
         width: 100%;
         min-width: 0;
-        min-height: 58px;
-        padding: 5px 1px 1px;
+        min-height: 64px;
+        padding: 2px 1px 8px;
         border: 0;
         border-radius: 16px;
         background: transparent;
@@ -438,9 +440,9 @@ textarea:focus-visible {
         font-size: 11px;
         font-weight: 700;
         flex-direction: column;
-        justify-content: flex-end;
+        justify-content: center;
         align-items: center;
-        gap: 4px;
+        gap: 5px;
         text-align: center;
     }
 
@@ -478,8 +480,9 @@ textarea:focus-visible {
     .nav a.nav-center {
         width: 88px;
         gap: 3px;
-        margin-top: -34px;
+        margin-top: -31px;
         justify-self: center;
+        padding-bottom: 3px;
         color: var(--text);
     }
 
