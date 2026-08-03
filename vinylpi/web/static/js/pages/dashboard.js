@@ -198,7 +198,7 @@ function renderEmptyStatus(message = "No recognized song yet") {
     if (genre) genre.classList.add("hidden");
 
     const cover = document.getElementById("song-cover");
-    if (cover) cover.src = "/logo.png";
+    if (cover) cover.src = "/static/images/logo.png";
 
     document.getElementById("discogs-context")?.classList.add("hidden");
     document.getElementById("discogs-side-flip")?.classList.add("hidden");
@@ -238,10 +238,10 @@ function renderStatus(status) {
 
     const cover = document.getElementById("song-cover");
     if (cover) {
-        cover.src = CURRENT_TRACK.coverUrl || "/logo.png";
+        cover.src = CURRENT_TRACK.coverUrl || "/static/images/logo.png";
         cover.onerror = () => {
             cover.onerror = null;
-            cover.src = "/logo.png";
+            cover.src = "/static/images/logo.png";
         };
     }
 

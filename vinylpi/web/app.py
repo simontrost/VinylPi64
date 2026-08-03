@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 from flask import Flask
 
 from vinylpi.core.storage import initialize_storage
-from vinylpi.paths import BASE_DIR, WEBAPP_DIR
+from vinylpi.paths import BASE_DIR
 from vinylpi.web.routes.config_api import config_bp
 from vinylpi.web.routes.discogs_api import discogs_bp
 from vinylpi.web.routes.events_api import events_bp
@@ -40,8 +40,9 @@ def create_app() -> Flask:
     initialize_storage()
     app = Flask(
         __name__,
-        static_folder=str(WEBAPP_DIR),
-        static_url_path="",
+        static_folder="static",
+        static_url_path="/static",
+        template_folder="templates",
     )
 
     for blueprint in _BLUEPRINTS:

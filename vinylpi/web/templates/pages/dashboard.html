@@ -1,0 +1,86 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}VinylPi Dashboard{% endblock %}
+
+{% block page_styles %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/dashboard.css') }}">
+{% endblock %}
+
+{% block page_scripts %}
+    <script src="{{ url_for('static', filename='js/pages/dashboard.js') }}" defer></script>
+{% endblock %}
+
+{% block content %}
+<main class="main">
+    <header class="main-header">
+        <div class="header-title pixel-title">Dashboard</div>
+        <img src="{{ url_for('static', filename='images/logo.png') }}" class="header-logo" alt="VinylPi Logo">
+    </header>
+
+    <section class="dashboard-shell">
+        <section class="song-card">
+            <div class="song-art">
+                <img id="song-cover" class="song-cover" src="{{ url_for('static', filename='images/logo.png') }}" alt="Album Cover">
+            </div>
+
+            <div class="song-copy">
+                <div class="song-topbar">
+                    <span class="eyebrow" id="now-playing-label">Now playing</span>
+                    <div class="recognition-inline" aria-label="Music recognition">
+                        <div id="rec-status-text" class="rec-status-text">Loading status...</div>
+                        <label class="toggle-switch" aria-label="Toggle music recognition">
+                            <input type="checkbox" id="recognizerToggle">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <div id="song-artist" class="song-artist">–</div>
+                <div id="song-title" class="song-title">Loading...</div>
+                <div id="song-album" class="song-album"></div>
+                <div id="song-genre" class="song-genre hidden"></div>
+
+                <div id="discogs-context" class="discogs-context hidden">
+                    <div class="discogs-context-head">
+                        <span class="discogs-collection-badge">In your collection</span>
+                        <span id="discogs-match-label" class="discogs-match-label"></span>
+                    </div>
+                    <div class="discogs-track-line">
+                        <strong id="discogs-position"></strong>
+                        <span id="discogs-track-progress"></span>
+                    </div>
+                    <div id="discogs-next-track" class="discogs-next-track hidden"></div>
+                    <div id="discogs-side-flip" class="discogs-side-flip hidden">
+                        <div class="discogs-side-flip-eyebrow">Turn record</div>
+                        <div id="discogs-side-flip-heading" class="discogs-side-flip-heading"></div>
+                        <div id="discogs-side-flip-detail" class="discogs-side-flip-detail"></div>
+                    </div>
+                </div>
+
+                <div class="song-actions">
+                    <button id="btn-lyrics" type="button">Lyrics</button>
+                    <button id="btn-track-info" type="button">Info</button>
+                    <button id="btn-lyrics-toggle" type="button" class="hidden">More</button>
+                </div>
+
+                <div class="lyrics-inline" id="lyrics-card">
+                    <pre id="lyrics-box" class="lyrics-box hidden collapsed"></pre>
+                </div>
+            </div>
+        </section>
+    </section>
+</main>
+
+<div id="info-backdrop" class="info-backdrop hidden"></div>
+
+<aside id="track-info-drawer" class="track-info-drawer">
+    <div class="track-info-header">
+        <div>
+            <div class="track-info-label">Shazam Info</div>
+            <h2 id="track-info-heading">Track Info</h2>
+        </div>
+        <button id="btn-track-info-close" type="button" class="track-info-close">×</button>
+    </div>
+    <div id="track-info-content" class="track-info-content">No data loaded.</div>
+</aside>
+{% endblock %}

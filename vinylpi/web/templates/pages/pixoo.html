@@ -1,0 +1,123 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Pixoo – VinylPi64{% endblock %}
+
+{% block page_styles %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/pixoo.css') }}">
+{% endblock %}
+
+{% block page_scripts %}
+    <script src="{{ url_for('static', filename='js/pages/pixoo.js') }}" defer></script>
+{% endblock %}
+
+{% block content %}
+<main class="main">
+    <header class="main-header">
+        <div class="header-title pixel-title">Pixoo</div>
+        <img src="{{ url_for('static', filename='images/logo.png') }}" class="header-logo" alt="VinylPi Logo">
+    </header>
+
+    <section class="pixoo-section">
+        <div class="pixoo-grid-top">
+            <div class="card pixoo-card-accent">
+                <div class="section-head">
+                    <div>
+                        <span class="eyebrow">Connection</span>
+                        <h2>Device status</h2>
+                    </div>
+                </div>
+                <p id="pixoo-status-text" class="pixoo-status-text">Loading Pixoo status...</p>
+                <p class="pixoo-status-sub" id="pixoo-status-sub"></p>
+            </div>
+
+            <div class="card pixoo-card-accent pixoo-card-secondary">
+                <div class="section-head">
+                    <div>
+                        <span class="eyebrow">Setup</span>
+                        <h2>Device discovery</h2>
+                    </div>
+                </div>
+                <p class="pixoo-help">Discover your Pixoo via the Divoom cloud and store its IP / IDs directly in the VinylPi config.</p>
+                <div class="pixoo-inline-action">
+                    <button id="pixooDiscoverBtn" class="btn-primary">Find device & save to config</button>
+                    <span id="pixooDiscoverStatus" class="pixoo-reboot-status"></span>
+                </div>
+            </div>
+        </div>
+
+        <div class="pixoo-grid-mid">
+            <div class="card pixoo-card-accent">
+                <div class="section-head">
+                    <div>
+                        <span class="eyebrow">Display</span>
+                        <h2>Brightness</h2>
+                    </div>
+                </div>
+                <div class="pixoo-row pixoo-row-slider">
+                    <label for="pixooBrightness">Brightness</label>
+                    <div class="pixoo-slider-wrap">
+                        <input type="range" id="pixooBrightness" min="0" max="100" step="1">
+                        <span id="pixooBrightnessValue" class="pixoo-slider-value">–%</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card pixoo-card-accent">
+                <div class="section-head">
+                    <div>
+                        <span class="eyebrow">Input source</span>
+                        <h2>Channel</h2>
+                    </div>
+                </div>
+                <p class="pixoo-help">Switch between Pixoo channels. VinylPi uses the HTTP GIF / Custom channel for generated frames.</p>
+                <div class="pixoo-channel-grid">
+                    <button class="pixoo-channel-btn" data-channel="0">Clock</button>
+                    <button class="pixoo-channel-btn" data-channel="1">Cloud</button>
+                    <button class="pixoo-channel-btn" data-channel="2">Visualizer</button>
+                    <button class="pixoo-channel-btn" data-channel="3">Custom</button>
+                    <button class="pixoo-channel-btn" data-channel="4">BlackScreen</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="pixoo-grid-bottom">
+            <div class="card pixoo-card-accent">
+                <div class="section-head">
+                    <div>
+                        <span class="eyebrow">Community</span>
+                        <h2>Liked GIFs</h2>
+                    </div>
+                </div>
+                <p class="pixoo-help">Load your liked Divoom community GIFs and play one on the Pixoo.</p>
+                <div class="pixoo-inline-action">
+                    <button id="pixooFetchLikesBtn" class="btn-primary">Load liked GIFs</button>
+                    <span id="pixooLikesStatus" class="pixoo-reboot-status"></span>
+                </div>
+                <div class="pixoo-row pixoo-row-select">
+                    <label for="pixooLikesSelect">Liked GIFs</label>
+                    <div class="pixoo-slider-wrap pixoo-select-wrap">
+                        <select id="pixooLikesSelect" class="pixoo-select">
+                            <option value="">– No GIFs loaded –</option>
+                        </select>
+                        <button id="pixooPlayLikeBtn" class="btn-primary">Play on Pixoo</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card pixoo-card-accent pixoo-power-card">
+                <div class="section-head">
+                    <div>
+                        <span class="eyebrow">Maintenance</span>
+                        <h2>Power</h2>
+                    </div>
+                </div>
+                <p class="pixoo-help">Reboot the Pixoo if it is stuck or not responding.</p>
+                <div class="pixoo-inline-action">
+                    <button id="pixooRebootBtn" class="btn-danger">Reboot Pixoo</button>
+                    <span id="pixooRebootStatus" class="pixoo-reboot-status"></span>
+                </div>
+            </div>
+        </div>
+    </section>
+</main>
+{% endblock %}

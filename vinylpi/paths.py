@@ -10,7 +10,6 @@ DISPLAY_REFRESH_PATH = DATA_DIR / "display_refresh.request"
 
 STATUS_PATH = DATA_DIR / "status.json"  # legacy path; runtime status is stored in SQLite
 
-WEBAPP_DIR = BASE_DIR / "webapp"
 
 UPLOAD_DIR = BASE_DIR / "assets" / "fallback"
 FONTS_DIR = BASE_DIR / "assets" / "fonts"

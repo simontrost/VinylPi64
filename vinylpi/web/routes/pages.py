@@ -1,23 +1,29 @@
-from flask import Blueprint, current_app
+from flask import Blueprint, render_template
 
 pages_bp = Blueprint("pages", __name__)
 
+
+@pages_bp.get("/index.html")
 @pages_bp.get("/")
 def index():
-    return current_app.send_static_file("index.html")
+    return render_template("pages/dashboard.html", active_page="dashboard")
+
 
 @pages_bp.get("/settings.html")
 def settings_page():
-    return current_app.send_static_file("settings.html")
+    return render_template("pages/settings.html", active_page="settings")
+
 
 @pages_bp.get("/stats.html")
 def stats_page():
-    return current_app.send_static_file("stats.html")
+    return render_template("pages/stats.html", active_page="stats")
+
 
 @pages_bp.get("/about.html")
 def about_page():
-    return current_app.send_static_file("about.html")
+    return render_template("pages/about.html", active_page="about")
+
 
 @pages_bp.get("/pixoo.html")
 def pixoo_page():
-    return current_app.send_static_file("pixoo.html")
+    return render_template("pages/pixoo.html", active_page="pixoo")
