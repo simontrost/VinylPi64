@@ -3,11 +3,11 @@
 {% block title %}VinylPi Settings{% endblock %}
 
 {% block page_styles %}
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/settings.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/settings.css') }}?v=20260803b">
 {% endblock %}
 
 {% block page_scripts %}
-    <script src="{{ url_for('static', filename='js/pages/settings.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/pages/settings.js') }}?v=20260803b" defer></script>
 {% endblock %}
 
 {% block content %}
@@ -39,23 +39,23 @@
                     <span><strong>Fallback</strong><small>No-song and turn-record images</small></span><span class="mobile-settings-arrow">›</span>
                 </button>
                 <button type="button" class="mobile-settings-category" data-settings-target="section-pixoo">
-                    <span class="mobile-settings-category-icon" aria-hidden="true"><rect x="4" y="4" width="6" height="6" rx="1"></rect><rect x="14" y="4" width="6" height="6" rx="1"></rect><rect x="4" y="14" width="6" height="6" rx="1"></rect><rect x="14" y="14" width="6" height="6" rx="1"></rect></svg></span>
+                    <span class="mobile-settings-category-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6" rx="1"></rect><rect x="14" y="4" width="6" height="6" rx="1"></rect><rect x="4" y="14" width="6" height="6" rx="1"></rect><rect x="14" y="14" width="6" height="6" rx="1"></rect></svg></span>
                     <span><strong>Pixoo</strong><small>Device and discovery</small></span><span class="mobile-settings-arrow">›</span>
                 </button>
                 <button type="button" class="mobile-settings-category" data-settings-target="section-discogs">
-                    <span class="mobile-settings-category-icon" aria-hidden="true"><circle cx="12" cy="12" r="8"></circle><circle cx="12" cy="12" r="2"></circle><path d="M12 4v3"></path></svg></span>
+                    <span class="mobile-settings-category-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"></circle><circle cx="12" cy="12" r="2"></circle><path d="M12 4v3"></path></svg></span>
                     <span><strong>Discogs</strong><small>Collection matching</small></span><span class="mobile-settings-arrow">›</span>
                 </button>
                 <button type="button" class="mobile-settings-category" data-settings-target="section-behavior">
-                    <span class="mobile-settings-category-icon" aria-hidden="true"><path d="M4 7h10"></path><path d="M18 7h2"></path><circle cx="16" cy="7" r="2"></circle><path d="M4 17h2"></path><path d="M10 17h10"></path><circle cx="8" cy="17" r="2"></circle></svg></span>
+                    <span class="mobile-settings-category-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 7h10"></path><path d="M18 7h2"></path><circle cx="16" cy="7" r="2"></circle><path d="M4 17h2"></path><path d="M10 17h10"></path><circle cx="8" cy="17" r="2"></circle></svg></span>
                     <span><strong>Behavior</strong><small>Timing and recognition</small></span><span class="mobile-settings-arrow">›</span>
                 </button>
                 <button type="button" class="mobile-settings-category" data-settings-target="section-ha">
-                    <span class="mobile-settings-category-icon" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"></path><path d="M5.5 10.5V20h13v-9.5"></path><path d="M9 20v-6h6v6"></path></svg></span>
+                    <span class="mobile-settings-category-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5"></path><path d="M5.5 10.5V20h13v-9.5"></path><path d="M9 20v-6h6v6"></path></svg></span>
                     <span><strong>Home Assistant</strong><small>Webhook integration</small></span><span class="mobile-settings-arrow">›</span>
                 </button>
                 <button type="button" class="mobile-settings-category" data-settings-target="section-debug">
-                    <span class="mobile-settings-category-icon" aria-hidden="true"><path d="M8 9h8"></path><path d="M9 4h6l1 3H8l1-3z"></path><rect x="6" y="7" width="12" height="13" rx="5"></rect><path d="M3 12h3"></path><path d="M18 12h3"></path><path d="M4 17h3"></path><path d="M17 17h3"></path></svg></span>
+                    <span class="mobile-settings-category-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 9h8"></path><path d="M9 4h6l1 3H8l1-3z"></path><rect x="6" y="7" width="12" height="13" rx="5"></rect><path d="M3 12h3"></path><path d="M18 12h3"></path><path d="M4 17h3"></path><path d="M17 17h3"></path></svg></span>
                     <span><strong>Debug</strong><small>Logs and output paths</small></span><span class="mobile-settings-arrow">›</span>
                 </button>
             </div>

@@ -475,7 +475,7 @@
     }
 }
 
-@media (max-width: 760px) {
+@media (max-width: 900px) {
     .color-mode-switch {
         min-width: 0;
     }
@@ -557,7 +557,7 @@
     line-height: 1.6;
 }
 
-@media (max-width: 760px) {
+@media (max-width: 900px) {
     .settings-card-header {
         padding: 18px;
     }
@@ -723,7 +723,7 @@
     line-height: 1.5;
 }
 
-@media (max-width: 760px) {
+@media (max-width: 900px) {
     .adaptive-sample-header {
         align-items: flex-start;
     }
@@ -933,7 +933,7 @@
 }
 
 /* Mobile color controls: keep labels, mode toggle and swatch inside the card. */
-@media (max-width: 760px) {
+@media (max-width: 900px) {
     .settings-card-content {
         padding-inline: 14px;
     }
@@ -1025,7 +1025,7 @@
     margin-top: -4px;
 }
 
-@media (max-width: 760px) {
+@media (max-width: 900px) {
     .color-invert-row {
         grid-template-columns: minmax(0, 1fr) auto;
         gap: 10px 16px;
@@ -1159,7 +1159,7 @@
     opacity: 0.72;
 }
 
-@media (max-width: 760px) {
+@media (max-width: 900px) {
     .setting-group-header {
         align-items: stretch;
         flex-direction: column;
@@ -1182,7 +1182,7 @@
     display: none;
 }
 
-@media (max-width: 760px) {
+@media (max-width: 900px) {
     .mobile-settings-menu {
         display: block;
         margin-bottom: 18px;
