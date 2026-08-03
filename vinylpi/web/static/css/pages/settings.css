@@ -1454,3 +1454,23 @@
         grid-template-columns: 1fr;
     }
 }
+
+/* Keep the primary settings actions side by side on mobile. */
+@media (max-width: 900px) {
+    .settings-actions,
+    #settings-form.mobile-category-open .settings-actions {
+        display: flex;
+        flex-direction: row;
+        align-items: stretch;
+        gap: 10px;
+    }
+
+    .settings-actions > button {
+        flex: 1 1 0;
+        min-width: 0;
+        width: auto;
+        padding-inline: 12px;
+        font-size: 14px;
+        white-space: nowrap;
+    }
+}
