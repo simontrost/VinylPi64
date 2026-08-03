@@ -1,4 +1,4 @@
- {% extends "layouts/base.html" %}
+{% extends "layouts/base.html" %}
 
 {% block title %}VinylPi Settings{% endblock %}
 
@@ -23,6 +23,7 @@
             <div class="mobile-settings-menu-copy">
                 <span class="mobile-settings-eyebrow">Settings</span>
                 <h2>Choose a category</h2>
+                <p>Open only the settings you need instead of scrolling through the full configuration.</p>
             </div>
             <div class="mobile-settings-categories">
                 <button type="button" class="mobile-settings-category" data-settings-target="section-audio">
@@ -176,7 +177,14 @@
 
                         <div class="form-group">
                             <div class="group-title">Typography</div>
-                            <div class="form-row"><label for="imageFontPath">Font path</label><input type="text" id="imageFontPath"></div>
+                            <input type="hidden" id="imageFontPath">
+                            <div class="form-row path-row">
+                                <label>Selected font</label>
+                                <code class="selected-image-path" id="imageFontPathLabel">No font selected</code>
+                            </div>
+                            <div class="form-row"><label for="fontUpload">Upload font</label><input type="file" id="fontUpload" accept=".ttf,.otf,font/ttf,font/otf"></div>
+                            <div class="form-row"><label>Font gallery</label><button type="button" id="openFontGallery">Open font gallery</button></div>
+                            <div id="fontGallery" class="font-gallery hidden"></div>
                             <div class="form-row"><label for="imageFontSize">Font size</label><input type="number" id="imageFontSize"></div>
                             <div class="form-row"><label for="imageLineSpacingMargin">Line spacing</label><input type="number" id="imageLineSpacingMargin"></div>
                             <div class="form-row"><label for="imageUppercase">Uppercase</label><input type="checkbox" id="imageUppercase"></div>

@@ -133,5 +133,33 @@ class WebApiTests(unittest.TestCase):
         list_images.assert_called_once_with(kind="turn")
 
 
+    @patch("vinylpi.web.routes.uploads_api.list_fonts")
+    def test_font_gallery_returns_available_fonts(self, list_fonts_mock):
+        list_fonts_mock.return_value = [
+            {
+                "filename": "vinylpixel.ttf",
+                "name": "vinylpixel",
+                "path": "assets/fonts/vinylpixel.ttf",
+                "preview_url": "/api/font-preview/vinylpixel.ttf",
+                "is_current": True,
+                "deletable": False,
+            }
+        ]
+
+        response = self.client.get("/api/fonts")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.get_json()["ok"])
+        self.assertEqual(response.get_json()["fonts"][0]["filename"], "vinylpixel.ttf")
+
+    @patch("vinylpi.web.routes.uploads_api.build_font_preview", return_value=None)
+    def test_missing_font_preview_returns_404(self, build_preview):
+        response = self.client.get("/api/font-preview/missing.ttf")
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.get_json()["error"], "font not found or invalid")
+
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -99,6 +99,17 @@ function setSelectedImagePath(inputId, pathId, path) {
     }
 }
 
+function setSelectedFontPath(path) {
+    const normalized = String(path || "").trim();
+    const input = document.getElementById("imageFontPath");
+    const label = document.getElementById("imageFontPathLabel");
+    if (input) input.value = normalized;
+    if (label) {
+        label.textContent = normalized || "No font selected";
+        label.title = normalized;
+    }
+}
+
 
 function formatDiscogsTimestamp(value) {
     const seconds = Number(value);
@@ -339,6 +350,123 @@ document.addEventListener("DOMContentLoaded", () => {
     return control;
   }
 
+  const fontUpload = document.getElementById("fontUpload");
+  const fontPathInput = document.getElementById("imageFontPath");
+  const openFontGallery = document.getElementById("openFontGallery");
+  const fontGallery = document.getElementById("fontGallery");
+
+  async function loadFontGallery() {
+    if (!fontGallery || !fontPathInput) return;
+    fontGallery.innerHTML = "Loading fonts …";
+    try {
+      const response = await fetch("/api/fonts", { cache: "no-store" });
+      const data = await response.json();
+      if (!response.ok || !data.ok) throw new Error(data.error || "Error");
+
+      const fonts = data.fonts || [];
+      if (!fonts.length) {
+        fontGallery.innerHTML = "<p>No fonts available.</p>";
+        return;
+      }
+
+      fontGallery.replaceChildren();
+      fonts.forEach((font) => {
+        const item = document.createElement("div");
+        const selected = font.path === fontPathInput.value;
+        item.className = `font-gallery-item${selected ? " current" : ""}`;
+        item.tabIndex = 0;
+        item.setAttribute("role", "button");
+        item.setAttribute("aria-label", `Use font ${font.name || font.filename}`);
+
+        const preview = document.createElement("img");
+        preview.src = `${font.preview_url}?v=${encodeURIComponent(font.filename)}`;
+        preview.alt = `Preview of ${font.name || font.filename}`;
+        preview.loading = "lazy";
+
+        const meta = document.createElement("div");
+        meta.className = "font-gallery-meta";
+        const name = document.createElement("strong");
+        name.textContent = font.name || font.filename;
+        const filename = document.createElement("span");
+        filename.textContent = font.filename;
+        meta.append(name, filename);
+
+        const selectFont = () => {
+          setSelectedFontPath(font.path);
+          fontGallery.querySelectorAll(".font-gallery-item").forEach((entry) => entry.classList.remove("current"));
+          item.classList.add("current");
+          showToast(`Font selected: ${font.name || font.filename}`);
+        };
+
+        item.addEventListener("click", selectFont);
+        item.addEventListener("keydown", (event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            selectFont();
+          }
+        });
+
+        item.append(preview, meta);
+
+        if (font.deletable) {
+          const deleteButton = document.createElement("button");
+          deleteButton.type = "button";
+          deleteButton.className = "gallery-delete";
+          deleteButton.textContent = "Delete";
+          deleteButton.addEventListener("click", async (event) => {
+            event.stopPropagation();
+            if (!confirm(`Delete font "${font.filename}"?`)) return;
+
+            const response = await fetch(`/api/font/${encodeURIComponent(font.filename)}`, { method: "DELETE" });
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok || !result.ok) {
+              showToast("Deletion failed: " + (result.error || "unknown error"), true);
+              return;
+            }
+            await loadConfig();
+            await loadFontGallery();
+            showToast(`Deleted ${font.filename}.`);
+          });
+          item.appendChild(deleteButton);
+        }
+        fontGallery.appendChild(item);
+      });
+    } catch (error) {
+      console.error(error);
+      fontGallery.innerHTML = "<p>Error loading font gallery.</p>";
+    }
+  }
+
+  openFontGallery?.addEventListener("click", async () => {
+    if (!fontGallery) return;
+    fontGallery.classList.toggle("hidden");
+    openFontGallery.textContent = fontGallery.classList.contains("hidden")
+      ? "Open font gallery"
+      : "Close font gallery";
+    if (!fontGallery.classList.contains("hidden")) await loadFontGallery();
+  });
+
+  fontUpload?.addEventListener("change", async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append("file", file);
+    try {
+      const response = await fetch("/api/font", { method: "POST", body: formData });
+      const data = await response.json();
+      if (!response.ok || !data.ok || !data.font_path) {
+        throw new Error(data.error || "unknown error");
+      }
+      setSelectedFontPath(data.font_path);
+      fontUpload.value = "";
+      if (fontGallery && !fontGallery.classList.contains("hidden")) await loadFontGallery();
+      showToast("Font uploaded and selected.");
+    } catch (error) {
+      console.error(error);
+      showToast(`Font upload failed: ${error.message || "network error"}`, true);
+    }
+  });
+
   setupFallbackImageControl({
     kind: "normal",
     uploadId: "fallbackUpload",
@@ -428,8 +556,7 @@ async function loadConfig() {
         image.margin_image_text ?? 3;
     document.getElementById("imageLineSpacingMargin").value =
         image.line_spacing_margin ?? 3;
-    document.getElementById("imageFontPath").value =
-        image.font_path || "";
+    setSelectedFontPath(image.font_path || "");
     document.getElementById("imageFontSize").value =
         image.font_size ?? 5;
 

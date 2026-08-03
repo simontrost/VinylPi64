@@ -16,6 +16,7 @@ FONTS_DIR = BASE_DIR / "assets" / "fonts"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 ALLOWED_EXT = {"png", "jpg", "jpeg"}
+ALLOWED_FONT_EXT = {"ttf", "otf"}
 
 CLOUD_BASE_URL = "https://app.divoom-gz.com"
 MB_URL = "https://musicbrainz.org/ws/2/recording"
