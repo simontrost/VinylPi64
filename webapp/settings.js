@@ -56,6 +56,49 @@ function syncAdaptiveSampleState() {
     });
 }
 
+function setDependentState(toggleId, rowName, enabledOverride = null) {
+    const toggle = document.getElementById(toggleId);
+    const details = document.querySelector(`[data-setting-row="${rowName}"]`);
+    if (!details) return;
+
+    const enabled = enabledOverride === null
+        ? Boolean(toggle?.checked)
+        : Boolean(enabledOverride);
+    details.classList.toggle("setting-disabled", !enabled);
+    details.setAttribute("aria-disabled", String(!enabled));
+    details.querySelectorAll("input, button, select, textarea").forEach((control) => {
+        control.disabled = !enabled;
+    });
+}
+
+function syncFallbackStates() {
+    const normalEnabled = Boolean(document.getElementById("fallbackEnabled")?.checked);
+    const turnEnabled = Boolean(document.getElementById("sideFlipEnabled")?.checked);
+    setDependentState("fallbackEnabled", "fallback-normal-details", normalEnabled);
+    setDependentState("sideFlipEnabled", "fallback-turn-details", turnEnabled);
+    setDependentState("fallbackEnabled", "fallback-shared-details", normalEnabled || turnEnabled);
+}
+
+function syncDependentSettingStates() {
+    syncAdaptiveSampleState();
+    syncFallbackStates();
+    setDependentState("discoveryEnabled", "discovery-details");
+    setDependentState("useHA", "ha-details");
+    setDependentState("debugLogs", "debug-details");
+    setDependentState("discogsEnabled", "discogs-details");
+}
+
+function setSelectedImagePath(inputId, pathId, path) {
+    const normalized = String(path || "").trim();
+    const input = document.getElementById(inputId);
+    const label = document.getElementById(pathId);
+    if (input) input.value = normalized;
+    if (label) {
+        label.textContent = normalized || "No image selected";
+        label.title = normalized;
+    }
+}
+
 
 function formatDiscogsTimestamp(value) {
     const seconds = Number(value);
@@ -158,129 +201,181 @@ async function startDiscogsSync() {
 
 
 document.addEventListener("DOMContentLoaded", () => {
-  const fallbackUploadInput = document.getElementById("fallbackUpload");
-  const fallbackPathInput = document.getElementById("fallbackImage");
-  const openGalleryBtn = document.getElementById("openFallbackGallery");
-  const galleryContainer = document.getElementById("fallbackGallery");
+  const galleryControls = [];
 
-  if (fallbackUploadInput) {
-    fallbackUploadInput.addEventListener("change", async (e) => {
-      const file = e.target.files[0];
+  async function reloadOpenGalleries() {
+    await Promise.all(galleryControls
+      .filter((control) => !control.gallery.classList.contains("hidden"))
+      .map((control) => control.loadGallery()));
+  }
+
+  function setupFallbackImageControl({
+    kind, uploadId, inputId, pathId, openId, galleryId, label,
+  }) {
+    const upload = document.getElementById(uploadId);
+    const pathInput = document.getElementById(inputId);
+    const openButton = document.getElementById(openId);
+    const gallery = document.getElementById(galleryId);
+    if (!upload || !pathInput || !openButton || !gallery) return null;
+
+    const control = { kind, gallery, loadGallery: null };
+
+    control.loadGallery = async () => {
+      gallery.innerHTML = "Loading images …";
+      try {
+        const response = await fetch(`/api/fallback-images?kind=${encodeURIComponent(kind)}`);
+        const data = await response.json();
+        if (!response.ok || !data.ok) throw new Error(data.error || "Error");
+
+        const images = data.images || [];
+        if (!images.length) {
+          gallery.innerHTML = "<p>No fallback images available.</p>";
+          return;
+        }
+
+        gallery.replaceChildren();
+        images.forEach((image) => {
+          const item = document.createElement("div");
+          const selected = image.path === pathInput.value;
+          item.className = `gallery-item selectable${selected ? " current" : ""}`;
+          item.tabIndex = 0;
+          item.setAttribute("role", "button");
+          item.setAttribute("aria-label", `Use ${image.filename} as ${label}`);
+
+          const thumbnail = document.createElement("img");
+          thumbnail.src = image.url;
+          thumbnail.alt = image.filename;
+
+          const name = document.createElement("div");
+          name.className = "gallery-filename";
+          name.textContent = image.filename;
+
+          const selectImage = () => {
+            setSelectedImagePath(inputId, pathId, image.path);
+            gallery.querySelectorAll(".gallery-item").forEach((entry) => entry.classList.remove("current"));
+            item.classList.add("current");
+            showToast(`${label} selected: ${image.filename}`);
+          };
+
+          item.addEventListener("click", selectImage);
+          item.addEventListener("keydown", (event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              selectImage();
+            }
+          });
+
+          const deleteButton = document.createElement("button");
+          deleteButton.type = "button";
+          deleteButton.className = "gallery-delete";
+          deleteButton.textContent = "Delete";
+          deleteButton.addEventListener("click", async (event) => {
+            event.stopPropagation();
+            if (!confirm(`Delete "${image.filename}"?`)) return;
+
+            const response = await fetch(`/api/fallback-image/${encodeURIComponent(image.filename)}`, {
+              method: "DELETE",
+            });
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok || !result.ok) {
+              showToast("Deletion failed: " + (result.error || "unknown error"), true);
+              return;
+            }
+
+            galleryControls.forEach((entry) => {
+              const selectedInput = document.getElementById(entry.inputId);
+              if (selectedInput?.value === image.path) {
+                setSelectedImagePath(entry.inputId, entry.pathId, "");
+              }
+            });
+            await reloadOpenGalleries();
+            showToast(`Deleted ${image.filename}.`);
+          });
+
+          item.append(thumbnail, name, deleteButton);
+          gallery.appendChild(item);
+        });
+      } catch (error) {
+        console.error(error);
+        gallery.innerHTML = "<p>Error loading gallery.</p>";
+      }
+    };
+
+    control.inputId = inputId;
+    control.pathId = pathId;
+    galleryControls.push(control);
+
+    upload.addEventListener("change", async (event) => {
+      const file = event.target.files?.[0];
       if (!file) return;
 
       const formData = new FormData();
       formData.append("file", file);
-
       try {
-        const res = await fetch("/api/fallback-image", {
+        const response = await fetch(`/api/fallback-image?kind=${encodeURIComponent(kind)}`, {
           method: "POST",
           body: formData,
         });
-        const data = await res.json();
-        if (data.ok && data.image_path) {
-          fallbackPathInput.value = data.image_path;
-          showToast("Fallback image updated.");
-          if (!galleryContainer.classList.contains("hidden")) {
-            await loadFallbackGallery();
-          }
-        } else {
-          showToast("Upload failed: " + (data.error || "unknown error"), true);
+        const data = await response.json();
+        if (!response.ok || !data.ok || !data.image_path) {
+          throw new Error(data.error || "unknown error");
         }
-      } catch (err) {
-        console.error(err);
-        showToast("Upload failed (network error).", true);
+        setSelectedImagePath(inputId, pathId, data.image_path);
+        upload.value = "";
+        await reloadOpenGalleries();
+        showToast(`${label} uploaded and selected.`);
+      } catch (error) {
+        console.error(error);
+        showToast(`Upload failed: ${error.message || "network error"}`, true);
       }
     });
-  }
 
-  async function loadFallbackGallery() {
-    galleryContainer.innerHTML = "Loading images …";
-    try {
-      const res = await fetch("/api/fallback-images");
-      const data = await res.json();
-      if (!data.ok) throw new Error(data.error || "Error");
-
-      const images = data.images || [];
-      if (!images.length) {
-        galleryContainer.innerHTML = "<p>No uploaded fallback images available.</p>";
-        return;
-      }
-
-      galleryContainer.innerHTML = "";
-      images.forEach(img => {
-        const item = document.createElement("div");
-        item.className = "gallery-item" + (img.is_current ? " current" : "");
-
-        const thumbnail = document.createElement("img");
-        thumbnail.src = img.url;
-        thumbnail.alt = img.filename;
-
-        const name = document.createElement("div");
-        name.textContent = img.filename;
-
-        const selectImage = () => {
-          fallbackPathInput.value = img.path;
-          document.querySelectorAll(".gallery-item").forEach(el => el.classList.remove("current"));
-          item.classList.add("current");
-          showToast(`Fallback image selected: ${img.filename}`);
-        };
-
-        item.classList.add("selectable");
-        item.tabIndex = 0;
-        item.setAttribute("role", "button");
-        item.setAttribute("aria-label", `Use ${img.filename} as fallback image`);
-        item.addEventListener("click", selectImage);
-        item.addEventListener("keydown", (event) => {
-          if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            selectImage();
-          }
-        });
-
-        const deleteBtn = document.createElement("button");
-        deleteBtn.type = "button";
-        deleteBtn.className = "gallery-delete";
-        deleteBtn.textContent = "Delete";
-        deleteBtn.addEventListener("click", async (event) => {
-          event.stopPropagation();
-          if (!confirm(`"${img.filename}" really delete?`)) return;
-          const res = await fetch(`/api/fallback-image/${encodeURIComponent(img.filename)}`, {
-            method: "DELETE",
-          });
-          const out = await res.json();
-          if (!out.ok) {
-            showToast("Deletion failed: " + (out.error || "unknown error"), true);
-          } else {
-            await loadFallbackGallery();
-          }
-        });
-
-        item.appendChild(thumbnail);
-        item.appendChild(name);
-        item.appendChild(deleteBtn);
-        galleryContainer.appendChild(item);
-      });
-    } catch (err) {
-      console.error(err);
-      galleryContainer.innerHTML = "<p>Error loading gallery.</p>";
-    }
-  }
-
-  if (openGalleryBtn && galleryContainer) {
-    openGalleryBtn.addEventListener("click", async () => {
-      galleryContainer.classList.toggle("hidden");
-      if (!galleryContainer.classList.contains("hidden")) {
-        await loadFallbackGallery();
-      }
+    openButton.addEventListener("click", async () => {
+      gallery.classList.toggle("hidden");
+      openButton.textContent = gallery.classList.contains("hidden") ? "Open gallery" : "Close gallery";
+      if (!gallery.classList.contains("hidden")) await control.loadGallery();
     });
+
+    return control;
   }
+
+  setupFallbackImageControl({
+    kind: "normal",
+    uploadId: "fallbackUpload",
+    inputId: "fallbackImage",
+    pathId: "fallbackImagePath",
+    openId: "openFallbackGallery",
+    galleryId: "fallbackGallery",
+    label: "Fallback image",
+  });
+  setupFallbackImageControl({
+    kind: "turn",
+    uploadId: "sideFlipUpload",
+    inputId: "sideFlipImage",
+    pathId: "sideFlipImagePath",
+    openId: "openSideFlipGallery",
+    galleryId: "sideFlipGallery",
+    label: "Turn-record image",
+  });
 
   ["useDynamicBg", "useDynamicText"].forEach((id) => {
     document.getElementById(id)?.addEventListener("change", syncAllManualColorStates);
   });
-  document.getElementById("adaptiveSampleEnabled")?.addEventListener("change", syncAdaptiveSampleState);
+  [
+    "adaptiveSampleEnabled",
+    "fallbackEnabled",
+    "sideFlipEnabled",
+    "discoveryEnabled",
+    "useHA",
+    "debugLogs",
+    "discogsEnabled",
+  ].forEach((id) => {
+    document.getElementById(id)?.addEventListener("change", syncDependentSettingStates);
+  });
+
   document.getElementById("discogsConnect")?.addEventListener("click", connectDiscogs);
   document.getElementById("discogsSync")?.addEventListener("click", startDiscogsSync);
+  syncDependentSettingStates();
   loadDiscogsStatus();
 });
 
@@ -363,10 +458,18 @@ async function loadConfig() {
     // FALLBACK
     document.getElementById("fallbackEnabled").checked =
         !!fallback.enabled;
-    document.getElementById("fallbackImage").value =
-        fallback.image_path || "";
-    document.getElementById("sideFlipImage").value =
-        fallback.side_flip_image_path || "assets/fallback/turn_record.png";
+    document.getElementById("sideFlipEnabled").checked =
+        fallback.side_flip_enabled !== false;
+    setSelectedImagePath(
+        "fallbackImage",
+        "fallbackImagePath",
+        fallback.image_path || "",
+    );
+    setSelectedImagePath(
+        "sideFlipImage",
+        "sideFlipImagePath",
+        fallback.side_flip_image_path || "assets/fallback/turn_record.png",
+    );
     document.getElementById("fallbackAllowedFailures").value =
         fallback.allowed_failures ?? 3;
 
@@ -426,6 +529,8 @@ async function loadConfig() {
         homeassistant.base_url || "";
     document.getElementById("webHookID").value =
         homeassistant.webhook_id || "";
+
+    syncDependentSettingStates();
 }
 
 document.getElementById("settings-form").addEventListener("submit", async (e) => {
@@ -516,10 +621,14 @@ document.getElementById("settings-form").addEventListener("submit", async (e) =>
         document.getElementById("fallbackEnabled").checked;
     fallback.image_path =
         document.getElementById("fallbackImage").value;
+    fallback.side_flip_enabled =
+        document.getElementById("sideFlipEnabled").checked;
     fallback.side_flip_image_path =
         document.getElementById("sideFlipImage").value || "assets/fallback/turn_record.png";
-    fallback.allowed_failures =
-        parseInt(document.getElementById("fallbackAllowedFailures").value) || 3;
+    fallback.allowed_failures = Math.max(
+        1,
+        parseInt(document.getElementById("fallbackAllowedFailures").value, 10) || 3,
+    );
 
     // DIVOOM
     divoom.ip =

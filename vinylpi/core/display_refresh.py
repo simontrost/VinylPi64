@@ -4,7 +4,7 @@ import os
 import threading
 import time
 
-from vinylpi.core.display import show_side_flip_prompt, start_scrolling_display
+from vinylpi.core.display import show_fallback_image, show_side_flip_prompt, start_scrolling_display
 from vinylpi.core.image_utils import load_image
 from vinylpi.core.stats_db import get_current_status
 from vinylpi.paths import DISPLAY_REFRESH_PATH
@@ -36,11 +36,16 @@ def refresh_current_display() -> bool:
     # A side-flip prompt is a real display state. Refreshing settings or
     # restarting the recognizer must not replace it with the last song.
     if bool(status.get("side_flip_prompt_active")):
-        show_side_flip_prompt(
+        shown = show_side_flip_prompt(
             status.get("side_flip_to_side"),
             next_position=status.get("side_flip_next_position"),
         )
-        return True
+        if shown:
+            return True
+        # If the turn-record image was disabled while it was active, fall back
+        # to the independently configured generic fallback instead.
+        if show_fallback_image():
+            return True
 
     artist = str(status.get("artist") or "").strip()
     title = str(status.get("title") or "").strip()

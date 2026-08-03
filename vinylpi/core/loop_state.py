@@ -6,6 +6,8 @@ class LoopConfig:
     delay: int = 10
     debug_log: bool = False
     fallback_allowed_failures: int = 3
+    fallback_enabled: bool = True
+    side_flip_enabled: bool = True
     auto_sleep: int = 50
     base_sample_seconds: float = 4.0
     adaptive_sample_enabled: bool = False
@@ -42,7 +44,9 @@ class LoopConfig:
         return LoopConfig(
             delay=int(behavior.get("loop_delay_seconds", 10)),
             debug_log=bool(debug.get("logs", False)),
-            fallback_allowed_failures=int(fallback.get("allowed_failures", 3)),
+            fallback_allowed_failures=max(1, int(fallback.get("allowed_failures", 3))),
+            fallback_enabled=bool(fallback.get("enabled", True)),
+            side_flip_enabled=bool(fallback.get("side_flip_enabled", True)),
             auto_sleep=int(behavior.get("auto_sleep", 50)),
             base_sample_seconds=max(0.5, float(audio.get("sample_seconds", 4))),
             adaptive_sample_enabled=bool(adaptive.get("enabled", False)),

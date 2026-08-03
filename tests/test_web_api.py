@@ -14,6 +14,7 @@ if Flask is not None:
     from vinylpi.web.routes.genius_api import genius_bp
     from vinylpi.web.routes.pixoo_api import pixoo_bp
     from vinylpi.web.routes.status_api import status_bp
+    from vinylpi.web.routes.uploads_api import uploads_bp
 
 
 @unittest.skipIf(Flask is None, "Flask is not installed")
@@ -21,7 +22,7 @@ class WebApiTests(unittest.TestCase):
     def setUp(self):
         app = Flask(__name__)
         app.config.update(TESTING=True)
-        for blueprint in (config_bp, genius_bp, pixoo_bp, status_bp):
+        for blueprint in (config_bp, genius_bp, pixoo_bp, status_bp, uploads_bp):
             app.register_blueprint(blueprint)
         self.client = app.test_client()
 
@@ -114,6 +115,22 @@ class WebApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json(), {"ok": True, "lyrics": "Words"})
         get_lyrics.assert_called_once_with("Artist", "Song")
+
+    def test_fallback_gallery_rejects_unknown_kind(self):
+        response = self.client.get("/api/fallback-images?kind=unknown")
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.get_json()["error"], "invalid kind")
+
+    @patch("vinylpi.web.routes.uploads_api.list_fallback_images")
+    def test_turn_record_gallery_passes_kind_to_service(self, list_images):
+        list_images.return_value = []
+
+        response = self.client.get("/api/fallback-images?kind=turn")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["kind"], "turn")
+        list_images.assert_called_once_with(kind="turn")
 
 
 if __name__ == "__main__":

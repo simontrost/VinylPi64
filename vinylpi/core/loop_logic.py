@@ -56,30 +56,41 @@ def handle_no_result(
         and (not disp.last_display_was_fallback or cfg_reloaded)
     )
     if fallback_due:
+        use_side_flip = bool(side_flip_prompt and cfg.side_flip_enabled)
+        use_normal_fallback = bool(cfg.fallback_enabled)
+
         if cfg.debug_log:
             if cfg_reloaded and disp.last_display_was_fallback:
-                print("Config changed while in fallback, refreshing fallback image.")
-            elif side_flip_prompt:
+                print("Config changed while in fallback, refreshing fallback display.")
+            elif use_side_flip:
                 print("Switching to side-flip prompt image.")
-            else:
+            elif use_normal_fallback:
                 print("Switching to fallback image.")
+            else:
+                print("Fallback displays are disabled; keeping the current Pixoo image.")
 
-        if side_flip_prompt:
-            show_side_flip_prompt(
+        display_shown = False
+        if use_side_flip:
+            display_shown = show_side_flip_prompt(
                 side_flip_prompt.get("to_side"),
                 next_position=side_flip_prompt.get("next_position"),
             )
-            write_side_flip_prompt(
-                from_side=side_flip_prompt.get("from_side"),
-                to_side=side_flip_prompt.get("to_side"),
-                next_title=side_flip_prompt.get("next_title"),
-                next_position=side_flip_prompt.get("next_position"),
-            )
+            if display_shown is not False:
+                write_side_flip_prompt(
+                    from_side=side_flip_prompt.get("from_side"),
+                    to_side=side_flip_prompt.get("to_side"),
+                    next_title=side_flip_prompt.get("next_title"),
+                    next_position=side_flip_prompt.get("next_position"),
+                )
+        elif use_normal_fallback:
+            clear_side_flip_prompt()
+            display_shown = show_fallback_image()
         else:
             clear_side_flip_prompt()
-            show_fallback_image()
 
-        disp.last_display_was_fallback = True
+        # Mocked display functions in unit tests return a MagicMock; only an
+        # explicit False means that no frame reached the Pixoo.
+        disp.last_display_was_fallback = display_shown is not False
         disp.last_display_was_inferred = False
 
     if cfg.auto_sleep > 0 and disp.consecutive_failures >= cfg.auto_sleep:

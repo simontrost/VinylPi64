@@ -40,7 +40,10 @@ def api_config_update():
     data = _strip_read_only_and_sensitive_fields(data if isinstance(data, dict) else {})
     before = read_config(force=True)
     updated = write_config(data)
-    display_changed = before.get("image") != updated.get("image")
+    display_changed = (
+        before.get("image") != updated.get("image")
+        or before.get("fallback") != updated.get("fallback")
+    )
     if display_changed:
         request_display_refresh()
     return jsonify({"ok": True, "display_refresh_requested": display_changed})
@@ -50,7 +53,10 @@ def api_config_update():
 def api_config_reset():
     before = read_config(force=True)
     updated = reset_config()
-    display_changed = before.get("image") != updated.get("image")
+    display_changed = (
+        before.get("image") != updated.get("image")
+        or before.get("fallback") != updated.get("fallback")
+    )
     if display_changed:
         request_display_refresh()
     return jsonify({"ok": True, "display_refresh_requested": display_changed})

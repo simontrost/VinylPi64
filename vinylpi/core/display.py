@@ -217,7 +217,7 @@ def start_scrolling_display(cover_img: Image.Image, artist: str, title: str) -> 
         _scroll_thread.start()
 
 
-def _send_static_frame(frame: Image.Image, *, debug_label: str | None = None) -> None:
+def _send_static_frame(frame: Image.Image, *, debug_label: str | None = None) -> bool:
     cfg = read_config()
     debug_log = bool(cfg["debug"]["logs"])
 
@@ -227,9 +227,11 @@ def _send_static_frame(frame: Image.Image, *, debug_label: str | None = None) ->
             _get_pixoo().send_frame(frame)
             if debug_log and debug_label:
                 print(debug_label)
+            return True
         except Exception as exc:
             _reset_pixoo_client()
             print(f"Error showing static Pixoo image: {exc}")
+            return False
 
 
 def _generate_side_flip_prompt_frame(
@@ -272,6 +274,66 @@ def _generate_side_flip_prompt_frame(
     return img
 
 
+def _overlay_side_letter(frame: Image.Image, next_side: str | None) -> Image.Image:
+    """Insert the target side into the blank badge of the turn-record asset.
+
+    The bundled image intentionally contains only ``SIDE``. The final letter is
+    rendered with the same configured pixel font used by the normal Pixoo
+    frames, so B, D, F and later paired sides share one reusable image.
+    """
+    side = str(next_side or "?").strip().upper()[:1] or "?"
+    width, height = frame.size
+    scale_x = width / 64.0
+    scale_y = height / 64.0
+
+    slot_left = max(0, round(38 * scale_x))
+    slot_top = max(0, round(54 * scale_y))
+    slot_right = min(width - 1, round(42 * scale_x))
+    slot_bottom = min(height - 1, round(58 * scale_y))
+
+    # Clear the slot first as a compatibility measure for older templates that
+    # already contained a fixed "B". The darkest nearby badge pixel is a good
+    # match for the badge interior without hard-coding the uploaded image color.
+    sample_left = max(0, slot_left - 1)
+    sample_top = max(0, slot_top - 1)
+    sample_right = min(width - 1, slot_right + 1)
+    sample_bottom = min(height - 1, slot_bottom + 1)
+    samples = [
+        frame.getpixel((x, y))
+        for y in range(sample_top, sample_bottom + 1)
+        for x in range(sample_left, sample_right + 1)
+    ]
+    badge_background = min(samples, key=lambda rgb: sum(rgb)) if samples else (0, 0, 8)
+
+    # Reuse the dominant bright/chromatic color from the existing SIDE label.
+    label_left = max(0, round(21 * scale_x))
+    label_top = max(0, round(54 * scale_y))
+    label_right = min(width - 1, round(36 * scale_x))
+    label_bottom = min(height - 1, round(58 * scale_y))
+    label_pixels = [
+        frame.getpixel((x, y))
+        for y in range(label_top, label_bottom + 1)
+        for x in range(label_left, label_right + 1)
+    ]
+    accent = max(
+        label_pixels,
+        key=lambda rgb: (max(rgb) - min(rgb)) * 3 + sum(rgb),
+        default=(224, 151, 44),
+    )
+
+    draw = ImageDraw.Draw(frame)
+    draw.rectangle((slot_left, slot_top, slot_right, slot_bottom), fill=badge_background)
+
+    font, _ = _get_font_for_config()
+    bbox = draw.textbbox((0, 0), side, font=font)
+    text_width = bbox[2] - bbox[0]
+    text_height = bbox[3] - bbox[1]
+    x = slot_left + max(0, (slot_right - slot_left + 1 - text_width) // 2) - bbox[0]
+    y = slot_top + max(0, (slot_bottom - slot_top + 1 - text_height) // 2) - bbox[1]
+    draw.text((x, y), side, font=font, fill=accent)
+    return frame
+
+
 def _load_side_flip_prompt_frame(
     next_side: str | None,
     *,
@@ -287,28 +349,7 @@ def _load_side_flip_prompt_frame(
             frame = Image.open(path).convert("RGB")
             if frame.size != (size, size):
                 frame = frame.resize((size, size), Image.Resampling.NEAREST)
-
-            # The bundled asset contains a bottom badge. Repaint its center so
-            # the same image can be used for A -> B and C -> D transitions.
-            draw = ImageDraw.Draw(frame)
-            badge_left = max(1, int(size * 0.245))
-            badge_top = max(1, int(size * 0.82))
-            badge_right = min(size - 2, int(size * 0.755))
-            badge_bottom = min(size - 2, int(size * 0.955))
-            draw.rectangle(
-                (badge_left, badge_top, badge_right, badge_bottom),
-                fill=(10, 8, 17),
-            )
-
-            font, _ = _get_font_for_config()
-            side_label = f"SIDE {str(next_side or '?').upper()}"
-            bbox = draw.textbbox((0, 0), side_label, font=font)
-            text_width = bbox[2] - bbox[0]
-            text_height = bbox[3] - bbox[1]
-            x = max(1, (size - text_width) // 2)
-            y = badge_top + max(0, (badge_bottom - badge_top - text_height) // 2) - bbox[1]
-            draw.text((x, y), side_label, font=font, fill=(245, 197, 66))
-            return frame
+            return _overlay_side_letter(frame, next_side)
         except Exception as exc:
             if bool(cfg["debug"]["logs"]):
                 print(f"Could not load side-flip image '{path}': {exc}; using generated prompt.")
@@ -316,26 +357,32 @@ def _load_side_flip_prompt_frame(
     return _generate_side_flip_prompt_frame(next_side, next_position=next_position)
 
 
-def show_side_flip_prompt(next_side: str | None, *, next_position: str | None = None) -> None:
+def show_side_flip_prompt(next_side: str | None, *, next_position: str | None = None) -> bool:
+    cfg = read_config()
+    fallback_cfg = cfg.get("fallback") or {}
+    if not bool(fallback_cfg.get("side_flip_enabled", True)):
+        if bool(cfg["debug"]["logs"]):
+            print("Turn-record fallback disabled in config, nothing to show.")
+        return False
+
     frame = _load_side_flip_prompt_frame(next_side, next_position=next_position)
     label = f"Side-flip prompt for side {next_side or '?'} sent to Pixoo."
-    _send_static_frame(frame, debug_label=label)
+    return _send_static_frame(frame, debug_label=label)
 
-
-def show_fallback_image() -> None:
+def show_fallback_image() -> bool:
     cfg = read_config()
     debug_log = bool(cfg["debug"]["logs"])
     fallback_cfg = cfg.get("fallback") or {}
     if not fallback_cfg.get("enabled", False):
         if debug_log:
             print("Fallback disabled in config, nothing to show.")
-        return
+        return False
 
     path = fallback_cfg.get("image_path")
     if not path:
         if debug_log:
             print("Fallback image path not set.")
-        return
+        return False
 
     size = int(cfg["image"]["canvas_size"])
 
@@ -345,7 +392,11 @@ def show_fallback_image() -> None:
             (size, size),
             Image.Resampling.NEAREST,
         )
-        _send_static_frame(fallback_resized, debug_label=f"Fallback image '{path}' sent to Pixoo.")
+        return _send_static_frame(
+            fallback_resized,
+            debug_label=f"Fallback image '{path}' sent to Pixoo.",
+        )
     except Exception as exc:
         _reset_pixoo_client()
         print(f"Error showing fallback image: {exc}")
+        return False

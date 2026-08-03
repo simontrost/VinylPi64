@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 from unittest.mock import patch
 
+from vinylpi.core.discogs_matcher import _is_turn_record_transition
 from vinylpi.core.loop_logic import (
     handle_no_result,
     should_update_display,
@@ -42,6 +43,34 @@ class LoopConfigTests(unittest.TestCase):
         self.assertEqual(cfg.base_sample_seconds, 0.5)
         self.assertEqual(cfg.adaptive_failure_durations, (7.0, 0.5))
         self.assertEqual(cfg.stats_min_consecutive, 2)
+
+    def test_from_config_reads_independent_fallback_switches(self):
+        cfg = LoopConfig.from_config(
+            {
+                "fallback": {
+                    "enabled": False,
+                    "side_flip_enabled": True,
+                    "allowed_failures": 0,
+                }
+            }
+        )
+
+        self.assertFalse(cfg.fallback_enabled)
+        self.assertTrue(cfg.side_flip_enabled)
+        self.assertEqual(cfg.fallback_allowed_failures, 1)
+
+
+class SideFlipTransitionTests(unittest.TestCase):
+    def test_all_paired_record_sides_are_supported(self):
+        self.assertTrue(_is_turn_record_transition("A", "B"))
+        self.assertTrue(_is_turn_record_transition("C", "D"))
+        self.assertTrue(_is_turn_record_transition("E", "F"))
+
+    def test_cross_record_and_reverse_transitions_are_not_prompts(self):
+        self.assertFalse(_is_turn_record_transition("B", "C"))
+        self.assertFalse(_is_turn_record_transition("D", "C"))
+        self.assertFalse(_is_turn_record_transition("F", "G"))
+
 
 
 class DisplayDecisionTests(unittest.TestCase):
@@ -140,6 +169,24 @@ class NoResultTests(unittest.TestCase):
         disp = DisplayState(consecutive_failures=1)
 
         self.assertTrue(handle_no_result(cfg, disp, cfg_reloaded=False))
+
+    @patch("vinylpi.core.loop_logic.clear_side_flip_prompt")
+    @patch("vinylpi.core.loop_logic.show_fallback_image")
+    def test_disabled_fallback_keeps_current_display(self, show_fallback, clear_prompt):
+        cfg = LoopConfig(
+            fallback_allowed_failures=1,
+            fallback_enabled=False,
+            side_flip_enabled=False,
+            auto_sleep=10,
+        )
+        disp = DisplayState()
+
+        handle_no_result(cfg, disp, cfg_reloaded=False)
+
+        show_fallback.assert_not_called()
+        clear_prompt.assert_called_once_with()
+        self.assertFalse(disp.last_display_was_fallback)
+
 
 
 class StatisticsSwitchTests(unittest.TestCase):

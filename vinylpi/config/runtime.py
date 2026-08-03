@@ -73,20 +73,36 @@ def _atomic_write_json(path: Path, obj: Dict[str, Any]) -> None:
     os.replace(tmp, path)
 
 
-def set_fallback_image_path(rel_path: str) -> bool:
+_FALLBACK_PATH_FIELDS = {
+    "normal": "image_path",
+    "turn": "side_flip_image_path",
+}
+
+
+def normalize_fallback_kind(kind: str | None) -> str:
+    value = str(kind or "normal").strip().casefold()
+    if value not in _FALLBACK_PATH_FIELDS:
+        raise ValueError("invalid fallback image kind")
+    return value
+
+
+def set_fallback_image_path(rel_path: str, *, kind: str = "normal") -> bool:
+    selected_kind = normalize_fallback_kind(kind)
     try:
         cfg = read_config()
     except Exception:
         cfg = json.loads(json.dumps(CONFIG_DEFAULTS))
 
     cfg.setdefault("fallback", {})
-    cfg["fallback"]["image_path"] = rel_path
+    cfg["fallback"][_FALLBACK_PATH_FIELDS[selected_kind]] = rel_path
     write_config(cfg)
     return True
 
-def get_current_fallback_path() -> str | None:
+
+def get_current_fallback_path(*, kind: str = "normal") -> str | None:
+    selected_kind = normalize_fallback_kind(kind)
     try:
         cfg = read_config()
-        return (cfg.get("fallback") or {}).get("image_path") or None
+        return (cfg.get("fallback") or {}).get(_FALLBACK_PATH_FIELDS[selected_kind]) or None
     except Exception:
         return None

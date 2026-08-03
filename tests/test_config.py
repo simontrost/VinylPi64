@@ -105,8 +105,20 @@ class RuntimeConfigTests(unittest.TestCase):
 
     def test_fallback_path_helpers_round_trip(self):
         runtime.set_fallback_image_path("assets/fallback/custom.png")
+        runtime.set_fallback_image_path(
+            "assets/fallback/custom_turn.png",
+            kind="turn",
+        )
 
         self.assertEqual(runtime.get_current_fallback_path(), "assets/fallback/custom.png")
+        self.assertEqual(
+            runtime.get_current_fallback_path(kind="turn"),
+            "assets/fallback/custom_turn.png",
+        )
+
+    def test_invalid_fallback_kind_is_rejected(self):
+        with self.assertRaises(ValueError):
+            runtime.get_current_fallback_path(kind="other")
 
 
 if __name__ == "__main__":

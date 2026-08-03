@@ -411,6 +411,9 @@ def get_side_flip_prompt(
         return None
 
     fallback_cfg = config.get("fallback") or {}
+    if not bool(fallback_cfg.get("side_flip_enabled", True)):
+        return None
+
     try:
         allowed_failures = max(1, int(fallback_cfg.get("allowed_failures", 3)))
     except (TypeError, ValueError):

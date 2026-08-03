@@ -66,7 +66,8 @@ CONFIG_DEFAULTS = {
     },
     "fallback": {
         "enabled": True,
-        "image_path": "assets/fallback/fallback.png",
+        "image_path": "assets/fallback/Fallback.png",
+        "side_flip_enabled": True,
         "side_flip_image_path": "assets/fallback/turn_record.png",
         "allowed_failures": 3
     },
