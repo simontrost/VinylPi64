@@ -747,3 +747,59 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 });
 
+
+// Mobile settings use a category-first view instead of one long page.
+document.addEventListener("DOMContentLoaded", () => {
+    const form = document.getElementById("settings-form");
+    const detailHeader = form?.querySelector(".mobile-settings-detail-header");
+    const currentLabel = form?.querySelector(".mobile-settings-current");
+    const backButton = form?.querySelector(".mobile-settings-back");
+    const categoryButtons = form?.querySelectorAll("[data-settings-target]") || [];
+
+    if (!form || !detailHeader || !backButton) return;
+
+    const openCategory = (targetId, label) => {
+        const target = document.getElementById(targetId);
+        if (!target) return;
+
+        form.querySelectorAll(".settings-card.mobile-selected-category").forEach((card) => {
+            card.classList.remove("mobile-selected-category");
+        });
+        target.classList.add("mobile-selected-category", "is-open");
+        target.querySelector(".settings-card-header")?.setAttribute("aria-expanded", "true");
+        form.classList.add("mobile-category-open");
+        detailHeader.hidden = false;
+        if (currentLabel) currentLabel.textContent = label || "Settings";
+        window.scrollTo({ top: 0, behavior: "smooth" });
+    };
+
+    const closeCategory = () => {
+        form.classList.remove("mobile-category-open");
+        detailHeader.hidden = true;
+        form.querySelectorAll(".settings-card.mobile-selected-category").forEach((card) => {
+            card.classList.remove("mobile-selected-category");
+        });
+        window.scrollTo({ top: 0, behavior: "smooth" });
+    };
+
+    categoryButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+            openCategory(
+                button.dataset.settingsTarget,
+                button.querySelector("strong")?.textContent?.trim(),
+            );
+        });
+    });
+
+    backButton.addEventListener("click", closeCategory);
+
+    const hashTarget = window.location.hash.replace("#", "");
+    if (window.matchMedia("(max-width: 760px)").matches && hashTarget) {
+        const matchingButton = [...categoryButtons].find(
+            (button) => button.dataset.settingsTarget === hashTarget,
+        );
+        if (matchingButton) {
+            openCategory(hashTarget, matchingButton.querySelector("strong")?.textContent?.trim());
+        }
+    }
+});

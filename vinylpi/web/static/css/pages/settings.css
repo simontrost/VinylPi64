@@ -1175,3 +1175,185 @@
         min-height: 44px;
     }
 }
+
+/* Mobile category-first settings navigation */
+.mobile-settings-menu,
+.mobile-settings-detail-header {
+    display: none;
+}
+
+@media (max-width: 760px) {
+    .mobile-settings-menu {
+        display: block;
+        margin-bottom: 18px;
+        padding: 18px;
+        border: 1px solid var(--border);
+        border-radius: 22px;
+        background: linear-gradient(180deg, rgba(31, 31, 39, 0.98), rgba(25, 25, 33, 0.98));
+        box-shadow: var(--shadow);
+    }
+
+    .mobile-settings-menu-copy h2 {
+        margin: 3px 0 7px;
+        font-size: 21px;
+    }
+
+    .mobile-settings-menu-copy p {
+        margin: 0 0 16px;
+        font-size: 13px;
+        line-height: 1.5;
+    }
+
+    .mobile-settings-eyebrow {
+        color: var(--yellow);
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: .1em;
+        text-transform: uppercase;
+    }
+
+    .mobile-settings-categories {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+    }
+
+    .mobile-settings-category {
+        display: grid;
+        grid-template-columns: 38px minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 10px;
+        min-height: 76px;
+        padding: 12px;
+        text-align: left;
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.035);
+        border-color: rgba(255, 255, 255, 0.08);
+    }
+
+    .mobile-settings-category:hover {
+        background: rgba(255, 255, 255, 0.06);
+        border-color: rgba(245, 197, 66, 0.25);
+    }
+
+    .mobile-settings-category-icon {
+        display: grid;
+        place-items: center;
+        width: 38px;
+        height: 38px;
+        border-radius: 12px;
+        color: var(--yellow);
+        background: rgba(245, 197, 66, 0.08);
+        border: 1px solid rgba(245, 197, 66, 0.16);
+    }
+
+    .mobile-settings-category-icon svg {
+        width: 20px;
+        height: 20px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.8;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
+
+    .mobile-settings-category strong,
+    .mobile-settings-category small {
+        display: block;
+    }
+
+    .mobile-settings-category strong {
+        font-size: 13px;
+        line-height: 1.2;
+    }
+
+    .mobile-settings-category small {
+        margin-top: 4px;
+        color: var(--muted);
+        font-size: 10px;
+        line-height: 1.25;
+    }
+
+    .mobile-settings-arrow {
+        color: var(--muted-2);
+        font-size: 21px;
+        line-height: 1;
+    }
+
+    #settings-form:not(.mobile-category-open) .settings-grid {
+        display: none;
+    }
+
+    #settings-form.mobile-category-open .mobile-settings-menu {
+        display: none;
+    }
+
+    #settings-form.mobile-category-open .mobile-settings-detail-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 12px;
+    }
+
+    .mobile-settings-back {
+        min-height: 38px;
+        padding: 7px 11px;
+        border-radius: 12px;
+        color: var(--text);
+        background: rgba(255, 255, 255, 0.05);
+    }
+
+    .mobile-settings-back span {
+        margin-right: 4px;
+        color: var(--yellow);
+        font-size: 20px;
+        vertical-align: -1px;
+    }
+
+    .mobile-settings-current {
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 700;
+    }
+
+    #settings-form.mobile-category-open .settings-grid {
+        display: block;
+    }
+
+    #settings-form.mobile-category-open .settings-card {
+        display: none;
+    }
+
+    #settings-form.mobile-category-open .settings-card.mobile-selected-category {
+        display: block;
+    }
+
+    #settings-form.mobile-category-open .settings-card.mobile-selected-category .settings-card-content {
+        display: block;
+    }
+
+    #settings-form.mobile-category-open .settings-card.mobile-selected-category .chevron {
+        transform: rotate(180deg);
+        color: var(--pink);
+    }
+
+    #settings-form.mobile-category-open .settings-actions {
+        display: grid;
+        margin-top: 14px;
+    }
+
+    .settings-side-panel {
+        display: none;
+    }
+}
+
+@media (max-width: 430px) {
+    .mobile-settings-categories {
+        grid-template-columns: 1fr;
+    }
+
+    .mobile-settings-category {
+        min-height: 68px;
+    }
+}

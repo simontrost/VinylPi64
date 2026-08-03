@@ -415,29 +415,29 @@ textarea:focus-visible {
 
     .nav {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 88px minmax(0, 1fr) minmax(0, 1fr);
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 70px minmax(0, 1fr) minmax(0, 1fr);
         align-items: end;
         gap: 0;
         width: 100%;
         min-height: 72px;
     }
 
-    .nav a[href="settings.html"] { order: 1; }
-    .nav a[href="pixoo.html"] { order: 2; }
-    .nav a[href="index.html"] { order: 3; }
-    .nav a[href="stats.html"] { order: 4; }
-    .nav a[href="about.html"] { order: 5; }
+    .nav a:nth-child(2) { order: 1; }
+    .nav a:nth-child(3) { order: 2; }
+    .nav a.nav-center { order: 3; }
+    .nav a:nth-child(4) { order: 4; }
+    .nav a:nth-child(5) { order: 5; }
 
     .nav a {
         width: 100%;
         min-width: 0;
-        min-height: 64px;
+        min-height: 60px;
         padding: 2px 1px 8px;
         border: 0;
         border-radius: 16px;
         background: transparent;
         color: var(--muted);
-        font-size: 11px;
+        font-size: 10px;
         font-weight: 700;
         flex-direction: column;
         justify-content: center;
@@ -457,9 +457,14 @@ textarea:focus-visible {
     }
 
     .nav-icon {
-        width: 22px;
-        height: 22px;
+        width: 19px;
+        height: 19px;
         opacity: 0.95;
+    }
+
+    .nav-icon svg {
+        width: 18px;
+        height: 18px;
     }
 
     .nav a:not(.nav-center).active {
@@ -478,27 +483,27 @@ textarea:focus-visible {
     }
 
     .nav a.nav-center {
-        width: 88px;
+        width: 70px;
         gap: 3px;
-        margin-top: -31px;
+        margin-top: -20px;
         justify-self: center;
         padding-bottom: 3px;
         color: var(--text);
     }
 
     .nav-center .nav-orb {
-        width: 74px;
-        height: 74px;
-        border-radius: 50%;
-        background: linear-gradient(180deg, #f1b476, #dda367);
+        width: 58px;
+        height: 58px;
+        border-radius: 18px;
+        background: linear-gradient(145deg, rgba(124, 58, 237, 0.95), rgba(239, 45, 143, 0.88));
         border: 1px solid rgba(255,255,255,0.16);
-        box-shadow: 0 12px 26px rgba(0, 0, 0, 0.35);
-        color: #2d170a;
+        box-shadow: 0 9px 22px rgba(0, 0, 0, 0.34), 0 0 18px rgba(239, 45, 143, 0.12);
+        color: #fff;
     }
 
     .nav-center .nav-orb svg {
-        width: 26px;
-        height: 26px;
+        width: 22px;
+        height: 22px;
         stroke-width: 2;
     }
 
@@ -507,7 +512,7 @@ textarea:focus-visible {
     }
 
     .nav a.nav-center.active .nav-orb {
-        background: linear-gradient(180deg, #f4ba7d, #e2aa6f);
+        background: linear-gradient(145deg, #8b4cf0, #ef2d8f);
     }
 
     .main {
