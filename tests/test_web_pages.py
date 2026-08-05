@@ -70,6 +70,13 @@ class WebPageStructureTests(unittest.TestCase):
         self.assertIn('Add to Discogs', html)
         self.assertIn('target="_blank"', html)
 
+    def test_stats_page_contains_share_button(self):
+        response = self.client.get("/stats.html")
+        html = response.get_data(as_text=True)
+
+        self.assertIn('id="stats-share-button"', html)
+        self.assertIn('Share', html)
+
 
 if __name__ == "__main__":
     unittest.main()

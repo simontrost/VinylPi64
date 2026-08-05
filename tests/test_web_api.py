@@ -14,6 +14,7 @@ if Flask is not None:
     from vinylpi.web.routes.genius_api import genius_bp
     from vinylpi.web.routes.pixoo_api import pixoo_bp
     from vinylpi.web.routes.profiles_api import profiles_bp
+    from vinylpi.web.routes.stats_api import stats_bp
     from vinylpi.web.routes.status_api import status_bp
     from vinylpi.web.routes.uploads_api import uploads_bp
 
@@ -23,7 +24,7 @@ class WebApiTests(unittest.TestCase):
     def setUp(self):
         app = Flask(__name__)
         app.config.update(TESTING=True)
-        for blueprint in (config_bp, genius_bp, pixoo_bp, profiles_bp, status_bp, uploads_bp):
+        for blueprint in (config_bp, genius_bp, pixoo_bp, profiles_bp, stats_bp, status_bp, uploads_bp):
             app.register_blueprint(blueprint)
         self.client = app.test_client()
 
@@ -172,6 +173,15 @@ class WebApiTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json()["active_profile"]["name"], "Default")
+
+    @patch("vinylpi.web.routes.stats_api.build_share_card_image", return_value=b"png-bytes")
+    def test_stats_share_card_endpoint_returns_png(self, build_share_card_image_mock):
+        response = self.client.get("/api/stats/share-card")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.mimetype, "image/png")
+        self.assertEqual(response.data, b"png-bytes")
+        build_share_card_image_mock.assert_called_once_with()
 
     @patch("vinylpi.web.routes.profiles_api.SYNC_MANAGER.is_syncing", return_value=False)
     @patch("vinylpi.web.routes.profiles_api._switch_profile")

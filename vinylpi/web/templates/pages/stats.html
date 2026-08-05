@@ -20,12 +20,25 @@
 
     <section class="page-intro page-intro-single">
         <div class="stats-minutes-card page-intro-copy">
-            <span class="eyebrow">Listening overview</span>
-            <div class="stats-value-row">
-                <strong id="stats-minutes" class="stats-minutes-value">—</strong>
-                <span class="stats-unit">minutes</span>
+            <div class="stats-intro-top">
+                <div>
+                    <span class="eyebrow">Listening overview</span>
+                    <div class="stats-value-row">
+                        <strong id="stats-minutes" class="stats-minutes-value">—</strong>
+                        <span class="stats-unit">minutes</span>
+                    </div>
+                    <div class="stats-description">Calculated from confirmed recognitions.</div>
+                </div>
+                <button id="stats-share-button" class="btn-primary stats-share-button" type="button" aria-label="Share your VinylPi statistics summary">
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                        <path d="M12 16V4"></path>
+                        <path d="M7 9l5-5 5 5"></path>
+                        <path d="M5 14v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3"></path>
+                    </svg>
+                    <span>Share</span>
+                </button>
             </div>
-            <div class="stats-description">Calculated from confirmed recognitions.</div>
+            <p id="stats-share-feedback" class="stats-share-feedback" role="status" aria-live="polite"></p>
         </div>
     </section>
 

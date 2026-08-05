@@ -1,12 +1,16 @@
 from __future__ import annotations
 
+import io
 import tempfile
 import unittest
 import warnings
 from pathlib import Path
 from unittest.mock import patch
 
+from PIL import Image
+
 from vinylpi.core import database, stats_db
+from vinylpi.web.services.stats import build_share_card_image
 
 warnings.filterwarnings("ignore", category=ResourceWarning, message="unclosed database.*")
 
@@ -106,6 +110,29 @@ class StatsDatabaseTests(unittest.TestCase):
         stats_db.update_song_stats("Artist", "Song")
 
         self.assertTrue(database.database_has_statistics())
+
+    def test_share_card_generation_returns_valid_png(self):
+        payload = {
+            "profile_name": "Simon",
+            "total_minutes_listened": 53623,
+            "top_genre": "Indie",
+            "top_artists": [
+                {"name": "Foo Fighters", "count": 12},
+                {"name": "The Strokes", "count": 10},
+            ],
+            "top_albums": [
+                {"name": "The Colour And The Shape", "count": 7},
+                {"name": "Is This It", "count": 5},
+            ],
+            "top_album_covers": [],
+        }
+
+        png_bytes = build_share_card_image(payload)
+
+        self.assertTrue(png_bytes.startswith(b"\x89PNG"))
+        with Image.open(io.BytesIO(png_bytes)) as image:
+            self.assertEqual(image.size, (1080, 1920))
+            self.assertEqual(image.mode, "RGB")
 
 
 if __name__ == "__main__":

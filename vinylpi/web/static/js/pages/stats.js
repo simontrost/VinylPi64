@@ -81,6 +81,72 @@ function setupExpandableList(listElement, items, renderItem, emptyMessage) {
     render();
 }
 
+function setShareFeedback(message, type = "") {
+    const element = document.getElementById("stats-share-feedback");
+    if (!element) return;
+    element.textContent = message || "";
+    element.classList.remove("is-error", "is-success", "is-muted");
+    if (type) {
+        element.classList.add(`is-${type}`);
+    }
+}
+
+async function shareStatsSummary() {
+    const button = document.getElementById("stats-share-button");
+    if (!button) return;
+
+    const originalHtml = button.innerHTML;
+    button.disabled = true;
+    button.classList.add("is-loading");
+    button.innerHTML = "<span>Preparing…</span>";
+    setShareFeedback("Creating your share image…", "muted");
+
+    try {
+        const response = await fetch("/api/stats/share-card", { cache: "no-store" });
+        if (!response.ok) {
+            throw new Error(`Share card request failed: ${response.status}`);
+        }
+
+        const blob = await response.blob();
+        const file = new File([blob], "vinylpi-wrapped.png", { type: blob.type || "image/png" });
+
+        const canUseWebShare =
+            typeof navigator !== "undefined" &&
+            typeof navigator.share === "function" &&
+            typeof navigator.canShare === "function" &&
+            navigator.canShare({ files: [file] });
+
+        if (canUseWebShare) {
+            await navigator.share({
+                title: "My VinylPi summary",
+                text: "My VinylPi listening summary.",
+                files: [file],
+            });
+            setShareFeedback("Share card ready.", "success");
+        } else {
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = "vinylpi-wrapped.png";
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.setTimeout(() => URL.revokeObjectURL(url), 1200);
+            setShareFeedback("Image downloaded. You can now share it on social media.", "success");
+        }
+    } catch (error) {
+        if (error && (error.name === "AbortError" || error.name === "NotAllowedError")) {
+            setShareFeedback("Sharing cancelled.", "muted");
+        } else {
+            console.error(error);
+            setShareFeedback("Could not create the share image right now.", "error");
+        }
+    } finally {
+        button.disabled = false;
+        button.classList.remove("is-loading");
+        button.innerHTML = originalHtml;
+    }
+}
 
 function renderGenreChart(genres = []) {
     const canvas = document.getElementById("genre-radar");
@@ -261,4 +327,10 @@ async function loadStats() {
     }
 }
 
-document.addEventListener("DOMContentLoaded", loadStats);
+document.addEventListener("DOMContentLoaded", () => {
+    loadStats();
+    const shareButton = document.getElementById("stats-share-button");
+    if (shareButton) {
+        shareButton.addEventListener("click", shareStatsSummary);
+    }
+});

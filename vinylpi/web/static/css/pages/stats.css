@@ -1,4 +1,47 @@
 
+.stats-intro-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 18px;
+}
+
+.stats-share-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 132px;
+    justify-content: center;
+    white-space: nowrap;
+    flex: 0 0 auto;
+}
+
+.stats-share-button svg {
+    width: 18px;
+    height: 18px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.stats-share-button.is-loading {
+    opacity: 0.82;
+}
+
+.stats-share-feedback {
+    min-height: 22px;
+    margin: 12px 0 0;
+    font-size: 13px;
+    color: var(--muted);
+}
+
+.stats-share-feedback.is-success { color: #d6d7de; }
+.stats-share-feedback.is-error { color: #ff9ea9; }
+.stats-share-feedback.is-muted { color: var(--muted); }
+
+
 .stats-section {
     display: grid;
     gap: 18px;
@@ -51,6 +94,17 @@
 @media (max-width: 980px) {
     .stats-grid,
     .stats-visual-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 640px) {
+    .stats-intro-top {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .stats-share-button {
+        width: 100%;
+    }
 }
 
 @media (max-width: 520px) {
