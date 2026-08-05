@@ -4,19 +4,70 @@
         <div>
             <span class="eyebrow">Listening profiles</span>
             <h2 id="profileDialogTitle">Choose a profile</h2>
-            <p>Statistics and settings are stored separately for every profile.</p>
+            <p>Every profile has its own settings, listening database and profile image.</p>
         </div>
         <button class="profile-dialog-close" id="profileDialogClose" type="button" aria-label="Close profile dialog">×</button>
     </header>
 
     <div class="profile-active-summary">
-        <span class="profile-avatar" id="profileActiveAvatar">G</span>
-        <div>
+        <span class="profile-avatar" id="profileActiveAvatar">
+            <img class="profile-avatar-image hidden" id="profileActiveImage" alt="">
+            <span id="profileActiveInitial">G</span>
+        </span>
+        <div class="profile-active-copy">
             <small>Currently active</small>
             <strong id="profileActiveName">Guest</strong>
+            <span class="profile-password-state" id="profilePasswordState"></span>
         </div>
-        <span class="profile-active-badge" id="profileActiveBadge">Guest mode</span>
+        <div class="profile-active-actions">
+            <span class="profile-active-badge" id="profileActiveBadge">Guest mode</span>
+            <button class="profile-edit-toggle hidden" id="profileEditToggle" type="button">Edit profile</button>
+        </div>
     </div>
+
+    <form class="profile-edit-form hidden" id="profileEditForm">
+        <div class="profile-create-heading">
+            <strong>Edit active profile</strong>
+            <span id="profileEditHint">Rename it, change the password or update the picture.</span>
+        </div>
+
+        <div class="profile-form-grid">
+            <label class="profile-field">
+                <span>Profile name</span>
+                <input id="profileEditName" name="name" maxlength="40" autocomplete="off" required>
+            </label>
+            <label class="profile-field" id="profileCurrentPasswordField">
+                <span>Current password</span>
+                <input id="profileCurrentPassword" name="current_password" type="password" maxlength="128" autocomplete="current-password">
+            </label>
+            <label class="profile-field">
+                <span id="profileNewPasswordLabel">New password</span>
+                <input id="profileNewPassword" name="new_password" type="password" minlength="4" maxlength="128" autocomplete="new-password">
+            </label>
+            <label class="profile-field">
+                <span>Confirm new password</span>
+                <input id="profileNewPasswordConfirmation" name="new_password_confirmation" type="password" minlength="4" maxlength="128" autocomplete="new-password">
+            </label>
+        </div>
+
+        <div class="profile-avatar-editor">
+            <span class="profile-avatar profile-avatar-preview" id="profileEditAvatarPreview"><span id="profileEditAvatarInitial">P</span></span>
+            <div>
+                <strong>Profile image</strong>
+                <span>PNG, JPG or WEBP, up to 5 MB.</span>
+                <div class="profile-avatar-editor-actions">
+                    <label class="profile-file-button" for="profileEditAvatar">Choose image</label>
+                    <input class="profile-file-input" id="profileEditAvatar" name="avatar" type="file" accept="image/png,image/jpeg,image/webp">
+                    <button class="profile-remove-avatar" id="profileRemoveAvatar" type="button">Remove</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="profile-form-actions">
+            <button id="profileEditCancel" type="button">Cancel</button>
+            <button class="btn-primary" type="submit">Save profile</button>
+        </div>
+    </form>
 
     <div class="profile-list" id="profileList" aria-live="polite"></div>
 
@@ -25,21 +76,43 @@
             <strong>Create profile</strong>
             <span>Starts with a separate, empty listening database.</span>
         </div>
-        <label for="profileName">Profile name</label>
-        <div class="profile-create-row">
-            <input id="profileName" name="name" maxlength="40" autocomplete="off" placeholder="e.g. Simon" required>
-            <button class="btn-primary" type="submit">Create & switch</button>
+
+        <div class="profile-form-grid">
+            <label class="profile-field">
+                <span>Profile name</span>
+                <input id="profileName" name="name" maxlength="40" autocomplete="off" placeholder="e.g. Simon" required>
+            </label>
+            <label class="profile-field">
+                <span>Password</span>
+                <input id="profilePassword" name="password" type="password" minlength="4" maxlength="128" autocomplete="new-password" required>
+            </label>
+            <label class="profile-field profile-field-wide">
+                <span>Confirm password</span>
+                <input id="profilePasswordConfirmation" name="password_confirmation" type="password" minlength="4" maxlength="128" autocomplete="new-password" required>
+            </label>
         </div>
+
+        <div class="profile-avatar-editor profile-avatar-editor-compact">
+            <span class="profile-avatar profile-avatar-preview" id="profileCreateAvatarPreview"><span id="profileCreateAvatarInitial">P</span></span>
+            <div>
+                <strong>Profile image <small>Optional</small></strong>
+                <span>Choose a square photo or artwork.</span>
+                <label class="profile-file-button" for="profileCreateAvatar">Choose image</label>
+                <input class="profile-file-input" id="profileCreateAvatar" name="avatar" type="file" accept="image/png,image/jpeg,image/webp">
+            </div>
+        </div>
+
         <label class="profile-copy-setting">
             <input id="profileCopySettings" type="checkbox" checked>
             <span>Copy the current settings into the new profile</span>
         </label>
+        <button class="btn-primary profile-create-submit" type="submit">Create & log in</button>
     </form>
 
     <div class="profile-dialog-message hidden" id="profileDialogMessage" role="status"></div>
 
     <footer class="profile-dialog-footer">
-        <span>Signing out switches VinylPi to a separate guest database.</span>
+        <span id="profileLogoutHint">Signing out switches VinylPi to a separate guest database.</span>
         <button id="profileLogout" type="button">Sign out</button>
     </footer>
 </section>

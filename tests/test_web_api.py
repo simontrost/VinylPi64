@@ -176,7 +176,7 @@ class WebApiTests(unittest.TestCase):
     @patch("vinylpi.web.routes.profiles_api.SYNC_MANAGER.is_syncing", return_value=False)
     @patch("vinylpi.web.routes.profiles_api._switch_profile")
     @patch("vinylpi.web.routes.profiles_api.create_profile")
-    def test_create_profile_can_copy_settings_and_activate(
+    def test_create_profile_requires_password_and_can_activate(
         self, create_profile_mock, switch_profile_mock, is_syncing_mock
     ):
         create_profile_mock.return_value = {"id": "abc", "name": "Simon"}
@@ -187,12 +187,102 @@ class WebApiTests(unittest.TestCase):
 
         response = self.client.post(
             "/api/profiles",
-            json={"name": "Simon", "copy_current_settings": True, "activate": True},
+            json={
+                "name": "Simon",
+                "password": "secret",
+                "password_confirmation": "secret",
+                "copy_current_settings": True,
+                "activate": True,
+            },
         )
 
         self.assertEqual(response.status_code, 201)
-        create_profile_mock.assert_called_once_with("Simon", copy_current_settings=True)
+        create_profile_mock.assert_called_once_with(
+            "Simon",
+            "secret",
+            copy_current_settings=True,
+            avatar_png=None,
+        )
         self.assertTrue(response.get_json()["activated"])
+
+    def test_create_profile_rejects_password_confirmation_mismatch(self):
+        response = self.client.post(
+            "/api/profiles",
+            json={
+                "name": "Simon",
+                "password": "secret",
+                "password_confirmation": "different",
+            },
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.get_json()["error"], "Passwords do not match")
+
+    @patch("vinylpi.web.routes.profiles_api._switch_profile")
+    def test_profile_login_passes_password_to_switch_action(self, switch_profile_mock):
+        switch_profile_mock.return_value = (
+            {"id": "abc", "name": "Simon", "is_guest": False},
+            False,
+        )
+
+        response = self.client.post(
+            "/api/profiles/abc/activate",
+            json={"password": "secret"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        action = switch_profile_mock.call_args.args[0]
+        with patch("vinylpi.web.routes.profiles_api.activate_profile") as activate_mock:
+            activate_mock.return_value = {"id": "abc"}
+            action()
+            activate_mock.assert_called_once_with("abc", "secret")
+
+    @patch("vinylpi.web.routes.profiles_api._switch_profile")
+    def test_legacy_profile_can_initialize_password_and_log_in(self, switch_profile_mock):
+        switch_profile_mock.return_value = (
+            {"id": "legacy", "name": "Legacy", "password_configured": True},
+            False,
+        )
+
+        response = self.client.post(
+            "/api/profiles/legacy/initialize-password",
+            json={"password": "secret", "password_confirmation": "secret"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        action = switch_profile_mock.call_args.args[0]
+        with patch("vinylpi.web.routes.profiles_api.initialize_profile_password") as initialize_mock:
+            initialize_mock.return_value = {"id": "legacy"}
+            action()
+            initialize_mock.assert_called_once_with("legacy", "secret")
+
+    @patch("vinylpi.web.routes.profiles_api.update_profile")
+    def test_active_profile_can_be_renamed_and_given_a_password(self, update_profile_mock):
+        update_profile_mock.return_value = {
+            "id": "default",
+            "name": "Simon",
+            "password_configured": True,
+        }
+
+        response = self.client.patch(
+            "/api/profiles/default",
+            json={
+                "name": "Simon",
+                "current_password": "",
+                "new_password": "secret",
+                "new_password_confirmation": "secret",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        update_profile_mock.assert_called_once_with(
+            "default",
+            name="Simon",
+            current_password="",
+            new_password="secret",
+            avatar_png=None,
+            remove_avatar=False,
+        )
 
 
 if __name__ == "__main__":

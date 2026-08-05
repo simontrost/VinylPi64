@@ -1,7 +1,10 @@
 <div class="header-actions">
     <button class="profile-trigger" id="profileTrigger" type="button" aria-haspopup="dialog" aria-controls="profileDialog" title="Profiles">
         <span class="profile-trigger-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"></circle><path d="M5 20c.7-4 3-6 7-6s6.3 2 7 6"></path></svg>
+            <img class="profile-avatar-image hidden" id="profileTriggerImage" alt="">
+            <span class="profile-trigger-fallback" id="profileTriggerFallback">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"></circle><path d="M5 20c.7-4 3-6 7-6s6.3 2 7 6"></path></svg>
+            </span>
         </span>
         <span class="profile-trigger-copy">
             <small>Profile</small>

@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+import base64
+import hashlib
+import hmac
+import io
 import json
 import os
 import re
+import secrets
 import shutil
 import sqlite3
 import threading
@@ -12,6 +17,7 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
+from PIL import Image, ImageOps, UnidentifiedImageError
 from vinylpi.paths import (
     CONFIG_PATH,
     DB_PATH,
@@ -22,11 +28,25 @@ from vinylpi.paths import (
 
 _DEFAULT_PROFILE_ID = "default"
 _GUEST_STORAGE_KEY = "_guest"
-_REGISTRY_VERSION = 1
+_REGISTRY_VERSION = 2
 _LOCK = threading.RLock()
 _CACHE: dict[str, Any] = {"mtime_ns": None, "registry": None}
 _NAME_RE = re.compile(r"\s+")
 _ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+_PASSWORD_HASH_ITERATIONS = 260_000
+_PASSWORD_HASH_PREFIX = "pbkdf2_sha256"
+_AVATAR_FILENAME = "avatar.png"
+_MAX_AVATAR_BYTES = 5 * 1024 * 1024
+_AVATAR_SIZE = 256
+_ALLOWED_AVATAR_FORMATS = {"JPEG", "PNG", "WEBP"}
+
+
+class ProfileAuthenticationError(PermissionError):
+    pass
+
+
+class ProfilePasswordNotConfiguredError(ValueError):
+    pass
 
 
 def _now() -> int:
@@ -51,6 +71,7 @@ def _atomic_write_json(path: Path, payload: dict[str, Any]) -> None:
 
 
 def _default_registry() -> dict[str, Any]:
+    timestamp = _now()
     return {
         "version": _REGISTRY_VERSION,
         "active_profile_id": _DEFAULT_PROFILE_ID,
@@ -58,8 +79,10 @@ def _default_registry() -> dict[str, Any]:
             {
                 "id": _DEFAULT_PROFILE_ID,
                 "name": "Default",
-                "created_at": _now(),
-                "updated_at": _now(),
+                "password_hash": "",
+                "avatar_version": None,
+                "created_at": timestamp,
+                "updated_at": timestamp,
             }
         ],
     }
@@ -79,23 +102,36 @@ def _normalise_registry(payload: Any) -> dict[str, Any]:
         if not _ID_RE.fullmatch(profile_id) or not name or profile_id in seen or profile_id == _GUEST_STORAGE_KEY:
             continue
         seen.add(profile_id)
+        password_hash = item.get("password_hash")
+        if not isinstance(password_hash, str):
+            password_hash = ""
+        avatar_version = item.get("avatar_version")
+        try:
+            avatar_version = int(avatar_version) if avatar_version is not None else None
+        except (TypeError, ValueError):
+            avatar_version = None
         profiles.append(
             {
                 "id": profile_id,
                 "name": name,
+                "password_hash": password_hash,
+                "avatar_version": avatar_version,
                 "created_at": _timestamp(item.get("created_at")),
                 "updated_at": _timestamp(item.get("updated_at")),
             }
         )
 
     if _DEFAULT_PROFILE_ID not in seen:
+        timestamp = _now()
         profiles.insert(
             0,
             {
                 "id": _DEFAULT_PROFILE_ID,
                 "name": "Default",
-                "created_at": _now(),
-                "updated_at": _now(),
+                "password_hash": "",
+                "avatar_version": None,
+                "created_at": timestamp,
+                "updated_at": timestamp,
             },
         )
         seen.add(_DEFAULT_PROFILE_ID)
@@ -122,6 +158,55 @@ def _normalise_name(value: Any, *, allow_empty: bool = False) -> str:
     return name
 
 
+def _normalise_password(value: Any, *, field_name: str = "Password") -> str:
+    password = str(value or "")
+    if len(password) < 4:
+        raise ValueError(f"{field_name} must contain at least 4 characters")
+    if len(password) > 128:
+        raise ValueError(f"{field_name} must not exceed 128 characters")
+    return password
+
+
+def _hash_password(password: str) -> str:
+    salt = secrets.token_bytes(16)
+    digest = hashlib.pbkdf2_hmac(
+        "sha256",
+        password.encode("utf-8"),
+        salt,
+        _PASSWORD_HASH_ITERATIONS,
+    )
+    salt_b64 = base64.urlsafe_b64encode(salt).decode("ascii").rstrip("=")
+    digest_b64 = base64.urlsafe_b64encode(digest).decode("ascii").rstrip("=")
+    return f"{_PASSWORD_HASH_PREFIX}${_PASSWORD_HASH_ITERATIONS}${salt_b64}${digest_b64}"
+
+
+def _decode_b64(value: str) -> bytes:
+    padding = "=" * (-len(value) % 4)
+    return base64.urlsafe_b64decode(value + padding)
+
+
+def _check_password(stored_hash: str, password: str) -> bool:
+    try:
+        prefix, iterations_raw, salt_raw, digest_raw = stored_hash.split("$", 3)
+        if prefix != _PASSWORD_HASH_PREFIX:
+            return False
+        iterations = int(iterations_raw)
+        if iterations < 100_000 or iterations > 2_000_000:
+            return False
+        salt = _decode_b64(salt_raw)
+        expected = _decode_b64(digest_raw)
+    except (TypeError, ValueError, base64.binascii.Error):
+        return False
+
+    actual = hashlib.pbkdf2_hmac(
+        "sha256",
+        str(password or "").encode("utf-8"),
+        salt,
+        iterations,
+    )
+    return hmac.compare_digest(actual, expected)
+
+
 def _read_registry_unlocked() -> tuple[dict[str, Any], bool]:
     try:
         mtime_ns = PROFILE_REGISTRY_PATH.stat().st_mtime_ns
@@ -145,6 +230,10 @@ def _read_registry_unlocked() -> tuple[dict[str, Any], bool]:
 
 def _profile_dir(storage_key: str) -> Path:
     return PROFILES_DIR / storage_key
+
+
+def _avatar_path(profile_id: str) -> Path:
+    return _profile_dir(profile_id) / _AVATAR_FILENAME
 
 
 def _copy_if_missing(source: Path, destination: Path) -> None:
@@ -194,6 +283,26 @@ def _find_profile(registry: dict[str, Any], profile_id: str) -> dict[str, Any] |
     return next((item for item in registry["profiles"] if item["id"] == profile_id), None)
 
 
+def _public_profile(profile: dict[str, Any], *, active_id: str | None = None) -> dict[str, Any]:
+    profile_id = str(profile["id"])
+    avatar_exists = _avatar_path(profile_id).is_file()
+    avatar_version = profile.get("avatar_version")
+    avatar_url = None
+    if avatar_exists:
+        suffix = f"?v={avatar_version}" if avatar_version is not None else ""
+        avatar_url = f"/api/profiles/{profile_id}/avatar{suffix}"
+    return {
+        "id": profile_id,
+        "name": str(profile["name"]),
+        "created_at": _timestamp(profile.get("created_at")),
+        "updated_at": _timestamp(profile.get("updated_at")),
+        "is_active": profile_id == active_id,
+        "is_default": profile_id == _DEFAULT_PROFILE_ID,
+        "password_configured": bool(profile.get("password_hash")),
+        "avatar_url": avatar_url,
+    }
+
+
 def get_active_storage_key() -> str:
     registry = ensure_profiles_initialized()
     return str(registry.get("active_profile_id") or _GUEST_STORAGE_KEY)
@@ -208,13 +317,16 @@ def get_active_profile() -> dict[str, Any]:
             "name": "Guest",
             "is_guest": True,
             "storage_key": _GUEST_STORAGE_KEY,
+            "password_configured": False,
+            "avatar_url": None,
         }
 
     profile = _find_profile(registry, str(active_id))
     if profile is None:
         profile = _find_profile(registry, _DEFAULT_PROFILE_ID)
+    public = _public_profile(profile or {"id": _DEFAULT_PROFILE_ID, "name": "Default"}, active_id=str(active_id))
     return {
-        **deepcopy(profile or {"id": _DEFAULT_PROFILE_ID, "name": "Default"}),
+        **public,
         "is_guest": False,
         "storage_key": str((profile or {}).get("id") or _DEFAULT_PROFILE_ID),
     }
@@ -222,17 +334,9 @@ def get_active_profile() -> dict[str, Any]:
 
 def list_profiles() -> dict[str, Any]:
     registry = ensure_profiles_initialized()
-    active = get_active_profile()
-    profiles = []
-    for item in registry["profiles"]:
-        profiles.append(
-            {
-                **deepcopy(item),
-                "is_active": item["id"] == registry.get("active_profile_id"),
-                "is_default": item["id"] == _DEFAULT_PROFILE_ID,
-            }
-        )
-    return {"active_profile": active, "profiles": profiles}
+    active_id = registry.get("active_profile_id")
+    profiles = [_public_profile(item, active_id=active_id) for item in registry["profiles"]]
+    return {"active_profile": get_active_profile(), "profiles": profiles}
 
 
 def _active_config_path_unlocked(registry: dict[str, Any]) -> Path:
@@ -240,8 +344,66 @@ def _active_config_path_unlocked(registry: dict[str, Any]) -> Path:
     return _profile_dir(storage_key) / "config.json"
 
 
-def create_profile(name: str, *, copy_current_settings: bool = True) -> dict[str, Any]:
+def prepare_profile_avatar(file_storage: Any) -> bytes:
+    if file_storage is None:
+        raise ValueError("Profile image is missing")
+
+    stream = getattr(file_storage, "stream", file_storage)
+    if not hasattr(stream, "read"):
+        raise ValueError("Invalid profile image")
+
+    try:
+        stream.seek(0)
+    except Exception:
+        pass
+    raw = stream.read(_MAX_AVATAR_BYTES + 1)
+    if not raw:
+        raise ValueError("Profile image is empty")
+    if len(raw) > _MAX_AVATAR_BYTES:
+        raise ValueError("Profile image must not exceed 5 MB")
+
+    try:
+        with Image.open(io.BytesIO(raw)) as source:
+            if (source.format or "").upper() not in _ALLOWED_AVATAR_FORMATS:
+                raise ValueError("Profile image must be PNG, JPG or WEBP")
+            image = ImageOps.exif_transpose(source).convert("RGBA")
+            image.load()
+    except (UnidentifiedImageError, OSError) as exc:
+        raise ValueError("Profile image is invalid") from exc
+
+    image = ImageOps.fit(
+        image,
+        (_AVATAR_SIZE, _AVATAR_SIZE),
+        method=Image.Resampling.LANCZOS,
+        centering=(0.5, 0.5),
+    )
+    output = io.BytesIO()
+    image.save(output, format="PNG", optimize=True)
+    return output.getvalue()
+
+
+def _write_avatar_unlocked(profile_id: str, avatar_png: bytes) -> int:
+    directory = _profile_dir(profile_id)
+    directory.mkdir(parents=True, exist_ok=True)
+    target = _avatar_path(profile_id)
+    temporary = target.with_name(f".{target.name}.{uuid.uuid4().hex}.tmp")
+    try:
+        temporary.write_bytes(avatar_png)
+        os.replace(temporary, target)
+    finally:
+        temporary.unlink(missing_ok=True)
+    return time.time_ns()
+
+
+def create_profile(
+    name: str,
+    password: str,
+    *,
+    copy_current_settings: bool = True,
+    avatar_png: bytes | None = None,
+) -> dict[str, Any]:
     clean_name = _normalise_name(name)
+    clean_password = _normalise_password(password)
     with _LOCK:
         registry = ensure_profiles_initialized()
         if any(item["name"].casefold() == clean_name.casefold() for item in registry["profiles"]):
@@ -252,33 +414,70 @@ def create_profile(name: str, *, copy_current_settings: bool = True) -> dict[str
         profile = {
             "id": profile_id,
             "name": clean_name,
+            "password_hash": _hash_password(clean_password),
+            "avatar_version": None,
             "created_at": timestamp,
             "updated_at": timestamp,
         }
         target_dir = _profile_dir(profile_id)
         target_dir.mkdir(parents=True, exist_ok=False)
 
-        if copy_current_settings:
-            source = _active_config_path_unlocked(registry)
-            _copy_if_missing(source, target_dir / "config.json")
+        try:
+            if copy_current_settings:
+                source = _active_config_path_unlocked(registry)
+                _copy_if_missing(source, target_dir / "config.json")
+            if avatar_png is not None:
+                profile["avatar_version"] = _write_avatar_unlocked(profile_id, avatar_png)
+            registry["profiles"].append(profile)
+            _atomic_write_json(PROFILE_REGISTRY_PATH, registry)
+        except Exception:
+            shutil.rmtree(target_dir, ignore_errors=True)
+            raise
 
-        registry["profiles"].append(profile)
-        _atomic_write_json(PROFILE_REGISTRY_PATH, registry)
-        return {**deepcopy(profile), "is_active": False, "is_default": False}
+        return _public_profile(profile, active_id=registry.get("active_profile_id"))
 
 
-def activate_profile(profile_id: str) -> dict[str, Any]:
+def activate_profile(profile_id: str, password: str) -> dict[str, Any]:
     profile_id = str(profile_id or "").strip()
     with _LOCK:
         registry = ensure_profiles_initialized()
         profile = _find_profile(registry, profile_id)
         if profile is None:
             raise KeyError("Profile not found")
+        password_hash = str(profile.get("password_hash") or "")
+        if not password_hash:
+            raise ProfilePasswordNotConfiguredError(
+                "This profile has no password yet. Set one while the profile is active before signing out."
+            )
+        if not _check_password(password_hash, str(password or "")):
+            raise ProfileAuthenticationError("Incorrect password")
         _profile_dir(profile_id).mkdir(parents=True, exist_ok=True)
         registry["active_profile_id"] = profile_id
         _atomic_write_json(PROFILE_REGISTRY_PATH, registry)
         return {
-            **deepcopy(profile),
+            **_public_profile(profile, active_id=profile_id),
+            "is_guest": False,
+            "storage_key": profile_id,
+        }
+
+
+def initialize_profile_password(profile_id: str, password: str) -> dict[str, Any]:
+    profile_id = str(profile_id or "").strip()
+    clean_password = _normalise_password(password)
+    with _LOCK:
+        registry = ensure_profiles_initialized()
+        profile = _find_profile(registry, profile_id)
+        if profile is None:
+            raise KeyError("Profile not found")
+        if profile.get("password_hash"):
+            raise ValueError("This profile already has a password")
+        profile["password_hash"] = _hash_password(clean_password)
+        profile["updated_at"] = _now()
+        _profile_dir(profile_id).mkdir(parents=True, exist_ok=True)
+        registry["active_profile_id"] = profile_id
+        _atomic_write_json(PROFILE_REGISTRY_PATH, registry)
+        return {
+            **_public_profile(profile, active_id=profile_id),
             "is_guest": False,
             "storage_key": profile_id,
         }
@@ -287,6 +486,13 @@ def activate_profile(profile_id: str) -> dict[str, Any]:
 def logout_to_guest(*, copy_current_settings: bool = True) -> dict[str, Any]:
     with _LOCK:
         registry = ensure_profiles_initialized()
+        active_id = registry.get("active_profile_id")
+        if active_id is not None:
+            profile = _find_profile(registry, str(active_id))
+            if profile is not None and not profile.get("password_hash"):
+                raise ProfilePasswordNotConfiguredError(
+                    "Set a password for the active profile before signing out."
+                )
         guest_dir = _profile_dir(_GUEST_STORAGE_KEY)
         guest_dir.mkdir(parents=True, exist_ok=True)
         guest_config = guest_dir / "config.json"
@@ -297,22 +503,73 @@ def logout_to_guest(*, copy_current_settings: bool = True) -> dict[str, Any]:
         return get_active_profile()
 
 
-def rename_profile(profile_id: str, name: str) -> dict[str, Any]:
-    clean_name = _normalise_name(name)
+def update_profile(
+    profile_id: str,
+    *,
+    name: str | None = None,
+    current_password: str = "",
+    new_password: str | None = None,
+    avatar_png: bytes | None = None,
+    remove_avatar: bool = False,
+) -> dict[str, Any]:
+    profile_id = str(profile_id or "").strip()
     with _LOCK:
         registry = ensure_profiles_initialized()
-        profile = _find_profile(registry, str(profile_id))
+        profile = _find_profile(registry, profile_id)
         if profile is None:
             raise KeyError("Profile not found")
-        if any(
-            item["id"] != profile["id"] and item["name"].casefold() == clean_name.casefold()
-            for item in registry["profiles"]
-        ):
-            raise ValueError("A profile with this name already exists")
-        profile["name"] = clean_name
+        if registry.get("active_profile_id") != profile_id:
+            raise ProfileAuthenticationError("Log in to this profile before editing it")
+
+        existing_hash = str(profile.get("password_hash") or "")
+        if existing_hash:
+            if not _check_password(existing_hash, str(current_password or "")):
+                raise ProfileAuthenticationError("Current password is incorrect")
+        elif new_password is None:
+            raise ProfilePasswordNotConfiguredError("Set a password to finish configuring this profile")
+
+        if name is not None:
+            clean_name = _normalise_name(name)
+            if any(
+                item["id"] != profile_id and item["name"].casefold() == clean_name.casefold()
+                for item in registry["profiles"]
+            ):
+                raise ValueError("A profile with this name already exists")
+            profile["name"] = clean_name
+
+        if new_password is not None:
+            clean_password = _normalise_password(new_password, field_name="New password")
+            profile["password_hash"] = _hash_password(clean_password)
+
+        if avatar_png is not None:
+            profile["avatar_version"] = _write_avatar_unlocked(profile_id, avatar_png)
+        elif remove_avatar:
+            _avatar_path(profile_id).unlink(missing_ok=True)
+            profile["avatar_version"] = None
+
         profile["updated_at"] = _now()
         _atomic_write_json(PROFILE_REGISTRY_PATH, registry)
-        return deepcopy(profile)
+        return {
+            **_public_profile(profile, active_id=profile_id),
+            "is_guest": False,
+            "storage_key": profile_id,
+        }
+
+
+def get_profile_avatar_path(profile_id: str) -> Path:
+    profile_id = str(profile_id or "").strip()
+    with _LOCK:
+        registry = ensure_profiles_initialized()
+        if _find_profile(registry, profile_id) is None:
+            raise KeyError("Profile not found")
+        path = _avatar_path(profile_id)
+        if not path.is_file():
+            raise FileNotFoundError("Profile image not found")
+        return path
+
+
+def rename_profile(profile_id: str, name: str, *, current_password: str = "") -> dict[str, Any]:
+    return update_profile(profile_id, name=name, current_password=current_password)
 
 
 def delete_profile(profile_id: str) -> None:
