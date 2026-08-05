@@ -297,7 +297,6 @@ def _create_share_card(payload: dict[str, Any]) -> Image.Image:
     eyebrow_font = _font(22, pixel=True)
     metric_font = _font(118, bold=True)
     metric_sub_font = _font(30, bold=True)
-    paragraph_font = _font(26)
     genre_label_font = _font(22, pixel=True)
     genre_value_font = _font(52, bold=True)
 
@@ -327,7 +326,6 @@ def _create_share_card(payload: dict[str, Any]) -> Image.Image:
     minutes_text = f"{minutes:,}"
     draw.text((left + 38, 500), minutes_text, font=metric_font, fill=(255, 255, 255, 250))
     draw.text((left + 42, 650), "minutes listened", font=metric_sub_font, fill=(245, 245, 248, 225))
-    draw.text((left + 42, 782), "Top 5 artists and albums, ready for your story or post.", font=paragraph_font, fill=(240, 240, 246, 220))
 
     _draw_cover_stack(image, payload, (right - 396, 422, right - 26, 816))
 

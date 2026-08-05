@@ -32,16 +32,21 @@
         <aside class="stats-share-panel card">
             <div class="stats-share-panel-copy">
                 <span class="eyebrow">Share</span>
-                <h2>Create a Vinyl Wrapped card</h2>
-                <p>Open a large preview first, then continue with your device’s native share sheet.</p>
+                <h2>Vinyl Wrapped</h2>
+                <p>Generate a shareable statistics card.</p>
             </div>
-            <button id="stats-share-button" class="btn-primary stats-share-button" type="button" aria-label="Open the VinylPi share dialog">
-                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                    <path d="M12 16V4"></path>
-                    <path d="M7 9l5-5 5 5"></path>
-                    <path d="M5 14v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3"></path>
-                </svg>
-                <span>Open share preview</span>
+            <button id="stats-share-button" class="btn-primary stats-share-button" type="button" aria-label="Create share preview">
+                <span class="stats-share-button-face">
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                        <path d="M12 16V4"></path>
+                        <path d="M7 9l5-5 5 5"></path>
+                        <path d="M5 14v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3"></path>
+                    </svg>
+                    <span id="stats-share-button-label">Share</span>
+                </span>
+                <span class="stats-share-button-progress" aria-hidden="true">
+                    <span id="stats-share-button-progress-fill" class="stats-share-button-progress-fill"></span>
+                </span>
             </button>
         </aside>
     </section>
@@ -88,16 +93,22 @@
             <img id="stats-share-image" class="stats-share-image" alt="Preview of the VinylPi share card">
         </div>
 
-        <div class="stats-native-share-block">
-            <button type="button" id="stats-native-share-button" class="btn-primary stats-native-share-button">
-                Open native share sheet
+        <div class="stats-share-action-row">
+            <button type="button" id="stats-native-share-button" class="btn-primary stats-action-button stats-action-button-share" aria-label="Share image">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path d="M12 16V4"></path>
+                    <path d="M7 9l5-5 5 5"></path>
+                    <path d="M5 14v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3"></path>
+                </svg>
+                <span>Share</span>
             </button>
-            <p class="stats-native-share-hint">On iPhone and Android this opens the native share menu of your device.</p>
-        </div>
-
-        <div id="stats-share-fallbacks" class="stats-share-fallbacks hidden">
-            <button type="button" class="stats-platform-button" data-share-action="copy">Copy image</button>
-            <button type="button" class="stats-platform-button" data-share-action="open">Open image</button>
+            <button type="button" id="stats-download-button" class="stats-action-button stats-action-button-download" aria-label="Download image">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path d="M12 4v10"></path>
+                    <path d="M8 10l4 4 4-4"></path>
+                    <path d="M5 18h14"></path>
+                </svg>
+            </button>
         </div>
 
         <p id="stats-share-modal-feedback" class="stats-share-modal-feedback" role="status" aria-live="polite"></p>

@@ -3,6 +3,7 @@ let radarChart = null;
 let albumCarouselTimer = null;
 let albumCarouselIndex = 0;
 let shareAsset = { blob: null, file: null, url: null };
+let shareButtonProgressTimer = null;
 
 function formatCount(value, singular, plural = `${singular}s`) {
     const count = Number(value) || 0;
@@ -139,35 +140,65 @@ function canNativeShareFile() {
     );
 }
 
+function setShareButtonProgress(value) {
+    const fill = document.getElementById("stats-share-button-progress-fill");
+    if (!fill) return;
+    fill.style.width = `${Math.max(0, Math.min(100, value))}%`;
+}
+
+function startShareButtonLoading() {
+    const button = document.getElementById("stats-share-button");
+    const label = document.getElementById("stats-share-button-label");
+    if (!button || !label) return;
+
+    let progress = 6;
+    button.disabled = true;
+    button.classList.add("is-loading");
+    label.textContent = "Preparing…";
+    setShareButtonProgress(progress);
+
+    if (shareButtonProgressTimer) {
+        clearInterval(shareButtonProgressTimer);
+    }
+
+    shareButtonProgressTimer = window.setInterval(() => {
+        progress += progress < 50 ? 8 : progress < 75 ? 4 : progress < 90 ? 2 : 0.5;
+        setShareButtonProgress(Math.min(progress, 92));
+    }, 180);
+}
+
+function stopShareButtonLoading(success) {
+    const button = document.getElementById("stats-share-button");
+    const label = document.getElementById("stats-share-button-label");
+    if (!button || !label) return;
+
+    if (shareButtonProgressTimer) {
+        clearInterval(shareButtonProgressTimer);
+        shareButtonProgressTimer = null;
+    }
+
+    if (success) {
+        setShareButtonProgress(100);
+    }
+
+    window.setTimeout(() => {
+        button.disabled = false;
+        button.classList.remove("is-loading");
+        label.textContent = "Share";
+        setShareButtonProgress(0);
+    }, success ? 180 : 0);
+}
+
 function updateShareCapabilities() {
     const nativeButton = document.getElementById("stats-native-share-button");
-    const fallbackContainer = document.getElementById("stats-share-fallbacks");
-    const hint = document.querySelector(".stats-native-share-hint");
-    if (!nativeButton || !fallbackContainer || !hint) return;
-
-    if (canNativeShareFile()) {
-        nativeButton.disabled = false;
-        nativeButton.textContent = "Open native share sheet";
-        fallbackContainer.classList.add("hidden");
-        hint.textContent = "On iPhone and Android this opens the native share menu of your device.";
-    } else {
-        nativeButton.disabled = true;
-        nativeButton.textContent = "Native share not available here";
-        fallbackContainer.classList.remove("hidden");
-        hint.textContent = "This browser cannot open the device share sheet. You can still copy or open the image below.";
-    }
+    if (!nativeButton) return;
+    nativeButton.disabled = !canNativeShareFile();
 }
 
 async function showSharePreview() {
-    const button = document.getElementById("stats-share-button");
-    if (!button) return;
-
-    const originalHtml = button.innerHTML;
-    button.disabled = true;
-    button.classList.add("is-loading");
-    button.innerHTML = "<span>Preparing…</span>";
-    setFeedback("stats-share-feedback", "Creating your share preview…", "muted");
+    setFeedback("stats-share-feedback", "", "");
     setFeedback("stats-share-modal-feedback", "", "");
+    startShareButtonLoading();
 
     try {
         const asset = await fetchShareAsset();
@@ -176,44 +207,37 @@ async function showSharePreview() {
             image.src = asset.url;
         }
         updateShareCapabilities();
+        stopShareButtonLoading(true);
         openShareModal();
-        setFeedback("stats-share-feedback", "Preview ready.", "success");
     } catch (error) {
         console.error(error);
+        stopShareButtonLoading(false);
         setFeedback("stats-share-feedback", "Could not create the share preview right now.", "error");
-    } finally {
-        button.disabled = false;
-        button.classList.remove("is-loading");
-        button.innerHTML = originalHtml;
     }
 }
 
 async function shareFileWithNative() {
     if (!canNativeShareFile()) {
-        throw new Error("Native file sharing is not supported on this device.");
+        throw new Error("Native sharing is not available in this browser.");
     }
 
     await navigator.share({
         title: "VinylPi statistics",
-        text: "My VinylPi statistics.",
         files: [shareAsset.file],
     });
 }
 
-async function copyShareImage() {
-    if (!(navigator.clipboard && window.ClipboardItem && shareAsset.blob)) {
-        throw new Error("Copying images is not supported in this browser.");
-    }
-    await navigator.clipboard.write([
-        new ClipboardItem({ [shareAsset.blob.type || "image/png"]: shareAsset.blob }),
-    ]);
-}
-
-function openShareImage() {
+function downloadShareImage() {
     if (!shareAsset.url) {
         throw new Error("Share image is not ready yet.");
     }
-    window.open(shareAsset.url, "_blank", "noopener,noreferrer");
+
+    const link = document.createElement("a");
+    link.href = shareAsset.url;
+    link.download = "vinylpi-wrapped.png";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
 }
 
 async function handleShareAction(action) {
@@ -221,15 +245,11 @@ async function handleShareAction(action) {
         switch (action) {
             case "native":
                 await shareFileWithNative();
-                setFeedback("stats-share-modal-feedback", "Native share sheet opened.", "success");
+                setFeedback("stats-share-modal-feedback", "", "");
                 break;
-            case "copy":
-                await copyShareImage();
-                setFeedback("stats-share-modal-feedback", "Image copied to your clipboard.", "success");
-                break;
-            case "open":
-                openShareImage();
-                setFeedback("stats-share-modal-feedback", "Image opened in a new tab.", "success");
+            case "download":
+                downloadShareImage();
+                setFeedback("stats-share-modal-feedback", "", "");
                 break;
             default:
                 break;
@@ -240,7 +260,7 @@ async function handleShareAction(action) {
             return;
         }
         console.error(error);
-        setFeedback("stats-share-modal-feedback", error.message || "This share action is not available right now.", "error");
+        setFeedback("stats-share-modal-feedback", error.message || "This action is not available right now.", "error");
     }
 }
 
@@ -428,6 +448,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const shareButton = document.getElementById("stats-share-button");
     const nativeShareButton = document.getElementById("stats-native-share-button");
+    const downloadButton = document.getElementById("stats-download-button");
     const closeButton = document.getElementById("stats-share-close");
     const backdrop = document.getElementById("stats-share-backdrop");
 
@@ -437,16 +458,15 @@ document.addEventListener("DOMContentLoaded", () => {
     if (nativeShareButton) {
         nativeShareButton.addEventListener("click", () => handleShareAction("native"));
     }
+    if (downloadButton) {
+        downloadButton.addEventListener("click", () => handleShareAction("download"));
+    }
     if (closeButton) {
         closeButton.addEventListener("click", closeShareModal);
     }
     if (backdrop) {
         backdrop.addEventListener("click", closeShareModal);
     }
-
-    document.querySelectorAll("[data-share-action]").forEach((button) => {
-        button.addEventListener("click", () => handleShareAction(button.dataset.shareAction));
-    });
 
     document.addEventListener("keydown", (event) => {
         if (event.key === "Escape") {
