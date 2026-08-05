@@ -115,6 +115,46 @@ def _fit_text(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.FreeTypeFont
     return ellipsis
 
 
+def _wrap_text_lines(
+    draw: ImageDraw.ImageDraw,
+    text: str,
+    font: ImageFont.FreeTypeFont,
+    max_width: int,
+    *,
+    max_lines: int = 2,
+) -> list[str]:
+    value = str(text or "").strip() or "—"
+    words = value.split()
+    if not words:
+        return ["—"]
+
+    lines: list[str] = []
+    current = words[0]
+    for word in words[1:]:
+        candidate = f"{current} {word}"
+        if _text_size(draw, candidate, font)[0] <= max_width:
+            current = candidate
+            continue
+
+        lines.append(current)
+        current = word
+        if len(lines) == max_lines - 1:
+            break
+
+    remaining_words = words[len(" ".join(lines + [current]).split()):]
+    remainder = " ".join([current] + remaining_words).strip()
+    if remainder:
+        lines.append(_fit_text(draw, remainder, font, max_width))
+
+    if len(lines) > max_lines:
+        lines = lines[:max_lines]
+
+    if len(lines) == 1 and _text_size(draw, lines[0], font)[0] > max_width:
+        lines[0] = _fit_text(draw, lines[0], font, max_width)
+
+    return lines[:max_lines]
+
+
 def _draw_gradient_background(size: tuple[int, int]) -> Image.Image:
     width, height = size
     image = Image.new("RGBA", size, (18, 18, 28, 255))
@@ -249,7 +289,7 @@ def _draw_list_card(
     padding_y = 24
 
     title_font = _font(30, bold=True)
-    item_font = _font(25, bold=True)
+    item_font = _font(23, bold=True)
     count_font = _font(21, bold=True)
     meta_font = _font(16, pixel=True)
 
@@ -263,27 +303,41 @@ def _draw_list_card(
         draw.text((left + padding_x, top + 96), "No listening data yet.", font=empty_font, fill=(220, 220, 230, 210))
         return
 
-    start_y = top + 98
-    line_h = 84
+    start_y = top + 100
+    row_h = 76
+    line_h = 96
+    line_gap = 4
+    content_left = left + padding_x + 38
+    content_right = right - padding_x - 74
+    max_name_width = max(96, content_right - content_left)
+
     for index, item in enumerate(items[:5], start=1):
         y = start_y + (index - 1) * line_h
         draw.rounded_rectangle(
-            (left + 18, y - 10, right - 18, y + 52),
+            (left + 18, y - 10, right - 18, y + row_h),
             radius=24,
             fill=(11, 11, 16, 205),
             outline=(255, 255, 255, 36),
             width=2,
         )
-        draw.text((left + padding_x, y), f"{index}", font=item_font, fill=accent)
+        draw.text((left + padding_x, y + 12), f"{index}", font=item_font, fill=accent)
 
         name = item.get("name") or item.get("title") or "Unknown"
-        name = _fit_text(draw, name, item_font, max_width=max(80, right - left - 200))
-        draw.text((left + padding_x + 38, y), name, font=item_font, fill=(255, 255, 255, 245))
+        lines = _wrap_text_lines(draw, name, item_font, max_width=max_name_width, max_lines=2)
+        text_y = y + (8 if len(lines) > 1 else 18)
+        for line_index, line in enumerate(lines):
+            draw.text(
+                (content_left, text_y + line_index * (item_font.size + line_gap)),
+                line,
+                font=item_font,
+                fill=(255, 255, 255, 245),
+            )
 
         count_raw = int(item.get("count") or 0)
         count_text = f"{count_raw:,}"
-        count_w, _ = _text_size(draw, count_text, count_font)
-        draw.text((right - padding_x - count_w, y + 4), count_text, font=count_font, fill=(235, 235, 243, 235))
+        count_w, count_h = _text_size(draw, count_text, count_font)
+        count_y = y + (row_h - count_h) / 2 - 4
+        draw.text((right - padding_x - count_w, count_y), count_text, font=count_font, fill=(235, 235, 243, 235))
 
 
 def _create_share_card(payload: dict[str, Any]) -> Image.Image:
@@ -316,7 +370,9 @@ def _create_share_card(payload: dict[str, Any]) -> Image.Image:
     profile_w, profile_h = _text_size(draw, profile_text, profile_font)
     profile_box = (left, 272, left + profile_w + 52, 272 + profile_h + 30)
     draw.rounded_rectangle(profile_box, radius=24, fill=(17, 17, 24, 150), outline=(255, 255, 255, 38), width=2)
-    draw.text((left + 24, 290), profile_text, font=profile_font, fill=(248, 248, 252, 235))
+    profile_x = profile_box[0] + ((profile_box[2] - profile_box[0]) - profile_w) / 2
+    profile_y = profile_box[1] + ((profile_box[3] - profile_box[1]) - profile_h) / 2 - 2
+    draw.text((profile_x, profile_y), profile_text, font=profile_font, fill=(248, 248, 252, 235))
 
     hero_box = (left, 380, right, 860)
     _panel(draw, hero_box, fill=(17, 17, 24, 176), outline=(255, 255, 255, 44))

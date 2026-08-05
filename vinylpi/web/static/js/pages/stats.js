@@ -151,7 +151,7 @@ function startShareButtonLoading() {
     const label = document.getElementById("stats-share-button-label");
     if (!button || !label) return;
 
-    let progress = 6;
+    let progress = 4;
     button.disabled = true;
     button.classList.add("is-loading");
     label.textContent = "Preparing…";
@@ -162,9 +162,9 @@ function startShareButtonLoading() {
     }
 
     shareButtonProgressTimer = window.setInterval(() => {
-        progress += progress < 50 ? 8 : progress < 75 ? 4 : progress < 90 ? 2 : 0.5;
-        setShareButtonProgress(Math.min(progress, 92));
-    }, 180);
+        progress = Math.min(progress + 1.25, 94);
+        setShareButtonProgress(progress);
+    }, 120);
 }
 
 function stopShareButtonLoading(success) {
