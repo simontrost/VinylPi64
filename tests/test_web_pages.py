@@ -62,6 +62,14 @@ class WebPageStructureTests(unittest.TestCase):
         self.assertIn('href="/settings.html" class="active" aria-current="page"', html)
         self.assertNotIn('href="/" class="nav-center active"', html)
 
+    def test_dashboard_contains_discogs_add_release_link(self):
+        response = self.client.get("/")
+        html = response.get_data(as_text=True)
+
+        self.assertIn('id="discogs-add-link"', html)
+        self.assertIn('Add to Discogs', html)
+        self.assertIn('target="_blank"', html)
+
 
 if __name__ == "__main__":
     unittest.main()

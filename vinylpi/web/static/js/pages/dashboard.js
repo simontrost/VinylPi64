@@ -122,12 +122,40 @@ function updateCurrentTrack(status) {
     CURRENT_TRACK.sideFlipNextPosition = status.side_flip_next_position || "";
 }
 
+function buildDiscogsSearchUrl() {
+    const artist = String(CURRENT_TRACK.artist || "").trim();
+    const releaseTitle = String(CURRENT_TRACK.album || CURRENT_TRACK.title || "").trim();
+    if (!artist || !releaseTitle) return "";
+
+    const params = new URLSearchParams({
+        q: `${artist} ${releaseTitle}`,
+        type: "release",
+        format_exact: "Vinyl",
+    });
+    return `https://www.discogs.com/search/?${params.toString()}`;
+}
+
 function renderDiscogsContext() {
     const context = document.getElementById("discogs-context");
+    const addLink = document.getElementById("discogs-add-link");
     if (!context) return;
 
     const matched = Boolean(CURRENT_TRACK.discogsReleaseId);
+    const searchUrl = matched ? "" : buildDiscogsSearchUrl();
+
     context.classList.toggle("hidden", !matched);
+    if (addLink) {
+        addLink.classList.toggle("hidden", matched || !searchUrl);
+        if (searchUrl) {
+            const releaseTitle = CURRENT_TRACK.album || CURRENT_TRACK.title;
+            addLink.href = searchUrl;
+            addLink.setAttribute(
+                "aria-label",
+                `Find ${CURRENT_TRACK.artist} – ${releaseTitle} on Discogs and add the correct vinyl release`,
+            );
+        }
+    }
+
     if (!matched) return;
 
     const confidence = Number(CURRENT_TRACK.discogsConfidence);
@@ -201,6 +229,7 @@ function renderEmptyStatus(message = "No recognized song yet") {
     if (cover) cover.src = "/static/images/logo.png";
 
     document.getElementById("discogs-context")?.classList.add("hidden");
+    document.getElementById("discogs-add-link")?.classList.add("hidden");
     document.getElementById("discogs-side-flip")?.classList.add("hidden");
 
     const songCard = document.querySelector(".song-card");

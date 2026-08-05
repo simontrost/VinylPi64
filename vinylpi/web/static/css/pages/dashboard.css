@@ -69,6 +69,12 @@
 .discogs-side-flip-heading { margin-top: 6px; color: var(--text); font-size: 14px; font-weight: 760; }
 .discogs-side-flip-detail { margin-top: 4px; color: rgba(255,255,255,.72); font-size: 12px; line-height: 1.45; }
 
+.discogs-add-link { display: inline-flex; align-items: center; gap: 8px; width: fit-content; min-height: 38px; margin-top: 16px; padding: 7px 11px 7px 8px; border: 1px solid rgba(245,197,66,.3); border-radius: 11px; background: rgba(245,197,66,.09); color: var(--yellow); font-size: 12px; font-weight: 760; text-decoration: none; transition: border-color .18s ease, background .18s ease, transform .18s ease; }
+.discogs-add-link:hover { border-color: rgba(245,197,66,.55); background: rgba(245,197,66,.14); transform: translateY(-1px); }
+.discogs-add-link:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(245,197,66,.16); }
+.discogs-add-plus { display: inline-grid; place-items: center; width: 23px; height: 23px; border-radius: 7px; background: rgba(245,197,66,.14); color: var(--yellow); font-size: 18px; font-weight: 500; line-height: 1; }
+.discogs-add-external { margin-left: 1px; color: rgba(245,197,66,.7); font-size: 13px; }
+
 .info-backdrop { position: fixed; inset: 0; z-index: 40; background: rgba(0,0,0,.5); backdrop-filter: blur(2px); }
 .track-info-drawer { position: fixed; top: 0; right: 0; z-index: 50; width: min(430px,92vw); height: 100dvh; padding: 24px; overflow-y: auto; transform: translateX(105%); border-left: 1px solid var(--border); background: #17171c; box-shadow: -18px 0 44px rgba(0,0,0,.55); color: var(--text); transition: transform .25s ease; }
 .track-info-drawer.open { transform: translateX(0); }
@@ -100,4 +106,5 @@
     .song-actions button { min-width: 0; width: 100%; }
     #btn-lyrics-toggle { grid-column: 1 / -1; }
     .discogs-context-head, .discogs-track-line { align-items: flex-start; flex-direction: column; gap: 6px; }
+    .discogs-add-link { width: 100%; justify-content: center; }
 }
