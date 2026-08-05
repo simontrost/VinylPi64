@@ -7,19 +7,20 @@ import time
 from vinylpi.core.display import show_fallback_image, show_side_flip_prompt, start_scrolling_display
 from vinylpi.core.image_utils import load_image
 from vinylpi.core.stats_db import get_current_status
-from vinylpi.paths import DISPLAY_REFRESH_PATH
+from vinylpi.paths import get_active_display_refresh_path
 
 
 def request_display_refresh() -> None:
-    DISPLAY_REFRESH_PATH.parent.mkdir(parents=True, exist_ok=True)
-    tmp = DISPLAY_REFRESH_PATH.with_suffix(".tmp")
+    path = get_active_display_refresh_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp")
     tmp.write_text(str(time.time_ns()), encoding="utf-8")
-    os.replace(tmp, DISPLAY_REFRESH_PATH)
+    os.replace(tmp, path)
 
 
 def _read_refresh_token(*, debug_log: bool = False) -> str | None:
     try:
-        return DISPLAY_REFRESH_PATH.read_text(encoding="utf-8").strip() or None
+        return get_active_display_refresh_path().read_text(encoding="utf-8").strip() or None
     except FileNotFoundError:
         return None
     except Exception as exc:

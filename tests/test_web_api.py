@@ -13,6 +13,7 @@ if Flask is not None:
     from vinylpi.web.routes.config_api import config_bp
     from vinylpi.web.routes.genius_api import genius_bp
     from vinylpi.web.routes.pixoo_api import pixoo_bp
+    from vinylpi.web.routes.profiles_api import profiles_bp
     from vinylpi.web.routes.status_api import status_bp
     from vinylpi.web.routes.uploads_api import uploads_bp
 
@@ -22,7 +23,7 @@ class WebApiTests(unittest.TestCase):
     def setUp(self):
         app = Flask(__name__)
         app.config.update(TESTING=True)
-        for blueprint in (config_bp, genius_bp, pixoo_bp, status_bp, uploads_bp):
+        for blueprint in (config_bp, genius_bp, pixoo_bp, profiles_bp, status_bp, uploads_bp):
             app.register_blueprint(blueprint)
         self.client = app.test_client()
 
@@ -159,6 +160,39 @@ class WebApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 404)
         self.assertEqual(response.get_json()["error"], "font not found or invalid")
 
+
+    @patch("vinylpi.web.routes.profiles_api.list_profiles")
+    def test_profiles_endpoint_returns_active_profile(self, list_profiles_mock):
+        list_profiles_mock.return_value = {
+            "active_profile": {"id": "default", "name": "Default", "is_guest": False},
+            "profiles": [{"id": "default", "name": "Default", "is_active": True}],
+        }
+
+        response = self.client.get("/api/profiles")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["active_profile"]["name"], "Default")
+
+    @patch("vinylpi.web.routes.profiles_api.SYNC_MANAGER.is_syncing", return_value=False)
+    @patch("vinylpi.web.routes.profiles_api._switch_profile")
+    @patch("vinylpi.web.routes.profiles_api.create_profile")
+    def test_create_profile_can_copy_settings_and_activate(
+        self, create_profile_mock, switch_profile_mock, is_syncing_mock
+    ):
+        create_profile_mock.return_value = {"id": "abc", "name": "Simon"}
+        switch_profile_mock.return_value = (
+            {"id": "abc", "name": "Simon", "is_guest": False},
+            True,
+        )
+
+        response = self.client.post(
+            "/api/profiles",
+            json={"name": "Simon", "copy_current_settings": True, "activate": True},
+        )
+
+        self.assertEqual(response.status_code, 201)
+        create_profile_mock.assert_called_once_with("Simon", copy_current_settings=True)
+        self.assertTrue(response.get_json()["activated"])
 
 
 if __name__ == "__main__":

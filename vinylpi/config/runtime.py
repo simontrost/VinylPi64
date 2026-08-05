@@ -7,15 +7,28 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any, Dict
 
-from vinylpi.paths import CONFIG_PATH
 from vinylpi.config.config_loader import CONFIG_DEFAULTS, deep_update, load_config
+from vinylpi.paths import CONFIG_PATH, get_active_config_path
+
+_LEGACY_CONFIG_PATH = CONFIG_PATH
 
 
-_CACHE: dict[str, Any] = {"mtime": None, "cfg": None, "ts": 0.0}
+_CACHE: dict[str, Any] = {"path": None, "mtime": None, "cfg": None, "ts": 0.0}
 _CACHE_TTL_SECONDS = 0.5
 
+def _current_config_path() -> Path:
+    # Preserve compatibility with tests/tools that monkey-patch CONFIG_PATH.
+    if Path(CONFIG_PATH) != Path(_LEGACY_CONFIG_PATH):
+        return Path(CONFIG_PATH)
+    return get_active_config_path()
+
+
+def clear_config_cache() -> None:
+    _CACHE.update({"path": None, "mtime": None, "cfg": None, "ts": 0.0})
+
+
 def read_config(force: bool = False) -> Dict[str, Any]:
-    path = CONFIG_PATH
+    path = _current_config_path()
     now = time.time()
 
     try:
@@ -26,11 +39,12 @@ def read_config(force: bool = False) -> Dict[str, Any]:
     if not force:
         if _CACHE["cfg"] is not None:
             fresh_enough = (now - float(_CACHE["ts"])) < _CACHE_TTL_SECONDS
-            same_file = _CACHE["mtime"] == mtime
+            same_file = _CACHE["path"] == str(path) and _CACHE["mtime"] == mtime
             if fresh_enough and same_file:
                 return deepcopy(_CACHE["cfg"])
 
     cfg = load_config(path)
+    _CACHE["path"] = str(path)
     _CACHE["mtime"] = mtime
     _CACHE["cfg"] = cfg
     _CACHE["ts"] = now
@@ -45,9 +59,11 @@ def write_config(data: Dict[str, Any] | None) -> Dict[str, Any]:
     if isinstance(data, dict):
         deep_update(new_cfg, data)
 
-    _atomic_write_json(CONFIG_PATH, new_cfg)
+    path = _current_config_path()
+    _atomic_write_json(path, new_cfg)
 
-    _CACHE["mtime"] = CONFIG_PATH.stat().st_mtime
+    _CACHE["path"] = str(path)
+    _CACHE["mtime"] = path.stat().st_mtime
     _CACHE["cfg"] = new_cfg
     _CACHE["ts"] = time.time()
 
@@ -56,9 +72,11 @@ def write_config(data: Dict[str, Any] | None) -> Dict[str, Any]:
 
 def reset_config() -> Dict[str, Any]:
     cfg = deepcopy(CONFIG_DEFAULTS)
-    _atomic_write_json(CONFIG_PATH, cfg)
+    path = _current_config_path()
+    _atomic_write_json(path, cfg)
 
-    _CACHE["mtime"] = CONFIG_PATH.stat().st_mtime
+    _CACHE["path"] = str(path)
+    _CACHE["mtime"] = path.stat().st_mtime
     _CACHE["cfg"] = cfg
     _CACHE["ts"] = time.time()
 

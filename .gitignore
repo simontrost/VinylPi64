@@ -11,3 +11,7 @@ data/vinylpi.db-wal
 data/vinylpi.db-shm
 
 vinylpi.env
+
+# Per-profile runtime data
+data/profiles.json
+data/profiles/

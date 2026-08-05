@@ -206,6 +206,22 @@ class DiscogsSyncManager:
             "message": "",
         }
 
+    def is_syncing(self) -> bool:
+        with self._lock:
+            return bool(self._thread is not None and self._thread.is_alive())
+
+    def reset_runtime(self) -> None:
+        with self._lock:
+            if self._thread is not None and self._thread.is_alive():
+                return
+            self._thread = None
+            self._runtime = {
+                "syncing": False,
+                "current": 0,
+                "total": 0,
+                "message": "",
+            }
+
     def status(self) -> dict[str, Any]:
         cfg = read_config()
         discogs_cfg = cfg.get("discogs") or {}

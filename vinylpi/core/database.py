@@ -4,16 +4,27 @@ import sqlite3
 import threading
 from pathlib import Path
 
-from vinylpi.paths import DB_PATH
+from vinylpi.paths import DB_PATH, get_active_db_path
+
+_LEGACY_DB_PATH = DB_PATH
 
 SCHEMA_VERSION = 3
 _INIT_LOCK = threading.Lock()
 _INITIALIZED_PATHS: set[str] = set()
 
 
+def _resolve_db_path(db_path: Path | str | None = None) -> Path:
+    if db_path is not None:
+        return Path(db_path)
+    # Keep unittest/maintenance compatibility when DB_PATH is monkey-patched.
+    if Path(DB_PATH) != Path(_LEGACY_DB_PATH):
+        return Path(DB_PATH)
+    return get_active_db_path()
+
+
 def get_connection(db_path: Path | str | None = None) -> sqlite3.Connection:
-    """Open a configured SQLite connection for VinylPi."""
-    path = Path(db_path) if db_path is not None else DB_PATH
+    """Open a configured SQLite connection for the active VinylPi profile."""
+    path = _resolve_db_path(db_path)
     path.parent.mkdir(parents=True, exist_ok=True)
 
     conn = sqlite3.connect(path, timeout=10.0)
@@ -314,7 +325,7 @@ def _migrate_schema(conn: sqlite3.Connection) -> None:
 
 def init_db(db_path: Path | str | None = None) -> None:
     """Create and migrate all database tables once per process."""
-    path = Path(db_path) if db_path is not None else DB_PATH
+    path = _resolve_db_path(db_path)
     path_key = str(path.resolve())
     if path_key in _INITIALIZED_PATHS:
         return

@@ -1,0 +1,45 @@
+<div class="profile-backdrop hidden" id="profileBackdrop"></div>
+<section class="profile-dialog hidden" id="profileDialog" role="dialog" aria-modal="true" aria-labelledby="profileDialogTitle">
+    <header class="profile-dialog-header">
+        <div>
+            <span class="eyebrow">Listening profiles</span>
+            <h2 id="profileDialogTitle">Choose a profile</h2>
+            <p>Statistics and settings are stored separately for every profile.</p>
+        </div>
+        <button class="profile-dialog-close" id="profileDialogClose" type="button" aria-label="Close profile dialog">×</button>
+    </header>
+
+    <div class="profile-active-summary">
+        <span class="profile-avatar" id="profileActiveAvatar">G</span>
+        <div>
+            <small>Currently active</small>
+            <strong id="profileActiveName">Guest</strong>
+        </div>
+        <span class="profile-active-badge" id="profileActiveBadge">Guest mode</span>
+    </div>
+
+    <div class="profile-list" id="profileList" aria-live="polite"></div>
+
+    <form class="profile-create-form" id="profileCreateForm">
+        <div class="profile-create-heading">
+            <strong>Create profile</strong>
+            <span>Starts with a separate, empty listening database.</span>
+        </div>
+        <label for="profileName">Profile name</label>
+        <div class="profile-create-row">
+            <input id="profileName" name="name" maxlength="40" autocomplete="off" placeholder="e.g. Simon" required>
+            <button class="btn-primary" type="submit">Create & switch</button>
+        </div>
+        <label class="profile-copy-setting">
+            <input id="profileCopySettings" type="checkbox" checked>
+            <span>Copy the current settings into the new profile</span>
+        </label>
+    </form>
+
+    <div class="profile-dialog-message hidden" id="profileDialogMessage" role="status"></div>
+
+    <footer class="profile-dialog-footer">
+        <span>Signing out switches VinylPi to a separate guest database.</span>
+        <button id="profileLogout" type="button">Sign out</button>
+    </footer>
+</section>

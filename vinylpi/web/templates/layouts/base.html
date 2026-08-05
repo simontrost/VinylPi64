@@ -10,13 +10,15 @@
     <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}" sizes="180x180">
     <link rel="manifest" href="{{ url_for('static', filename='site.webmanifest') }}">
     <meta name="theme-color" content="#151519">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}?v=20260805a">
     {% block page_styles %}{% endblock %}
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <script src="{{ url_for('static', filename='js/profile.js') }}?v=20260805a" defer></script>
     {% block page_scripts %}{% endblock %}
 </head>
 <body>
     {% include "components/navigation.html" %}
     {% block content %}{% endblock %}
+    {% include "components/profile_dialog.html" %}
 </body>
 </html>

@@ -15,10 +15,11 @@ from vinylpi.core.stats_db import (
     set_meta,
     write_current_status,
 )
-from vinylpi.paths import DATA_DIR, STATS_PATH, STATUS_PATH
+from vinylpi.paths import DATA_DIR, STATS_PATH, STATUS_PATH, get_active_db_path
+from vinylpi.profiles import ensure_profiles_initialized, is_default_profile_active
 
 _lock = threading.Lock()
-_initialized = False
+_initialized_paths: set[str] = set()
 
 
 def _sha256(path: Path) -> str:
@@ -36,7 +37,7 @@ def _archive_legacy_file(path: Path) -> None:
 
 
 def _migrate_legacy_statistics_once() -> None:
-    """Import legacy JSON only when the SQLite database is still empty."""
+    """Import legacy JSON only into the default profile and only once."""
     if get_meta("legacy_json_migration_complete") == "1":
         return
 
@@ -78,19 +79,22 @@ def _migrate_legacy_status_once() -> None:
 
 
 def initialize_storage() -> None:
-    """Initialize SQLite and safely absorb legacy JSON runtime data once."""
-    global _initialized
-    if _initialized:
+    """Initialize storage for the currently active profile."""
+    ensure_profiles_initialized()
+    db_path = get_active_db_path()
+    path_key = str(db_path.resolve())
+    if path_key in _initialized_paths:
         return
 
     with _lock:
-        if _initialized:
+        if path_key in _initialized_paths:
             return
 
-        init_db()
-        try:
-            _migrate_legacy_statistics_once()
-        except Exception as exc:
-            print(f"Could not migrate legacy stats.json to SQLite: {exc}")
-        _migrate_legacy_status_once()
-        _initialized = True
+        init_db(db_path)
+        if is_default_profile_active():
+            try:
+                _migrate_legacy_statistics_once()
+            except Exception as exc:
+                print(f"Could not migrate legacy stats.json to SQLite: {exc}")
+            _migrate_legacy_status_once()
+        _initialized_paths.add(path_key)

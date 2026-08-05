@@ -1,7 +1,9 @@
 import json
 from copy import deepcopy
 from pathlib import Path
-from vinylpi.paths import CONFIG_PATH
+from vinylpi.paths import CONFIG_PATH, get_active_config_path
+
+_LEGACY_CONFIG_PATH = CONFIG_PATH
 
 CONFIG_DEFAULTS = {
     "audio": {
@@ -93,7 +95,12 @@ def deep_update(base: dict, updates: dict) -> dict:
     return base
 
 def load_config(path: Path | str | None = None) -> dict:
-    path = Path(path) if path is not None else CONFIG_PATH
+    if path is not None:
+        path = Path(path)
+    elif Path(CONFIG_PATH) != Path(_LEGACY_CONFIG_PATH):
+        path = Path(CONFIG_PATH)
+    else:
+        path = get_active_config_path()
     cfg = deepcopy(CONFIG_DEFAULTS)
 
     try:

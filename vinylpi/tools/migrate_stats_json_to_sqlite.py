@@ -8,7 +8,7 @@ from pathlib import Path
 
 from vinylpi.core.database import get_connection, init_db
 from vinylpi.core.stats_db import get_stats_snapshot, import_stats_json
-from vinylpi.paths import DB_PATH, STATS_PATH
+from vinylpi.paths import STATS_PATH, get_active_db_path
 
 
 def print_summary() -> None:
@@ -27,7 +27,7 @@ def print_summary() -> None:
         ).fetchone()[0]
         integrity = conn.execute("PRAGMA integrity_check").fetchone()[0]
 
-    print(f"Database: {DB_PATH}")
+    print(f"Database: {get_active_db_path()}")
     for label, value in counts.items():
         print(f"  {label:16}: {value}")
     print(f"  total minutes   : {round(float(total_seconds or 0) / 60.0, 2)}")

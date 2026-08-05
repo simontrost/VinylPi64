@@ -7,10 +7,10 @@ from typing import Optional
 import requests
 from PIL import Image
 
-from vinylpi.config.runtime import read_config
+from vinylpi.config.runtime import read_config, write_config
 from vinylpi.integrations.pixoo_discovery import discover_pixoo_ip, _probe_ip
 
-from vinylpi.paths import CLOUD_BASE_URL, CONFIG_PATH
+from vinylpi.paths import CLOUD_BASE_URL
 
 class PixooError(Exception):
     pass
@@ -57,22 +57,11 @@ class PixooClient:
             CONFIG["divoom"]["ip"] = self.ip
 
             try:
-                if CONFIG_PATH.exists():
-                    with CONFIG_PATH.open("r", encoding="utf-8") as f:
-                        cfg_file = json.load(f)
-                else:
-                    cfg_file = {}
-
-                cfg_file.setdefault("divoom", {})
-                cfg_file["divoom"]["ip"] = self.ip
-
-                with CONFIG_PATH.open("w", encoding="utf-8") as f:
-                    json.dump(cfg_file, f, indent=4)
-
+                write_config({"divoom": {"ip": self.ip}})
                 if debug_log:
-                    print(f"Saved Pixoo IP to config.json: {self.ip}")
+                    print(f"Saved Pixoo IP to active profile config: {self.ip}")
             except Exception as e:
-                print(f"Warning: could not save Pixoo IP to config.json: {e}")
+                print(f"Warning: could not save Pixoo IP to active profile config: {e}")
 
         self.base_url = f"http://{self.ip}/post"
         if debug_log:

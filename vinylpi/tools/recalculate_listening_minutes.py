@@ -15,7 +15,7 @@ from vinylpi.core.stats_db import (
     update_song_duration,
     upsert_duration_cache,
 )
-from vinylpi.paths import DB_PATH
+from vinylpi.paths import get_active_db_path
 
 
 def resolve_duration(entry: dict) -> tuple[int | None, str]:
@@ -104,7 +104,7 @@ def main() -> None:
     print("\nDone.")
     print(f"Processed: {processed}; skipped: {skipped}")
     print(f"New total: {total_seconds / 60.0:.2f} minutes")
-    print(f"Database updated: {DB_PATH}")
+    print(f"Database updated: {get_active_db_path()}")
 
 
 if __name__ == "__main__":

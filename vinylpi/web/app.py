@@ -12,6 +12,7 @@ from vinylpi.web.routes.genius_api import genius_bp
 from vinylpi.web.routes.ha_api import bp as ha_api_bp
 from vinylpi.web.routes.pages import pages_bp
 from vinylpi.web.routes.pixoo_api import pixoo_bp
+from vinylpi.web.routes.profiles_api import profiles_bp
 from vinylpi.web.routes.recognizer_api import recognizer_bp
 from vinylpi.web.routes.shazam_api import shazam_bp
 from vinylpi.web.routes.stats_api import stats_bp
@@ -25,6 +26,7 @@ _BLUEPRINTS = (
     status_bp,
     events_bp,
     config_bp,
+    profiles_bp,
     discogs_bp,
     recognizer_bp,
     pixoo_bp,

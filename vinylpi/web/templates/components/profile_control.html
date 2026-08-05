@@ -1,0 +1,12 @@
+<div class="header-actions">
+    <button class="profile-trigger" id="profileTrigger" type="button" aria-haspopup="dialog" aria-controls="profileDialog" title="Profiles">
+        <span class="profile-trigger-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"></circle><path d="M5 20c.7-4 3-6 7-6s6.3 2 7 6"></path></svg>
+        </span>
+        <span class="profile-trigger-copy">
+            <small>Profile</small>
+            <strong id="profileTriggerName">Loading...</strong>
+        </span>
+    </button>
+    <img src="{{ url_for('static', filename='images/logo.png') }}" class="header-logo" alt="VinylPi Logo">
+</div>
