@@ -129,6 +129,35 @@ function closeShareModal() {
     document.body.classList.remove("stats-share-open");
 }
 
+function canNativeShareFile() {
+    return (
+        typeof navigator !== "undefined" &&
+        typeof navigator.share === "function" &&
+        typeof navigator.canShare === "function" &&
+        shareAsset.file &&
+        navigator.canShare({ files: [shareAsset.file] })
+    );
+}
+
+function updateShareCapabilities() {
+    const nativeButton = document.getElementById("stats-native-share-button");
+    const fallbackContainer = document.getElementById("stats-share-fallbacks");
+    const hint = document.querySelector(".stats-native-share-hint");
+    if (!nativeButton || !fallbackContainer || !hint) return;
+
+    if (canNativeShareFile()) {
+        nativeButton.disabled = false;
+        nativeButton.textContent = "Open native share sheet";
+        fallbackContainer.classList.add("hidden");
+        hint.textContent = "On iPhone and Android this opens the native share menu of your device.";
+    } else {
+        nativeButton.disabled = true;
+        nativeButton.textContent = "Native share not available here";
+        fallbackContainer.classList.remove("hidden");
+        hint.textContent = "This browser cannot open the device share sheet. You can still copy or open the image below.";
+    }
+}
+
 async function showSharePreview() {
     const button = document.getElementById("stats-share-button");
     if (!button) return;
@@ -146,6 +175,7 @@ async function showSharePreview() {
         if (image) {
             image.src = asset.url;
         }
+        updateShareCapabilities();
         openShareModal();
         setFeedback("stats-share-feedback", "Preview ready.", "success");
     } catch (error) {
@@ -158,24 +188,14 @@ async function showSharePreview() {
     }
 }
 
-function canNativeShareFile() {
-    return (
-        typeof navigator !== "undefined" &&
-        typeof navigator.share === "function" &&
-        typeof navigator.canShare === "function" &&
-        shareAsset.file &&
-        navigator.canShare({ files: [shareAsset.file] })
-    );
-}
-
-async function shareFileWithNative(text = "My VinylPi statistics") {
+async function shareFileWithNative() {
     if (!canNativeShareFile()) {
         throw new Error("Native file sharing is not supported on this device.");
     }
 
     await navigator.share({
         title: "VinylPi statistics",
-        text,
+        text: "My VinylPi statistics.",
         files: [shareAsset.file],
     });
 }
@@ -196,48 +216,12 @@ function openShareImage() {
     window.open(shareAsset.url, "_blank", "noopener,noreferrer");
 }
 
-function openSocialShare(url) {
-    window.open(url, "_blank", "noopener,noreferrer,width=720,height=720");
-}
-
 async function handleShareAction(action) {
-    const shareText = "Check out my VinylPi listening statistics.";
-    const pageUrl = window.location.href;
-
     try {
         switch (action) {
             case "native":
-                await shareFileWithNative(shareText);
-                setFeedback("stats-share-modal-feedback", "Shared successfully.", "success");
-                break;
-            case "instagram":
-                if (canNativeShareFile()) {
-                    await shareFileWithNative("VinylPi statistics for Instagram");
-                    setFeedback("stats-share-modal-feedback", "Use your device share sheet to continue with Instagram.", "success");
-                } else {
-                    openShareImage();
-                    setFeedback("stats-share-modal-feedback", "Instagram does not support direct browser uploads here. The image was opened in a new tab so you can use it there.", "muted");
-                }
-                break;
-            case "facebook":
-                openSocialShare(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(pageUrl)}`);
-                setFeedback("stats-share-modal-feedback", "Opened Facebook share options in a new tab.", "success");
-                break;
-            case "x":
-                openSocialShare(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(pageUrl)}`);
-                setFeedback("stats-share-modal-feedback", "Opened X share options in a new tab.", "success");
-                break;
-            case "whatsapp":
-                openSocialShare(`https://wa.me/?text=${encodeURIComponent(`${shareText} ${pageUrl}`)}`);
-                setFeedback("stats-share-modal-feedback", "Opened WhatsApp share options in a new tab.", "success");
-                break;
-            case "telegram":
-                openSocialShare(`https://t.me/share/url?url=${encodeURIComponent(pageUrl)}&text=${encodeURIComponent(shareText)}`);
-                setFeedback("stats-share-modal-feedback", "Opened Telegram share options in a new tab.", "success");
-                break;
-            case "email":
-                window.location.href = `mailto:?subject=${encodeURIComponent("My VinylPi statistics")}&body=${encodeURIComponent(`${shareText}\n\n${pageUrl}`)}`;
-                setFeedback("stats-share-modal-feedback", "Opened your email app.", "success");
+                await shareFileWithNative();
+                setFeedback("stats-share-modal-feedback", "Native share sheet opened.", "success");
                 break;
             case "copy":
                 await copyShareImage();
@@ -443,11 +427,15 @@ document.addEventListener("DOMContentLoaded", () => {
     loadStats();
 
     const shareButton = document.getElementById("stats-share-button");
+    const nativeShareButton = document.getElementById("stats-native-share-button");
     const closeButton = document.getElementById("stats-share-close");
     const backdrop = document.getElementById("stats-share-backdrop");
 
     if (shareButton) {
         shareButton.addEventListener("click", showSharePreview);
+    }
+    if (nativeShareButton) {
+        nativeShareButton.addEventListener("click", () => handleShareAction("native"));
     }
     if (closeButton) {
         closeButton.addEventListener("click", closeShareModal);

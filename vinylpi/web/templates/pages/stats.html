@@ -33,7 +33,7 @@
             <div class="stats-share-panel-copy">
                 <span class="eyebrow">Share</span>
                 <h2>Create a Vinyl Wrapped card</h2>
-                <p>Preview your statistics in a social-media-friendly layout and open sharing options.</p>
+                <p>Open a large preview first, then continue with your device’s native share sheet.</p>
             </div>
             <button id="stats-share-button" class="btn-primary stats-share-button" type="button" aria-label="Open the VinylPi share dialog">
                 <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -41,7 +41,7 @@
                     <path d="M7 9l5-5 5 5"></path>
                     <path d="M5 14v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3"></path>
                 </svg>
-                <span>Share</span>
+                <span>Open share preview</span>
             </button>
         </aside>
     </section>
@@ -88,14 +88,14 @@
             <img id="stats-share-image" class="stats-share-image" alt="Preview of the VinylPi share card">
         </div>
 
-        <div class="stats-share-actions">
-            <button type="button" class="stats-platform-button" data-share-action="native">Native share</button>
-            <button type="button" class="stats-platform-button" data-share-action="instagram">Instagram</button>
-            <button type="button" class="stats-platform-button" data-share-action="facebook">Facebook</button>
-            <button type="button" class="stats-platform-button" data-share-action="x">X / Twitter</button>
-            <button type="button" class="stats-platform-button" data-share-action="whatsapp">WhatsApp</button>
-            <button type="button" class="stats-platform-button" data-share-action="telegram">Telegram</button>
-            <button type="button" class="stats-platform-button" data-share-action="email">Email</button>
+        <div class="stats-native-share-block">
+            <button type="button" id="stats-native-share-button" class="btn-primary stats-native-share-button">
+                Open native share sheet
+            </button>
+            <p class="stats-native-share-hint">On iPhone and Android this opens the native share menu of your device.</p>
+        </div>
+
+        <div id="stats-share-fallbacks" class="stats-share-fallbacks hidden">
             <button type="button" class="stats-platform-button" data-share-action="copy">Copy image</button>
             <button type="button" class="stats-platform-button" data-share-action="open">Open image</button>
         </div>

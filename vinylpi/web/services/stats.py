@@ -291,9 +291,9 @@ def _create_share_card(payload: dict[str, Any]) -> Image.Image:
     image = _draw_gradient_background(_SHARE_CARD_SIZE)
     draw = ImageDraw.Draw(image)
 
-    badge_font = _font(28, pixel=True)
+    badge_font = _font(26, pixel=True)
     heading_font = _font(72, bold=True)
-    profile_font = _font(30, bold=True)
+    profile_font = _font(28, bold=True)
     eyebrow_font = _font(22, pixel=True)
     metric_font = _font(118, bold=True)
     metric_sub_font = _font(30, bold=True)
@@ -306,18 +306,18 @@ def _create_share_card(payload: dict[str, Any]) -> Image.Image:
 
     badge_text = "VINYL WRAPPED"
     badge_w, badge_h = _text_size(draw, badge_text, badge_font)
-    badge_box = (left, 64, left + badge_w + 40, 64 + badge_h + 24)
+    badge_box = (left, 64, left + badge_w + 54, 64 + badge_h + 34)
     draw.rounded_rectangle(badge_box, radius=26, fill=(25, 25, 34, 170), outline=(255, 255, 255, 42), width=2)
-    draw.text((left + 18, 80), badge_text, font=badge_font, fill=(255, 255, 255, 245))
+    draw.text((left + 24, 86), badge_text, font=badge_font, fill=(255, 255, 255, 245))
 
     draw.text((left, 160), "Your Vinyl Statistics", font=heading_font, fill=(255, 255, 255, 248))
 
     profile_name = str(payload.get("profile_name") or "Guest")
     profile_text = _fit_text(draw, profile_name, profile_font, max_width=420)
     profile_w, profile_h = _text_size(draw, profile_text, profile_font)
-    profile_box = (left, 272, left + profile_w + 36, 272 + profile_h + 22)
+    profile_box = (left, 272, left + profile_w + 52, 272 + profile_h + 30)
     draw.rounded_rectangle(profile_box, radius=24, fill=(17, 17, 24, 150), outline=(255, 255, 255, 38), width=2)
-    draw.text((left + 18, 284), profile_text, font=profile_font, fill=(248, 248, 252, 235))
+    draw.text((left + 24, 290), profile_text, font=profile_font, fill=(248, 248, 252, 235))
 
     hero_box = (left, 380, right, 860)
     _panel(draw, hero_box, fill=(17, 17, 24, 176), outline=(255, 255, 255, 44))
@@ -352,15 +352,13 @@ def _create_share_card(payload: dict[str, Any]) -> Image.Image:
 
     footer_box = (left, 1600, right, 1816)
     _panel(draw, footer_box, fill=(16, 16, 22, 172), outline=(255, 255, 255, 34))
-    draw.text((left + 34, 1644), "VINYLPI64", font=badge_font, fill=(255, 255, 255, 240))
-    draw.text((left + 34, 1718), "Built from your local listening statistics.", font=paragraph_font, fill=(240, 240, 246, 212))
 
     genre_label = "TOP GENRE"
-    genre_value = _fit_text(draw, str(payload.get("top_genre") or "Unknown"), genre_value_font, max_width=320)
-    genre_label_w, _ = _text_size(draw, genre_label, genre_label_font)
-    genre_value_w, _ = _text_size(draw, genre_value, genre_value_font)
-    genre_right = right - 36
-    draw.text((genre_right - genre_label_w, 1648), genre_label, font=genre_label_font, fill=(245, 197, 66, 255))
-    draw.text((genre_right - genre_value_w, 1700), genre_value, font=genre_value_font, fill=(255, 255, 255, 245))
+    genre_value = _fit_text(draw, str(payload.get("top_genre") or "Unknown"), genre_value_font, max_width=760)
+    genre_label_w, genre_label_h = _text_size(draw, genre_label, genre_label_font)
+    genre_value_w, genre_value_h = _text_size(draw, genre_value, genre_value_font)
+    center_x = (left + right) // 2
+    draw.text((center_x - genre_label_w // 2, 1650), genre_label, font=genre_label_font, fill=(245, 197, 66, 255))
+    draw.text((center_x - genre_value_w // 2, 1706), genre_value, font=genre_value_font, fill=(255, 255, 255, 245))
 
     return image.convert("RGB")

@@ -1,6 +1,6 @@
 .stats-summary-row {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 280px;
+    grid-template-columns: minmax(0, 1fr) 300px;
     gap: 18px;
     width: min(var(--content-max), 100%);
     margin: 0 auto 18px;
@@ -27,7 +27,8 @@
     font-size: 14px;
 }
 
-.stats-share-button {
+.stats-share-button,
+.stats-native-share-button {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -46,7 +47,8 @@
     stroke-linejoin: round;
 }
 
-.stats-share-button.is-loading {
+.stats-share-button.is-loading,
+.stats-native-share-button.is-loading {
     opacity: 0.82;
 }
 
@@ -359,11 +361,22 @@
     background: #121218;
 }
 
-.stats-share-actions {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 12px;
+.stats-native-share-block {
     margin-top: 18px;
+}
+
+.stats-native-share-hint {
+    margin: 10px 4px 0;
+    color: var(--muted);
+    font-size: 13px;
+    text-align: center;
+}
+
+.stats-share-fallbacks {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    margin-top: 14px;
 }
 
 .stats-platform-button {
@@ -439,7 +452,7 @@ body.stats-share-open {
         max-height: calc(100vh - 16px);
     }
 
-    .stats-share-actions {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+    .stats-share-fallbacks {
+        grid-template-columns: 1fr;
     }
 }
