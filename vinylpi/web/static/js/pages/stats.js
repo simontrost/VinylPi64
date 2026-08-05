@@ -2,6 +2,7 @@ const MAX_VISIBLE = 5;
 let radarChart = null;
 let albumCarouselTimer = null;
 let albumCarouselIndex = 0;
+let shareAsset = { blob: null, file: null, url: null };
 
 function formatCount(value, singular, plural = `${singular}s`) {
     const count = Number(value) || 0;
@@ -81,8 +82,8 @@ function setupExpandableList(listElement, items, renderItem, emptyMessage) {
     render();
 }
 
-function setShareFeedback(message, type = "") {
-    const element = document.getElementById("stats-share-feedback");
+function setFeedback(targetId, message, type = "") {
+    const element = document.getElementById(targetId);
     if (!element) return;
     element.textContent = message || "";
     element.classList.remove("is-error", "is-success", "is-muted");
@@ -91,7 +92,44 @@ function setShareFeedback(message, type = "") {
     }
 }
 
-async function shareStatsSummary() {
+function clearShareAsset() {
+    if (shareAsset.url) {
+        URL.revokeObjectURL(shareAsset.url);
+    }
+    shareAsset = { blob: null, file: null, url: null };
+}
+
+async function fetchShareAsset() {
+    const response = await fetch("/api/stats/share-card", { cache: "no-store" });
+    if (!response.ok) {
+        throw new Error(`Share card request failed: ${response.status}`);
+    }
+
+    const blob = await response.blob();
+    clearShareAsset();
+    shareAsset.blob = blob;
+    shareAsset.file = new File([blob], "vinylpi-wrapped.png", { type: blob.type || "image/png" });
+    shareAsset.url = URL.createObjectURL(blob);
+    return shareAsset;
+}
+
+function openShareModal() {
+    const modal = document.getElementById("stats-share-modal");
+    if (!modal) return;
+    modal.classList.remove("hidden");
+    modal.setAttribute("aria-hidden", "false");
+    document.body.classList.add("stats-share-open");
+}
+
+function closeShareModal() {
+    const modal = document.getElementById("stats-share-modal");
+    if (!modal) return;
+    modal.classList.add("hidden");
+    modal.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("stats-share-open");
+}
+
+async function showSharePreview() {
     const button = document.getElementById("stats-share-button");
     if (!button) return;
 
@@ -99,52 +137,126 @@ async function shareStatsSummary() {
     button.disabled = true;
     button.classList.add("is-loading");
     button.innerHTML = "<span>Preparing…</span>";
-    setShareFeedback("Creating your share image…", "muted");
+    setFeedback("stats-share-feedback", "Creating your share preview…", "muted");
+    setFeedback("stats-share-modal-feedback", "", "");
 
     try {
-        const response = await fetch("/api/stats/share-card", { cache: "no-store" });
-        if (!response.ok) {
-            throw new Error(`Share card request failed: ${response.status}`);
+        const asset = await fetchShareAsset();
+        const image = document.getElementById("stats-share-image");
+        if (image) {
+            image.src = asset.url;
         }
-
-        const blob = await response.blob();
-        const file = new File([blob], "vinylpi-wrapped.png", { type: blob.type || "image/png" });
-
-        const canUseWebShare =
-            typeof navigator !== "undefined" &&
-            typeof navigator.share === "function" &&
-            typeof navigator.canShare === "function" &&
-            navigator.canShare({ files: [file] });
-
-        if (canUseWebShare) {
-            await navigator.share({
-                title: "My VinylPi summary",
-                text: "My VinylPi listening summary.",
-                files: [file],
-            });
-            setShareFeedback("Share card ready.", "success");
-        } else {
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement("a");
-            link.href = url;
-            link.download = "vinylpi-wrapped.png";
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
-            window.setTimeout(() => URL.revokeObjectURL(url), 1200);
-            setShareFeedback("Image downloaded. You can now share it on social media.", "success");
-        }
+        openShareModal();
+        setFeedback("stats-share-feedback", "Preview ready.", "success");
     } catch (error) {
-        if (error && (error.name === "AbortError" || error.name === "NotAllowedError")) {
-            setShareFeedback("Sharing cancelled.", "muted");
-        } else {
-            console.error(error);
-            setShareFeedback("Could not create the share image right now.", "error");
-        }
+        console.error(error);
+        setFeedback("stats-share-feedback", "Could not create the share preview right now.", "error");
     } finally {
         button.disabled = false;
         button.classList.remove("is-loading");
         button.innerHTML = originalHtml;
+    }
+}
+
+function canNativeShareFile() {
+    return (
+        typeof navigator !== "undefined" &&
+        typeof navigator.share === "function" &&
+        typeof navigator.canShare === "function" &&
+        shareAsset.file &&
+        navigator.canShare({ files: [shareAsset.file] })
+    );
+}
+
+async function shareFileWithNative(text = "My VinylPi statistics") {
+    if (!canNativeShareFile()) {
+        throw new Error("Native file sharing is not supported on this device.");
+    }
+
+    await navigator.share({
+        title: "VinylPi statistics",
+        text,
+        files: [shareAsset.file],
+    });
+}
+
+async function copyShareImage() {
+    if (!(navigator.clipboard && window.ClipboardItem && shareAsset.blob)) {
+        throw new Error("Copying images is not supported in this browser.");
+    }
+    await navigator.clipboard.write([
+        new ClipboardItem({ [shareAsset.blob.type || "image/png"]: shareAsset.blob }),
+    ]);
+}
+
+function openShareImage() {
+    if (!shareAsset.url) {
+        throw new Error("Share image is not ready yet.");
+    }
+    window.open(shareAsset.url, "_blank", "noopener,noreferrer");
+}
+
+function openSocialShare(url) {
+    window.open(url, "_blank", "noopener,noreferrer,width=720,height=720");
+}
+
+async function handleShareAction(action) {
+    const shareText = "Check out my VinylPi listening statistics.";
+    const pageUrl = window.location.href;
+
+    try {
+        switch (action) {
+            case "native":
+                await shareFileWithNative(shareText);
+                setFeedback("stats-share-modal-feedback", "Shared successfully.", "success");
+                break;
+            case "instagram":
+                if (canNativeShareFile()) {
+                    await shareFileWithNative("VinylPi statistics for Instagram");
+                    setFeedback("stats-share-modal-feedback", "Use your device share sheet to continue with Instagram.", "success");
+                } else {
+                    openShareImage();
+                    setFeedback("stats-share-modal-feedback", "Instagram does not support direct browser uploads here. The image was opened in a new tab so you can use it there.", "muted");
+                }
+                break;
+            case "facebook":
+                openSocialShare(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(pageUrl)}`);
+                setFeedback("stats-share-modal-feedback", "Opened Facebook share options in a new tab.", "success");
+                break;
+            case "x":
+                openSocialShare(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(pageUrl)}`);
+                setFeedback("stats-share-modal-feedback", "Opened X share options in a new tab.", "success");
+                break;
+            case "whatsapp":
+                openSocialShare(`https://wa.me/?text=${encodeURIComponent(`${shareText} ${pageUrl}`)}`);
+                setFeedback("stats-share-modal-feedback", "Opened WhatsApp share options in a new tab.", "success");
+                break;
+            case "telegram":
+                openSocialShare(`https://t.me/share/url?url=${encodeURIComponent(pageUrl)}&text=${encodeURIComponent(shareText)}`);
+                setFeedback("stats-share-modal-feedback", "Opened Telegram share options in a new tab.", "success");
+                break;
+            case "email":
+                window.location.href = `mailto:?subject=${encodeURIComponent("My VinylPi statistics")}&body=${encodeURIComponent(`${shareText}\n\n${pageUrl}`)}`;
+                setFeedback("stats-share-modal-feedback", "Opened your email app.", "success");
+                break;
+            case "copy":
+                await copyShareImage();
+                setFeedback("stats-share-modal-feedback", "Image copied to your clipboard.", "success");
+                break;
+            case "open":
+                openShareImage();
+                setFeedback("stats-share-modal-feedback", "Image opened in a new tab.", "success");
+                break;
+            default:
+                break;
+        }
+    } catch (error) {
+        if (error && (error.name === "AbortError" || error.name === "NotAllowedError")) {
+            setFeedback("stats-share-modal-feedback", "Sharing cancelled.", "muted");
+            return;
+        }
+        console.error(error);
+        setFeedback("stats-share-modal-feedback", error.message || "This share action is not available right now.", "error");
     }
 }
 
@@ -329,8 +441,30 @@ async function loadStats() {
 
 document.addEventListener("DOMContentLoaded", () => {
     loadStats();
+
     const shareButton = document.getElementById("stats-share-button");
+    const closeButton = document.getElementById("stats-share-close");
+    const backdrop = document.getElementById("stats-share-backdrop");
+
     if (shareButton) {
-        shareButton.addEventListener("click", shareStatsSummary);
+        shareButton.addEventListener("click", showSharePreview);
     }
+    if (closeButton) {
+        closeButton.addEventListener("click", closeShareModal);
+    }
+    if (backdrop) {
+        backdrop.addEventListener("click", closeShareModal);
+    }
+
+    document.querySelectorAll("[data-share-action]").forEach((button) => {
+        button.addEventListener("click", () => handleShareAction(button.dataset.shareAction));
+    });
+
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") {
+            closeShareModal();
+        }
+    });
+
+    window.addEventListener("beforeunload", clearShareAsset);
 });

@@ -18,28 +18,32 @@
         {% include "components/profile_control.html" %}
     </header>
 
-    <section class="page-intro page-intro-single">
+    <section class="stats-summary-row">
         <div class="stats-minutes-card page-intro-copy">
-            <div class="stats-intro-top">
-                <div>
-                    <span class="eyebrow">Listening overview</span>
-                    <div class="stats-value-row">
-                        <strong id="stats-minutes" class="stats-minutes-value">—</strong>
-                        <span class="stats-unit">minutes</span>
-                    </div>
-                    <div class="stats-description">Calculated from confirmed recognitions.</div>
-                </div>
-                <button id="stats-share-button" class="btn-primary stats-share-button" type="button" aria-label="Share your VinylPi statistics summary">
-                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                        <path d="M12 16V4"></path>
-                        <path d="M7 9l5-5 5 5"></path>
-                        <path d="M5 14v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3"></path>
-                    </svg>
-                    <span>Share</span>
-                </button>
+            <span class="eyebrow">Listening overview</span>
+            <div class="stats-value-row">
+                <strong id="stats-minutes" class="stats-minutes-value">—</strong>
+                <span class="stats-unit">minutes</span>
             </div>
+            <div class="stats-description">Calculated from confirmed recognitions.</div>
             <p id="stats-share-feedback" class="stats-share-feedback" role="status" aria-live="polite"></p>
         </div>
+
+        <aside class="stats-share-panel card">
+            <div class="stats-share-panel-copy">
+                <span class="eyebrow">Share</span>
+                <h2>Create a Vinyl Wrapped card</h2>
+                <p>Preview your statistics in a social-media-friendly layout and open sharing options.</p>
+            </div>
+            <button id="stats-share-button" class="btn-primary stats-share-button" type="button" aria-label="Open the VinylPi share dialog">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path d="M12 16V4"></path>
+                    <path d="M7 9l5-5 5 5"></path>
+                    <path d="M5 14v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3"></path>
+                </svg>
+                <span>Share</span>
+            </button>
+        </aside>
     </section>
 
     <section class="stats-section" aria-live="polite">
@@ -68,4 +72,35 @@
         </div>
     </section>
 </main>
+
+<div id="stats-share-modal" class="stats-share-modal hidden" aria-hidden="true">
+    <div id="stats-share-backdrop" class="stats-share-backdrop"></div>
+    <div class="stats-share-dialog card" role="dialog" aria-modal="true" aria-labelledby="stats-share-title">
+        <div class="stats-share-dialog-header">
+            <div>
+                <span class="eyebrow">Share preview</span>
+                <h2 id="stats-share-title">Vinyl Wrapped</h2>
+            </div>
+            <button id="stats-share-close" class="stats-share-close" type="button" aria-label="Close share dialog">×</button>
+        </div>
+
+        <div class="stats-share-preview-wrap">
+            <img id="stats-share-image" class="stats-share-image" alt="Preview of the VinylPi share card">
+        </div>
+
+        <div class="stats-share-actions">
+            <button type="button" class="stats-platform-button" data-share-action="native">Native share</button>
+            <button type="button" class="stats-platform-button" data-share-action="instagram">Instagram</button>
+            <button type="button" class="stats-platform-button" data-share-action="facebook">Facebook</button>
+            <button type="button" class="stats-platform-button" data-share-action="x">X / Twitter</button>
+            <button type="button" class="stats-platform-button" data-share-action="whatsapp">WhatsApp</button>
+            <button type="button" class="stats-platform-button" data-share-action="telegram">Telegram</button>
+            <button type="button" class="stats-platform-button" data-share-action="email">Email</button>
+            <button type="button" class="stats-platform-button" data-share-action="copy">Copy image</button>
+            <button type="button" class="stats-platform-button" data-share-action="open">Open image</button>
+        </div>
+
+        <p id="stats-share-modal-feedback" class="stats-share-modal-feedback" role="status" aria-live="polite"></p>
+    </div>
+</div>
 {% endblock %}
