@@ -492,16 +492,57 @@ textarea:focus-visible {
     }
 
     .nav-center .nav-orb {
+        position: relative;
+        isolation: isolate;
         width: 58px;
         height: 58px;
-        border-radius: 18px;
-        background: linear-gradient(145deg, rgba(124, 58, 237, 0.95), rgba(239, 45, 143, 0.88));
-        border: 1px solid rgba(255,255,255,0.16);
-        box-shadow: 0 9px 22px rgba(0, 0, 0, 0.34), 0 0 18px rgba(239, 45, 143, 0.12);
+        overflow: hidden;
+        border-radius: 50%;
+        background:
+            radial-gradient(circle at 34% 27%, rgba(255, 255, 255, 0.10), transparent 22%),
+            repeating-radial-gradient(
+                circle at center,
+                rgba(239, 45, 143, 0.36) 0 1px,
+                rgba(124, 58, 237, 0.18) 1px 2px,
+                transparent 2px 5px
+            ),
+            radial-gradient(circle at center, #211525 0 58%, #121018 72%, #0c0b10 100%);
+        border: 2px solid rgba(239, 45, 143, 0.82);
+        box-shadow:
+            0 9px 22px rgba(0, 0, 0, 0.38),
+            0 0 0 1px rgba(124, 58, 237, 0.34),
+            0 0 18px rgba(239, 45, 143, 0.15);
         color: #fff;
     }
 
+    .nav-center .nav-orb::before {
+        content: "";
+        position: absolute;
+        z-index: 1;
+        inset: 50% auto auto 50%;
+        width: 29px;
+        height: 29px;
+        transform: translate(-50%, -50%);
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: 50%;
+        background: linear-gradient(145deg, #8b4cf0, #ef2d8f);
+        box-shadow: 0 0 10px rgba(239, 45, 143, 0.20);
+    }
+
+    .nav-center .nav-orb::after {
+        content: "";
+        position: absolute;
+        z-index: 0;
+        inset: 6px;
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        border-radius: 50%;
+        box-shadow: inset 0 0 0 1px rgba(124, 58, 237, 0.12);
+        pointer-events: none;
+    }
+
     .nav-center .nav-orb svg {
+        position: relative;
+        z-index: 2;
         width: 22px;
         height: 22px;
         stroke-width: 2;
@@ -512,7 +553,15 @@ textarea:focus-visible {
     }
 
     .nav a.nav-center.active .nav-orb {
-        background: linear-gradient(145deg, #8b4cf0, #ef2d8f);
+        border-color: rgba(255, 76, 178, 0.96);
+        box-shadow:
+            0 9px 22px rgba(0, 0, 0, 0.38),
+            0 0 0 1px rgba(139, 76, 240, 0.48),
+            0 0 20px rgba(239, 45, 143, 0.24);
+    }
+
+    .nav a.nav-center.active .nav-orb::before {
+        background: linear-gradient(145deg, #9a5cff, #f2389b);
     }
 
     .main {
