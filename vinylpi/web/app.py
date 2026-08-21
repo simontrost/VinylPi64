@@ -10,8 +10,9 @@ from flask import Flask, g, session
 from vinylpi.core.storage import initialize_storage
 from vinylpi.paths import BASE_DIR, DATA_DIR
 from vinylpi.profiles import (
+    get_profile_storage_override,
     profile_exists,
-    reset_profile_storage_override,
+    restore_profile_storage_override,
     set_profile_storage_override,
 )
 from vinylpi.web.routes.config_api import config_bp
@@ -105,15 +106,17 @@ def create_app() -> Flask:
         if profile_id and not profile_exists(profile_id):
             session.pop("vinylpi_profile_id", None)
             profile_id = ""
-        g._vinylpi_profile_override_token = set_profile_storage_override(
-            profile_id or "_guest"
-        )
+        # Keep the exact previous value instead of a ContextVar Token. Flask's
+        # streamed SSE response can be finalized in a copied Python context,
+        # where resetting a token created in ``before_request`` raises
+        # ``ValueError: Token was created in a different Context``.
+        g._vinylpi_previous_profile_override = get_profile_storage_override()
+        set_profile_storage_override(profile_id or "_guest")
 
     @app.teardown_request
     def _release_browser_profile(_exc=None) -> None:
-        token = getattr(g, "_vinylpi_profile_override_token", None)
-        if token is not None:
-            reset_profile_storage_override(token)
+        if hasattr(g, "_vinylpi_previous_profile_override"):
+            restore_profile_storage_override(g._vinylpi_previous_profile_override)
 
     for blueprint in _BLUEPRINTS:
         app.register_blueprint(blueprint)

@@ -322,6 +322,18 @@ def reset_profile_storage_override(token: Token) -> None:
     _PROFILE_STORAGE_OVERRIDE.reset(token)
 
 
+def restore_profile_storage_override(storage_key: str | None) -> None:
+    """Restore an exact override value without relying on a ContextVar token.
+
+    Flask streaming responses may finish in a copied Python context. A token
+    created during ``before_request`` cannot be reset from that different
+    context and raises ``ValueError``. Setting the previous value directly is
+    safe for request teardown and also preserves ``None`` (meaning: use the
+    global runtime/playback profile).
+    """
+    _PROFILE_STORAGE_OVERRIDE.set(storage_key)
+
+
 def get_profile_storage_override() -> str | None:
     return _PROFILE_STORAGE_OVERRIDE.get()
 

@@ -20,7 +20,7 @@ def api_events() -> Response:
 
         while True:
             status = get_visible_status()
-            revision = (status.get("source"), status.get("updated_at")) if status else None
+            revision = status.get("updated_at") if status else None
             if revision != last_revision:
                 last_revision = revision
                 payload = status or {"ok": False, "status": None}
