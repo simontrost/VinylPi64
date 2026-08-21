@@ -2,8 +2,7 @@ from __future__ import annotations
 
 import threading
 from vinylpi.config.runtime import read_config
-from vinylpi.core.display import show_fallback_image, start_scrolling_display
-from vinylpi.core.image_utils import load_image
+from vinylpi.core.display import show_fallback_image
 from vinylpi.core.stats_db import get_current_status
 from vinylpi.core.status import get_last_source_status
 from vinylpi.integrations.spotify_client import (
@@ -112,22 +111,6 @@ def get_visible_status() -> dict:
     return waiting
 
 
-def _restore_source_display(source: str) -> None:
-    status = get_last_source_status(source)
-    if not status or not status.get("cover_url"):
-        show_fallback_image()
-        return
-    try:
-        cover = load_image(str(status["cover_url"]))
-        start_scrolling_display(
-            cover,
-            str(status.get("artist") or ""),
-            str(status.get("title") or ""),
-        )
-    except Exception:
-        # A stale remote cover URL should never prevent changing source.
-        show_fallback_image()
-
 
 def get_status() -> dict:
     mode = get_mode()
@@ -159,6 +142,12 @@ def set_mode(mode: str) -> dict:
         if current_mode != "off" and viewer_key != runtime_key:
             raise SourceBusyError(str(runtime.get("name") or "another profile"))
 
+        # Clicking the already active source must be a no-op. In particular,
+        # never replace a currently playing Pixoo frame with the fallback while
+        # the recognizer/Spotify worker is still running.
+        if requested == current_mode and requested != "off":
+            return get_status()
+
         if requested == "off":
             spotify.stop()
             recognizer.stop()
@@ -175,8 +164,17 @@ def set_mode(mode: str) -> dict:
             # same time.
             if current_mode == "off":
                 set_runtime_profile(None if viewer_key == "_guest" else viewer_key)
+
+            # IMPORTANT: the website may *display* the last Vinyl track from
+            # the database, but it must never start its own Pixoo marquee for
+            # that cached track. The recognizer is a separate process; starting
+            # a second scrolling thread here makes both processes continuously
+            # overwrite each other's Pixoo frames. This caused new songs and
+            # the fallback image to flicker back to the previous session's
+            # cover. Stop the old source, show one static fallback frame, then
+            # let the recognizer become the sole Pixoo writer.
             spotify.stop()
-            _restore_source_display("vinyl")
+            show_fallback_image()
             recognizer.start(silence_output=_debug_silence())
             _source_mode = "vinyl"
             return get_status()
@@ -203,7 +201,10 @@ def set_mode(mode: str) -> dict:
         if current_mode == "off":
             set_runtime_profile(None if viewer_key == "_guest" else viewer_key)
         recognizer.stop()
-        _restore_source_display("spotify")
+        # Same rule as Vinyl: remembered Spotify metadata is dashboard-only.
+        # Keep the Pixoo on the fallback until the Spotify worker confirms a
+        # track that is actually playing now.
+        show_fallback_image()
         spotify.start(silence_output=_debug_silence())
         _source_mode = "spotify"
         return get_status()
