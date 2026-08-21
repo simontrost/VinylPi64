@@ -5,7 +5,7 @@ import time
 
 from flask import Blueprint, Response, stream_with_context
 
-from vinylpi.core.stats_db import get_current_status
+from vinylpi.web.services.source import get_visible_status
 
 events_bp = Blueprint("events_api", __name__)
 
@@ -19,8 +19,8 @@ def api_events() -> Response:
         yield "retry: 2000\n\n"
 
         while True:
-            status = get_current_status()
-            revision = status.get("updated_at") if status else None
+            status = get_visible_status()
+            revision = (status.get("source"), status.get("updated_at")) if status else None
             if revision != last_revision:
                 last_revision = revision
                 payload = status or {"ok": False, "status": None}

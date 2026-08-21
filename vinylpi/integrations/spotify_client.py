@@ -1,15 +1,18 @@
 from __future__ import annotations
 
 import os
+import re
 import time
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlencode
 
 import requests
-from dotenv import load_dotenv, set_key
+from dotenv import load_dotenv
 
-from vinylpi.paths import BASE_DIR
+from vinylpi.core.database import get_connection, init_db
+from vinylpi.core.genre_tags import normalize_genre
+from vinylpi.paths import BASE_DIR, get_active_db_path
 
 SPOTIFY_API_BASE = "https://api.spotify.com/v1"
 SPOTIFY_ACCOUNTS_BASE = "https://accounts.spotify.com"
@@ -47,61 +50,209 @@ class SpotifyTrack:
     genre: str | None = None
 
 
-def _env_path() -> Path:
-    return BASE_DIR / ".env"
-
-
 def load_spotify_env() -> None:
-    # Keep backwards compatibility with the existing Discogs/environment file,
-    # but let the dedicated .env override it for Spotify settings.
+    """Load app-wide Spotify credentials without exposing them to the browser."""
     load_dotenv(BASE_DIR / "vinylpi.env", override=False)
-    load_dotenv(_env_path(), override=True)
+    load_dotenv(BASE_DIR / ".env", override=True)
 
 
-def spotify_env_status() -> dict:
-    load_spotify_env()
-    client_id = (os.getenv("SPOTIFY_CLIENT_ID") or "").strip()
-    client_secret = (os.getenv("SPOTIFY_CLIENT_SECRET") or "").strip()
-    refresh_token = (os.getenv("SPOTIFY_REFRESH_TOKEN") or "").strip()
-    access_token = (os.getenv("SPOTIFY_ACCESS_TOKEN") or "").strip()
-    redirect_uri = (os.getenv("SPOTIFY_REDIRECT_URI") or "").strip()
-    return {
-        "configured": bool(client_id and client_secret),
-        "connected": bool(refresh_token or access_token),
-        "has_refresh_token": bool(refresh_token),
-        "redirect_uri": redirect_uri,
-    }
+def _profile_db_path(db_path: Path | str | None = None) -> Path:
+    return Path(db_path) if db_path is not None else get_active_db_path()
 
 
-def clear_refresh_token() -> None:
-    path = _env_path()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    if not path.exists():
-        path.touch()
-    set_key(str(path), "SPOTIFY_REFRESH_TOKEN", "", quote_mode="never")
-    os.environ.pop("SPOTIFY_REFRESH_TOKEN", None)
+def get_spotify_account(db_path: Path | str | None = None) -> dict | None:
+    path = _profile_db_path(db_path)
+    init_db(path)
+    with get_connection(path) as conn:
+        row = conn.execute(
+            """
+            SELECT account_id, spotify_user_id, display_name, external_url,
+                   connected_at, updated_at
+            FROM spotify_account WHERE id = 1
+            """
+        ).fetchone()
+    if not row:
+        return None
+    return {key: row[key] for key in row.keys()}
 
 
-def save_refresh_token(refresh_token: str) -> None:
-    token = (refresh_token or "").strip()
+def _get_refresh_token(db_path: Path | str | None = None) -> str:
+    path = _profile_db_path(db_path)
+    init_db(path)
+    with get_connection(path) as conn:
+        row = conn.execute(
+            "SELECT refresh_token FROM spotify_account WHERE id = 1"
+        ).fetchone()
+    return str(row["refresh_token"] or "").strip() if row else ""
+
+
+def save_spotify_account(
+    refresh_token: str,
+    *,
+    account_id: str | None = None,
+    spotify_user_id: str | None = None,
+    display_name: str | None = None,
+    external_url: str | None = None,
+    db_path: Path | str | None = None,
+) -> None:
+    token = str(refresh_token or "").strip()
     if not token:
         raise SpotifyError("Spotify did not return a refresh token")
 
-    path = _env_path()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    if not path.exists():
-        path.touch()
-    set_key(str(path), "SPOTIFY_REFRESH_TOKEN", token, quote_mode="never")
-    os.environ["SPOTIFY_REFRESH_TOKEN"] = token
+    path = _profile_db_path(db_path)
+    init_db(path)
+    now = int(time.time())
+    with get_connection(path) as conn:
+        conn.execute(
+            """
+            INSERT INTO spotify_account (
+                id, refresh_token, account_id, spotify_user_id, display_name,
+                external_url, connected_at, updated_at
+            ) VALUES (1, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                refresh_token = excluded.refresh_token,
+                account_id = COALESCE(excluded.account_id, spotify_account.account_id),
+                spotify_user_id = COALESCE(excluded.spotify_user_id, spotify_account.spotify_user_id),
+                display_name = COALESCE(excluded.display_name, spotify_account.display_name),
+                external_url = COALESCE(excluded.external_url, spotify_account.external_url),
+                updated_at = excluded.updated_at
+            """,
+            (
+                token,
+                account_id,
+                spotify_user_id,
+                display_name,
+                external_url,
+                now,
+                now,
+            ),
+        )
+
+
+def update_spotify_account_profile(
+    profile: dict,
+    *,
+    db_path: Path | str | None = None,
+) -> None:
+    token = _get_refresh_token(db_path)
+    if not token:
+        return
+    external_urls = profile.get("external_urls") or {}
+    save_spotify_account(
+        token,
+        account_id=str(profile.get("account_id") or "").strip() or None,
+        spotify_user_id=str(profile.get("id") or "").strip() or None,
+        display_name=str(profile.get("display_name") or "").strip() or None,
+        external_url=str(external_urls.get("spotify") or "").strip() or None,
+        db_path=db_path,
+    )
+
+
+def clear_spotify_account(db_path: Path | str | None = None) -> None:
+    path = _profile_db_path(db_path)
+    init_db(path)
+    with get_connection(path) as conn:
+        conn.execute("DELETE FROM spotify_account WHERE id = 1")
+
+
+def _remove_env_key(path: Path, key: str) -> None:
+    """Remove one legacy secret assignment while preserving the rest of the file."""
+    if not path.is_file():
+        return
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+        pattern = re.compile(rf"^\s*(?:export\s+)?{re.escape(key)}\s*=")
+        filtered = [line for line in lines if not pattern.match(line)]
+        if filtered != lines:
+            path.write_text("\n".join(filtered) + "\n", encoding="utf-8")
+    except OSError:
+        pass
+
+
+def _migrate_legacy_refresh_token(db_path: Path) -> None:
+    """Move the first implementation's global token into the active profile DB."""
+    if _get_refresh_token(db_path):
+        return
+    legacy = str(os.getenv("SPOTIFY_REFRESH_TOKEN") or "").strip()
+    if not legacy:
+        return
+    save_spotify_account(legacy, db_path=db_path)
+    _remove_env_key(BASE_DIR / ".env", "SPOTIFY_REFRESH_TOKEN")
+    _remove_env_key(BASE_DIR / "vinylpi.env", "SPOTIFY_REFRESH_TOKEN")
+    os.environ.pop("SPOTIFY_REFRESH_TOKEN", None)
+
+
+def spotify_env_status(db_path: Path | str | None = None) -> dict:
+    load_spotify_env()
+    path = _profile_db_path(db_path)
+    _migrate_legacy_refresh_token(path)
+
+    client_id = (os.getenv("SPOTIFY_CLIENT_ID") or "").strip()
+    client_secret = (os.getenv("SPOTIFY_CLIENT_SECRET") or "").strip()
+    redirect_uri = (os.getenv("SPOTIFY_REDIRECT_URI") or "").strip()
+    account = get_spotify_account(path)
+    return {
+        "configured": bool(client_id and client_secret),
+        "connected": bool(_get_refresh_token(path)),
+        "has_refresh_token": bool(_get_refresh_token(path)),
+        "redirect_uri": redirect_uri,
+        "account": account,
+    }
+
+
+_LASTFM_NOISE_TAGS = {
+    "seen live",
+    "favorites",
+    "favourites",
+    "favorite",
+    "favourite",
+    "male vocalists",
+    "female vocalists",
+    "spotify",
+    "my music",
+    "awesome",
+    "love",
+    "under 2000 listeners",
+}
+
+
+
+_GENRE_HINTS = (
+    "rock", "pop", "rap", "hip hop", "hip-hop", "r&b", "soul", "jazz",
+    "metal", "punk", "indie", "alternative", "electronic", "electronica",
+    "house", "techno", "folk", "country", "classical", "reggae", "ska",
+    "funk", "blues", "ambient", "grunge", "emo", "hardcore", "drum",
+    "bass", "garage", "trap", "singer", "songwriter", "dance", "disco",
+    "gospel", "latin", "afro", "shoegaze", "psychedelic",
+)
+
+def _useful_lastfm_tag(value: object) -> str | None:
+    text = re.sub(r"\s+", " ", str(value or "")).strip()
+    if not text or len(text) > 48:
+        return None
+    lower = text.casefold()
+    if lower in _LASTFM_NOISE_TAGS or lower.startswith("seen live"):
+        return None
+    if re.fullmatch(r"(?:19|20)\d0s?", lower):
+        return None
+    return normalize_genre(text)
 
 
 class SpotifyClient:
-    def __init__(self, *, timeout: float = 10.0):
+    def __init__(
+        self,
+        *,
+        timeout: float = 10.0,
+        profile_db_path: Path | str | None = None,
+    ):
         load_spotify_env()
         self.timeout = float(timeout)
+        self.profile_db_path = _profile_db_path(profile_db_path)
+        _migrate_legacy_refresh_token(self.profile_db_path)
+
         self.client_id = (os.getenv("SPOTIFY_CLIENT_ID") or "").strip()
         self.client_secret = (os.getenv("SPOTIFY_CLIENT_SECRET") or "").strip()
-        self.refresh_token = (os.getenv("SPOTIFY_REFRESH_TOKEN") or "").strip()
+        self.refresh_token = _get_refresh_token(self.profile_db_path)
         self.redirect_uri = (os.getenv("SPOTIFY_REDIRECT_URI") or "").strip()
         self._access_token = (os.getenv("SPOTIFY_ACCESS_TOKEN") or "").strip() or None
         self._access_token_expires_at = 0.0
@@ -118,21 +269,27 @@ class SpotifyClient:
     def _require_configured(self) -> None:
         if not self.configured:
             raise SpotifyNotConfigured(
-                "SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET are missing in .env"
+                "SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET are missing in vinylpi.env"
             )
 
-    def build_authorize_url(self, *, state: str, redirect_uri: str | None = None) -> str:
+    def build_authorize_url(
+        self,
+        *,
+        state: str,
+        redirect_uri: str | None = None,
+        show_dialog: bool = False,
+    ) -> str:
         self._require_configured()
         callback = (redirect_uri or self.redirect_uri or "").strip()
         if not callback:
-            raise SpotifyNotConfigured("SPOTIFY_REDIRECT_URI is missing in .env")
+            raise SpotifyNotConfigured("SPOTIFY_REDIRECT_URI is missing in vinylpi.env")
         params = {
             "client_id": self.client_id,
             "response_type": "code",
             "redirect_uri": callback,
             "scope": " ".join(SPOTIFY_SCOPES),
             "state": state,
-            "show_dialog": "false",
+            "show_dialog": "true" if show_dialog else "false",
         }
         return f"{SPOTIFY_ACCOUNTS_BASE}/authorize?{urlencode(params)}"
 
@@ -140,7 +297,7 @@ class SpotifyClient:
         self._require_configured()
         callback = (redirect_uri or self.redirect_uri or "").strip()
         if not callback:
-            raise SpotifyNotConfigured("SPOTIFY_REDIRECT_URI is missing in .env")
+            raise SpotifyNotConfigured("SPOTIFY_REDIRECT_URI is missing in vinylpi.env")
 
         try:
             response = requests.post(
@@ -157,11 +314,18 @@ class SpotifyClient:
             raise SpotifyError(f"Spotify authorization request failed: {exc}") from exc
         if response.status_code >= 400:
             raise SpotifyError(f"Spotify authorization failed ({response.status_code})")
+
         data = response.json()
         self._accept_token_response(data)
-        if data.get("refresh_token"):
-            save_refresh_token(str(data["refresh_token"]))
-            self.refresh_token = str(data["refresh_token"])
+        if not self.refresh_token:
+            raise SpotifyError("Spotify authorization did not return a refresh token")
+
+        try:
+            profile = self.get_current_user_profile()
+            update_spotify_account_profile(profile, db_path=self.profile_db_path)
+        except SpotifyError:
+            # The token itself is valid; account metadata can be refreshed later.
+            pass
         return data
 
     def _accept_token_response(self, data: dict) -> None:
@@ -175,13 +339,22 @@ class SpotifyClient:
         rotated_refresh = str(data.get("refresh_token") or "").strip()
         if rotated_refresh:
             self.refresh_token = rotated_refresh
-            save_refresh_token(rotated_refresh)
+            existing = get_spotify_account(self.profile_db_path) or {}
+            save_spotify_account(
+                rotated_refresh,
+                account_id=existing.get("account_id"),
+                spotify_user_id=existing.get("spotify_user_id"),
+                display_name=existing.get("display_name"),
+                external_url=existing.get("external_url"),
+                db_path=self.profile_db_path,
+            )
 
     def refresh_access_token(self) -> str:
         self._require_configured()
+        self.refresh_token = _get_refresh_token(self.profile_db_path)
         if not self.refresh_token:
             raise SpotifyNotAuthorized(
-                "SPOTIFY_REFRESH_TOKEN is missing. Connect Spotify from the dashboard first."
+                "This VinylPi profile is not connected to Spotify yet."
             )
 
         try:
@@ -202,13 +375,13 @@ class SpotifyClient:
             except Exception:
                 error_code = ""
             if error_code == "invalid_grant":
-                clear_refresh_token()
+                clear_spotify_account(self.profile_db_path)
                 self.refresh_token = ""
                 raise SpotifyNotAuthorized(
-                    "Spotify authorization expired or was revoked. Reconnect Spotify."
+                    "Spotify authorization expired or was revoked. Reconnect this profile."
                 )
             raise SpotifyNotAuthorized(
-                f"Spotify token refresh failed ({response.status_code}). Reconnect Spotify."
+                f"Spotify token refresh failed ({response.status_code}). Reconnect this profile."
             )
         self._accept_token_response(response.json())
         return str(self._access_token)
@@ -238,21 +411,86 @@ class SpotifyClient:
             return self._api_get(path, retry_auth=False)
         return response
 
-    def get_artist_genre(self, artist_id: str | None) -> str | None:
-        if not artist_id:
+    def get_current_user_profile(self) -> dict:
+        response = self._api_get("/me")
+        if response.status_code >= 400:
+            raise SpotifyError(f"Spotify profile request failed ({response.status_code})")
+        data = response.json() or {}
+        if not isinstance(data, dict):
+            raise SpotifyError("Spotify returned an invalid account profile")
+        return data
+
+    def _lastfm_genre(self, artist: str, title: str | None = None) -> str | None:
+        api_key = str(os.getenv("LAST_FM_API_KEY") or "").strip()
+        artist = str(artist or "").strip()
+        title = str(title or "").strip()
+        if not api_key or not artist:
             return None
-        if artist_id in self._artist_genre_cache:
-            return self._artist_genre_cache[artist_id]
-        try:
-            response = self._api_get(f"/artists/{artist_id}")
-            if response.status_code != 200:
-                self._artist_genre_cache[artist_id] = None
-                return None
-            genres = response.json().get("genres") or []
-            genre = str(genres[0]).strip() if genres else None
-        except Exception:
-            genre = None
-        self._artist_genre_cache[artist_id] = genre
+
+        methods: list[tuple[str, dict[str, str]]] = []
+        if title:
+            methods.append(("track.getTopTags", {"artist": artist, "track": title}))
+        methods.append(("artist.getTopTags", {"artist": artist}))
+
+        for method, params in methods:
+            try:
+                response = requests.get(
+                    "https://ws.audioscrobbler.com/2.0/",
+                    params={
+                        "method": method,
+                        "api_key": api_key,
+                        "format": "json",
+                        **params,
+                    },
+                    timeout=self.timeout,
+                )
+                if response.status_code != 200:
+                    continue
+                tags = ((response.json() or {}).get("toptags") or {}).get("tag") or []
+                candidates = [
+                    genre
+                    for tag in tags[:12]
+                    if (genre := _useful_lastfm_tag((tag or {}).get("name")))
+                ]
+                for genre in candidates:
+                    lower = genre.casefold()
+                    if any(hint in lower for hint in _GENRE_HINTS):
+                        return genre
+                if candidates:
+                    return candidates[0]
+            except (requests.RequestException, ValueError, TypeError):
+                continue
+        return None
+
+    def get_artist_genre(
+        self,
+        artist_id: str | None,
+        *,
+        artist: str = "",
+        title: str = "",
+    ) -> str | None:
+        cache_key = str(artist_id or artist or "").strip().casefold()
+        if cache_key and cache_key in self._artist_genre_cache:
+            return self._artist_genre_cache[cache_key]
+
+        genre = None
+        if artist_id:
+            try:
+                response = self._api_get(f"/artists/{artist_id}")
+                if response.status_code == 200:
+                    genres = response.json().get("genres") or []
+                    if genres:
+                        genre = normalize_genre(genres[0])
+            except Exception:
+                genre = None
+
+        # Spotify's artist genres are deprecated and may be empty. The project
+        # already supports a LAST_FM_API_KEY, so use Last.fm tags as a fallback.
+        if not genre:
+            genre = self._lastfm_genre(artist, title)
+
+        if cache_key:
+            self._artist_genre_cache[cache_key] = genre
         return genre
 
     @staticmethod
@@ -274,7 +512,6 @@ class SpotifyClient:
         images = album.get("images") or []
         cover_url = None
         if images:
-            # Spotify returns largest first. The Pixoo renderer downsamples anyway.
             cover_url = str((images[0] or {}).get("url") or "").strip() or None
 
         external_urls = item.get("external_urls") or {}
@@ -296,7 +533,7 @@ class SpotifyClient:
     def get_currently_playing(self) -> SpotifyTrack | None:
         if not self.authorized:
             raise SpotifyNotAuthorized(
-                "Spotify is not connected. Use Connect Spotify in the dashboard."
+                "This VinylPi profile is not connected to Spotify yet."
             )
         response = self._api_get("/me/player/currently-playing")
         if response.status_code == 204:
@@ -306,6 +543,10 @@ class SpotifyClient:
         if response.status_code >= 400:
             raise SpotifyError(f"Spotify currently-playing request failed ({response.status_code})")
         track = self.parse_currently_playing(response.json())
-        if track and track.artist_id:
-            track.genre = self.get_artist_genre(track.artist_id)
+        if track:
+            track.genre = self.get_artist_genre(
+                track.artist_id,
+                artist=track.artist,
+                title=track.title,
+            )
         return track

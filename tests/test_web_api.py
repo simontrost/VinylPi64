@@ -87,20 +87,21 @@ class WebApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.get_json()["error"], "missing file_id")
 
-    @patch("vinylpi.web.routes.status_api.get_current_status", return_value=None)
-    def test_status_endpoint_reports_empty_state(self, get_status):
+    @patch("vinylpi.web.routes.status_api.get_visible_status")
+    def test_status_endpoint_reports_off_fallback_state(self, get_status):
+        get_status.return_value = {"source": "off", "title": "Playback off"}
         response = self.client.get("/api/status")
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.get_json(), {"ok": False, "status": None})
+        self.assertEqual(response.get_json(), {"source": "off", "title": "Playback off"})
 
-    @patch("vinylpi.web.routes.status_api.get_current_status")
-    def test_status_endpoint_returns_current_status(self, get_status):
-        get_status.return_value = {"artist": "Artist", "title": "Song"}
+    @patch("vinylpi.web.routes.status_api.get_visible_status")
+    def test_status_endpoint_returns_selected_source_status(self, get_status):
+        get_status.return_value = {"source": "vinyl", "artist": "Artist", "title": "Song"}
 
         response = self.client.get("/api/status")
 
-        self.assertEqual(response.get_json(), {"artist": "Artist", "title": "Song"})
+        self.assertEqual(response.get_json(), {"source": "vinyl", "artist": "Artist", "title": "Song"})
 
     def test_lyrics_endpoint_requires_artist_and_title(self):
         response = self.client.get("/api/lyrics?artist=Artist")

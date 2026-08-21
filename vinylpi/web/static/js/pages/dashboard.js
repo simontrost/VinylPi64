@@ -7,6 +7,8 @@ const CURRENT_TRACK = {
     trackId: "",
     artistId: "",
     durationMs: null,
+    source: "vinyl",
+    spotifyUrl: "",
     discogsReleaseId: null,
     discogsPosition: "",
     discogsSide: "",
@@ -98,6 +100,8 @@ function updateCurrentTrack(status) {
     CURRENT_TRACK.trackId = status.track_id || "";
     CURRENT_TRACK.artistId = status.artist_id || "";
     CURRENT_TRACK.durationMs = status.duration_ms || null;
+    CURRENT_TRACK.source = status.source || "vinyl";
+    CURRENT_TRACK.spotifyUrl = status.spotify_url || "";
     CURRENT_TRACK.discogsReleaseId = status.discogs_release_id || null;
     CURRENT_TRACK.discogsPosition = status.discogs_position || "";
     CURRENT_TRACK.discogsSide = status.discogs_side || "";
@@ -249,21 +253,35 @@ function renderStatus(status) {
     updateCurrentTrack(status);
     currentTrackKey = getTrackKey();
 
-    setText(
-        "now-playing-label",
-        CURRENT_TRACK.discogsMatchSource === "sequence_inferred" ? "Likely playing" : "Now playing",
-    );
-    setText("song-artist", CURRENT_TRACK.artist || "Unknown artist");
-    setText("song-title", CURRENT_TRACK.title || "Unknown title");
-    setText("song-album", CURRENT_TRACK.album);
+    const isOff = CURRENT_TRACK.source === "off";
+    if (isOff) {
+        setText("now-playing-label", "Off");
+        setText("song-artist", "");
+        setText("song-title", CURRENT_TRACK.title || "Playback off");
+        setText("song-album", "");
+    } else {
+        setText(
+            "now-playing-label",
+            CURRENT_TRACK.discogsMatchSource === "sequence_inferred" ? "Likely playing" : "Now playing",
+        );
+        setText("song-artist", CURRENT_TRACK.artist || "Unknown artist");
+        setText("song-title", CURRENT_TRACK.title || "Unknown title");
+        setText("song-album", CURRENT_TRACK.album);
+    }
 
     const genre = document.getElementById("song-genre");
     if (genre) {
         genre.textContent = CURRENT_TRACK.genre;
-        genre.classList.toggle("hidden", !CURRENT_TRACK.genre);
+        genre.classList.toggle("hidden", isOff || !CURRENT_TRACK.genre);
     }
 
-    renderDiscogsContext();
+    if (isOff) {
+        document.getElementById("discogs-context")?.classList.add("hidden");
+        document.getElementById("discogs-add-link")?.classList.add("hidden");
+        document.getElementById("discogs-side-flip")?.classList.add("hidden");
+    } else {
+        renderDiscogsContext();
+    }
 
     const cover = document.getElementById("song-cover");
     if (cover) {

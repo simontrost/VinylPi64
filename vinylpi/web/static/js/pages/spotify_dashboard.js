@@ -15,15 +15,15 @@ function setSpotifyFeedback(message = "", type = "") {
     if (type) box.classList.add(`is-${type}`);
 }
 
-function hideDiscogsForSpotify() {
+function hideDiscogsForNonVinyl() {
     document.getElementById("discogs-context")?.classList.add("hidden");
     document.getElementById("discogs-add-link")?.classList.add("hidden");
     document.getElementById("discogs-side-flip")?.classList.add("hidden");
 }
 
 renderDiscogsContext = function renderDiscogsContextWithSource() {
-    if (vinylPiSourceMode === "spotify") {
-        hideDiscogsForSpotify();
+    if (vinylPiSourceMode !== "vinyl") {
+        hideDiscogsForNonVinyl();
         return;
     }
     return vinylPiOriginalRenderDiscogsContext();
@@ -42,13 +42,11 @@ function renderSpotifyTrackInfo() {
     appendInfoRow(songBlock, "Genre", CURRENT_TRACK.genre);
     appendInfoRow(songBlock, "Duration", formatDuration(CURRENT_TRACK.durationMs));
     appendInfoRow(songBlock, "Spotify track ID", CURRENT_TRACK.trackId);
-    if (CURRENT_TRACK.trackId && !String(CURRENT_TRACK.trackId).startsWith("local:")) {
-        appendInfoLink(
-            songBlock,
-            "Open track in Spotify",
-            `https://open.spotify.com/track/${encodeURIComponent(CURRENT_TRACK.trackId)}`,
-        );
-    }
+    const trackUrl = CURRENT_TRACK.spotifyUrl
+        || (CURRENT_TRACK.trackId && !String(CURRENT_TRACK.trackId).startsWith("local:")
+            ? `https://open.spotify.com/track/${encodeURIComponent(CURRENT_TRACK.trackId)}`
+            : "");
+    appendInfoLink(songBlock, "Open track in Spotify", trackUrl);
 
     const artistBlock = createInfoBlock("Artist");
     appendInfoRow(artistBlock, "Name", CURRENT_TRACK.artist || "Unknown");
@@ -80,24 +78,19 @@ function renderSpotifyConnection(spotify = {}) {
 
     const configured = Boolean(spotify.configured);
     const connected = Boolean(spotify.connected);
+    const shouldShow = vinylPiSourceMode === "spotify" && (!configured || !connected);
+    row.classList.toggle("hidden", !shouldShow);
+    if (!shouldShow) return;
 
     if (!configured) {
-        row.classList.remove("hidden");
-        copy.textContent = "Spotify credentials are missing in .env.";
+        copy.textContent = "Spotify app credentials are missing in vinylpi.env.";
         button.classList.add("hidden");
         return;
     }
 
-    if (!connected) {
-        row.classList.remove("hidden");
-        copy.textContent = "Connect your Spotify account once to enable playback tracking.";
-        button.classList.remove("hidden");
-        button.textContent = "Connect Spotify";
-        return;
-    }
-
-    row.classList.add("hidden");
+    copy.textContent = "This profile is not connected to Spotify yet.";
     button.classList.remove("hidden");
+    button.textContent = "Connect Spotify";
 }
 
 function updateSourceUI(data = {}) {
@@ -109,31 +102,22 @@ function updateSourceUI(data = {}) {
         button.setAttribute("aria-pressed", active ? "true" : "false");
     });
 
-    const status = document.getElementById("source-status-text");
-    if (status) {
-        status.classList.remove("is-off", "is-vinyl", "is-spotify");
-        status.classList.add(`is-${vinylPiSourceMode}`);
-        status.textContent = {
-            off: "Off",
-            vinyl: "Vinyl / Shazam",
-            spotify: "Spotify",
-        }[vinylPiSourceMode];
-    }
-
     renderSpotifyConnection(data.spotify || {});
 
     const infoLabel = document.querySelector(".track-info-label");
     if (infoLabel) infoLabel.textContent = vinylPiSourceMode === "spotify" ? "Spotify Info" : "Shazam Info";
 
-    if (vinylPiSourceMode === "spotify") {
-        hideDiscogsForSpotify();
-        if (currentTrackKey) setText("now-playing-label", "Spotify");
+    const actions = document.querySelector(".song-actions");
+    actions?.classList.toggle("hidden", vinylPiSourceMode === "off");
+
+    if (vinylPiSourceMode !== "vinyl") {
+        hideDiscogsForNonVinyl();
     } else if (currentTrackKey) {
         vinylPiOriginalRenderDiscogsContext();
-        setText(
-            "now-playing-label",
-            CURRENT_TRACK.discogsMatchSource === "sequence_inferred" ? "Likely playing" : "Now playing",
-        );
+    }
+
+    if (vinylPiSourceMode === "spotify" && currentTrackKey) {
+        setText("now-playing-label", "Spotify");
     }
 }
 
@@ -145,8 +129,6 @@ async function loadSourceStatus() {
         updateSourceUI(data);
     } catch (error) {
         console.error(error);
-        const status = document.getElementById("source-status-text");
-        if (status) status.textContent = "Unavailable";
     }
 }
 
@@ -167,17 +149,13 @@ async function setSourceMode(mode) {
 
         if (!response.ok || !data.ok) {
             if (data.needs_auth) {
-                setSpotifyFeedback("Spotify is configured but not connected yet.", "error");
+                setSpotifyFeedback("Connect Spotify for this profile first.", "error");
             } else if (data.needs_config) {
-                setSpotifyFeedback("Add SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET to .env first.", "error");
+                setSpotifyFeedback("Add the Spotify app credentials to vinylpi.env first.", "error");
             } else {
                 setSpotifyFeedback(data.error || "Could not change source.", "error");
             }
             return;
-        }
-
-        if (mode === "spotify") {
-            setSpotifyFeedback("Spotify source enabled.", "success");
         }
     } catch (error) {
         console.error(error);
@@ -187,6 +165,7 @@ async function setSourceMode(mode) {
             button.disabled = false;
         });
         await loadSourceStatus();
+        await loadStatus();
     }
 }
 

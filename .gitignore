@@ -10,6 +10,7 @@ data/vinylpi.db
 data/vinylpi.db-wal
 data/vinylpi.db-shm
 
+.env
 vinylpi.env
 
 # Per-profile runtime data

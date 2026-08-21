@@ -23,6 +23,8 @@ from vinylpi.profiles import (
     update_profile,
 )
 from vinylpi.web.services.recognizer import is_running, start, stop
+from vinylpi.web.services import spotify as spotify_service
+from vinylpi.web.services.source import set_mode
 
 profiles_bp = Blueprint("profiles_api", __name__)
 _PROFILE_SWITCH_LOCK = threading.Lock()
@@ -42,14 +44,31 @@ def _switch_profile(action):
         if SYNC_MANAGER.is_syncing():
             raise RuntimeError("Wait for the current Discogs sync to finish before switching profiles")
         was_running = is_running()
+        spotify_was_running = spotify_service.is_running()
         if was_running:
             stop()
+        if spotify_was_running:
+            spotify_service.stop()
         try:
             result = action()
         except Exception:
             _restart_recognizer_after_profile_change(was_running)
+            if spotify_was_running:
+                try:
+                    set_mode("spotify")
+                except Exception:
+                    pass
             raise
+
         _restart_recognizer_after_profile_change(was_running)
+        if spotify_was_running:
+            try:
+                # Each profile owns its own Spotify refresh token. Re-entering
+                # Spotify mode now binds the worker to the newly active account.
+                set_mode("spotify")
+            except Exception:
+                # The new profile may intentionally have no Spotify account yet.
+                set_mode("off")
         return result, was_running
 
 

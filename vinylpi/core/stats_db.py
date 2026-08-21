@@ -292,11 +292,12 @@ def upsert_tag_cache(
 
 def write_current_status(data: dict) -> None:
     init_db()
+    now = int(time.time() * 1000)
     with get_connection() as conn:
         conn.execute(
             """
             INSERT INTO current_status (
-                id, artist, title, cover_url, album, genre, bg_color,
+                id, artist, title, cover_url, album, genre, bg_color, source, spotify_url,
                 track_id, artist_id, duration_ms, discogs_release_id,
                 discogs_position, discogs_side, discogs_track_index,
                 discogs_track_count, discogs_side_track_number,
@@ -307,7 +308,7 @@ def write_current_status(data: dict) -> None:
                 discogs_expected_next_position, discogs_expected_next_side,
                 side_flip_prompt_active, side_flip_from_side, side_flip_to_side,
                 side_flip_next_title, side_flip_next_position, updated_at
-            ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
                 artist = excluded.artist,
                 title = excluded.title,
@@ -315,6 +316,8 @@ def write_current_status(data: dict) -> None:
                 album = excluded.album,
                 genre = excluded.genre,
                 bg_color = excluded.bg_color,
+                source = excluded.source,
+                spotify_url = excluded.spotify_url,
                 track_id = excluded.track_id,
                 artist_id = excluded.artist_id,
                 duration_ms = excluded.duration_ms,
@@ -349,6 +352,8 @@ def write_current_status(data: dict) -> None:
                 data.get("album"),
                 data.get("genre"),
                 data.get("bg_color"),
+                data.get("source"),
+                data.get("spotify_url"),
                 data.get("track_id"),
                 data.get("artist_id"),
                 data.get("duration_ms"),
@@ -374,7 +379,7 @@ def write_current_status(data: dict) -> None:
                 data.get("side_flip_to_side"),
                 data.get("side_flip_next_title"),
                 data.get("side_flip_next_position"),
-                int(time.time() * 1000),
+                now,
             ),
         )
 
@@ -384,7 +389,7 @@ def get_current_status() -> dict | None:
     with get_connection() as conn:
         row = conn.execute(
             """
-            SELECT artist, title, cover_url, album, genre, bg_color,
+            SELECT artist, title, cover_url, album, genre, bg_color, source, spotify_url,
                    track_id, artist_id, duration_ms, discogs_release_id,
                    discogs_position, discogs_side, discogs_track_index,
                    discogs_track_count, discogs_side_track_number,
@@ -401,6 +406,82 @@ def get_current_status() -> dict | None:
     if not row:
         return None
     return {key: row[key] for key in row.keys()}
+
+
+def get_last_vinyl_status_from_stats() -> dict | None:
+    """Best-effort migration fallback for the last Vinyl song before source caches existed."""
+    init_db()
+    with get_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT artist, title, album, cover_url, genre, shazam_track_id,
+                   shazam_artist_id, duration_ms, updated_at
+            FROM songs
+            WHERE play_count > 0
+            ORDER BY updated_at DESC
+            LIMIT 1
+            """
+        ).fetchone()
+    if not row:
+        return None
+    return {
+        "source": "vinyl",
+        "artist": row["artist"],
+        "title": row["title"],
+        "album": row["album"],
+        "cover_url": row["cover_url"],
+        "genre": row["genre"],
+        "track_id": row["shazam_track_id"],
+        "artist_id": row["shazam_artist_id"],
+        "duration_ms": row["duration_ms"],
+        "updated_at": int(row["updated_at"] or 0) * 1000,
+    }
+
+
+def write_source_status(source: str, data: dict) -> None:
+    source_key = str(source or "").strip().lower()
+    if source_key not in {"vinyl", "spotify"}:
+        return
+    init_db()
+    payload = dict(data or {})
+    payload["source"] = source_key
+    now = int(time.time() * 1000)
+    payload["updated_at"] = now
+    with get_connection() as conn:
+        conn.execute(
+            """
+            INSERT INTO source_status (source, status_json, updated_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT(source) DO UPDATE SET
+                status_json = excluded.status_json,
+                updated_at = excluded.updated_at
+            """,
+            (source_key, json.dumps(payload, ensure_ascii=False), now),
+        )
+
+
+def get_source_status(source: str) -> dict | None:
+    source_key = str(source or "").strip().lower()
+    if source_key not in {"vinyl", "spotify"}:
+        return None
+    init_db()
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT status_json, updated_at FROM source_status WHERE source = ?",
+            (source_key,),
+        ).fetchone()
+    if not row:
+        return None
+    try:
+        payload = json.loads(row["status_json"] or "{}")
+    except (TypeError, json.JSONDecodeError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    payload["source"] = source_key
+    payload["updated_at"] = int(row["updated_at"] or payload.get("updated_at") or 0)
+    return payload
+
 
 
 def upsert_album_cover(

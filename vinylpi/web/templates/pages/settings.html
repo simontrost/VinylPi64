@@ -8,6 +8,7 @@
 
 {% block page_scripts %}
     <script src="{{ url_for('static', filename='js/pages/settings.js') }}?v=20260803b" defer></script>
+    <script src="{{ url_for('static', filename='js/pages/spotify_settings.js') }}" defer></script>
 {% endblock %}
 
 {% block content %}
@@ -45,6 +46,10 @@
                 <button type="button" class="mobile-settings-category" data-settings-target="section-discogs">
                     <span class="mobile-settings-category-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"></circle><circle cx="12" cy="12" r="2"></circle><path d="M12 4v3"></path></svg></span>
                     <span><strong>Discogs</strong><small>Collection matching</small></span><span class="mobile-settings-arrow">›</span>
+                </button>
+                <button type="button" class="mobile-settings-category" data-settings-target="section-spotify">
+                    <span class="mobile-settings-category-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="M7.5 9.5c3.7-1.1 7.7-.7 10.4.8"></path><path d="M8.2 12.5c3.1-.8 6.4-.5 8.8.7"></path><path d="M9 15.3c2.5-.6 5-.3 7 .6"></path></svg></span>
+                    <span><strong>Spotify</strong><small>Profile account connection</small></span><span class="mobile-settings-arrow">›</span>
                 </button>
                 <button type="button" class="mobile-settings-category" data-settings-target="section-behavior">
                     <span class="mobile-settings-category-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 7h10"></path><path d="M18 7h2"></path><circle cx="16" cy="7" r="2"></circle><path d="M4 17h2"></path><path d="M10 17h10"></path><circle cx="8" cy="17" r="2"></circle></svg></span>
@@ -379,6 +384,44 @@
                     </div>
                 </section>
 
+                <section class="card settings-card" id="section-spotify">
+                    <button class="settings-card-header" type="button" aria-expanded="false">
+                        <span class="settings-card-title"><h2>Spotify</h2><span>Connect a different Spotify account for each VinylPi profile</span></span>
+                        <span class="chevron">⌄</span>
+                    </button>
+                    <div class="settings-card-content">
+                        <div class="spotify-settings-status-card">
+                            <div class="spotify-settings-status-main">
+                                <span class="spotify-settings-status-dot" id="spotifySettingsStatusDot"></span>
+                                <div>
+                                    <div class="spotify-settings-status-title" id="spotifySettingsStatusTitle">Loading Spotify status…</div>
+                                    <div class="spotify-settings-status-copy" id="spotifySettingsStatusCopy">The connection belongs only to the currently active VinylPi profile.</div>
+                                </div>
+                            </div>
+                            <span class="spotify-settings-profile-badge">Per profile</span>
+                        </div>
+
+                        <div class="form-group">
+                            <div class="group-title">Spotify account</div>
+                            <div class="spotify-settings-actions">
+                                <button type="button" class="btn-primary" id="spotifySettingsConnect">Connect Spotify</button>
+                                <button type="button" id="spotifySettingsDisconnect" disabled>Disconnect</button>
+                            </div>
+                            <div id="spotifySettingsFeedback" class="form-hint" role="status" aria-live="polite"></div>
+                        </div>
+
+                        <div class="form-group">
+                            <div class="group-title">App credentials</div>
+                            <div class="discogs-env-card spotify-env-card">
+                                <span id="spotifySettingsAppStatus">Checking <strong>vinylpi.env</strong>…</span>
+                                <code>SPOTIFY_CLIENT_ID=… &nbsp; SPOTIFY_CLIENT_SECRET=… &nbsp; SPOTIFY_REDIRECT_URI=…</code>
+                            </div>
+                            <div class="form-hint">Client ID, Client Secret and Redirect URI identify this VinylPi installation and stay app-wide in <strong>vinylpi.env</strong>. The account-specific refresh token is stored server-side in the active profile database and is never returned to the browser.</div>
+                            <div id="spotifySettingsRedirect" class="spotify-settings-redirect"></div>
+                        </div>
+                    </div>
+                </section>
+
                 <section class="card settings-card" id="section-behavior">
                     <button class="settings-card-header" type="button" aria-expanded="false">
                         <span class="settings-card-title"><h2>Behavior</h2><span>Loop timing and auto sleep</span></span>
@@ -446,6 +489,7 @@
                         <a href="#section-fallback">Fallback</a>
                         <a href="#section-pixoo">Pixoo</a>
                         <a href="#section-discogs">Discogs</a>
+                        <a href="#section-spotify">Spotify</a>
                         <a href="#section-behavior">Behavior</a>
                         <a href="#section-ha">Home Assistant</a>
                         <a href="#section-debug">Debug</a>

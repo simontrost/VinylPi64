@@ -1,6 +1,12 @@
 from __future__ import annotations
 
-from vinylpi.core.stats_db import get_current_status, write_current_status
+from vinylpi.core.stats_db import (
+    get_current_status,
+    get_last_vinyl_status_from_stats,
+    get_source_status,
+    write_current_status,
+    write_source_status,
+)
 
 
 def write_status(
@@ -10,6 +16,8 @@ def write_status(
     album: str | None = None,
     genre: str | None = None,
     bg_color: str | None = None,
+    source: str = "vinyl",
+    spotify_url: str | None = None,
     track_id: str | None = None,
     artist_id: str | None = None,
     duration_ms: int | None = None,
@@ -37,43 +45,75 @@ def write_status(
     side_flip_next_position: str | None = None,
 ) -> None:
     try:
-        write_current_status(
-            {
-                "artist": artist,
-                "title": title,
-                "cover_url": cover_url,
-                "album": album,
-                "genre": genre,
-                "bg_color": bg_color,
-                "track_id": track_id,
-                "artist_id": artist_id,
-                "duration_ms": duration_ms,
-                "discogs_release_id": discogs_release_id,
-                "discogs_position": discogs_position,
-                "discogs_side": discogs_side,
-                "discogs_track_index": discogs_track_index,
-                "discogs_track_count": discogs_track_count,
-                "discogs_side_track_number": discogs_side_track_number,
-                "discogs_side_track_count": discogs_side_track_count,
-                "discogs_match_source": discogs_match_source,
-                "discogs_confidence": discogs_confidence,
-                "discogs_cover_url": discogs_cover_url,
-                "discogs_year": discogs_year,
-                "discogs_label": discogs_label,
-                "discogs_catalog_number": discogs_catalog_number,
-                "discogs_expected_next_title": discogs_expected_next_title,
-                "discogs_expected_next_artist": discogs_expected_next_artist,
-                "discogs_expected_next_position": discogs_expected_next_position,
-                "discogs_expected_next_side": discogs_expected_next_side,
-                "side_flip_prompt_active": side_flip_prompt_active,
-                "side_flip_from_side": side_flip_from_side,
-                "side_flip_to_side": side_flip_to_side,
-                "side_flip_next_title": side_flip_next_title,
-                "side_flip_next_position": side_flip_next_position,
-            }
-        )
+        payload = {
+            "artist": artist,
+            "title": title,
+            "cover_url": cover_url,
+            "album": album,
+            "genre": genre,
+            "bg_color": bg_color,
+            "track_id": track_id,
+            "artist_id": artist_id,
+            "duration_ms": duration_ms,
+            "discogs_release_id": discogs_release_id,
+            "discogs_position": discogs_position,
+            "discogs_side": discogs_side,
+            "discogs_track_index": discogs_track_index,
+            "discogs_track_count": discogs_track_count,
+            "discogs_side_track_number": discogs_side_track_number,
+            "discogs_side_track_count": discogs_side_track_count,
+            "discogs_match_source": discogs_match_source,
+            "discogs_confidence": discogs_confidence,
+            "discogs_cover_url": discogs_cover_url,
+            "discogs_year": discogs_year,
+            "discogs_label": discogs_label,
+            "discogs_catalog_number": discogs_catalog_number,
+            "discogs_expected_next_title": discogs_expected_next_title,
+            "discogs_expected_next_artist": discogs_expected_next_artist,
+            "discogs_expected_next_position": discogs_expected_next_position,
+            "discogs_expected_next_side": discogs_expected_next_side,
+            "side_flip_prompt_active": side_flip_prompt_active,
+            "side_flip_from_side": side_flip_from_side,
+            "side_flip_to_side": side_flip_to_side,
+            "side_flip_next_title": side_flip_next_title,
+            "side_flip_next_position": side_flip_next_position,
+            "source": str(source or "vinyl").strip().lower() or "vinyl",
+            "spotify_url": spotify_url,
+        }
+        write_current_status(payload)
+        write_source_status(payload["source"], payload)
     except Exception as exc:
         print(f"Could not write status to database: {exc}")
+
+
+def get_last_source_status(source: str) -> dict | None:
+    """Return the last track shown for Vinyl or Spotify in the active profile."""
+    try:
+        cached = get_source_status(source)
+        if cached:
+            return cached
+
+        # Migration fallback: Spotify never writes into the Vinyl songs table,
+        # so the most recently updated Vinyl statistics row is a safer source
+        # than the old shared current_status row (which may contain Spotify).
+        source_key = str(source or "").strip().lower()
+        if source_key == "vinyl":
+            migrated = get_last_vinyl_status_from_stats()
+            if migrated:
+                return migrated
+        elif source_key == "spotify":
+            from vinylpi.core.spotify_stats import get_last_spotify_status_from_stats
+
+            migrated = get_last_spotify_status_from_stats()
+            if migrated:
+                return migrated
+
+        current = get_current_status()
+        if current and str(current.get("source") or "").strip().lower() == str(source or "").strip().lower():
+            return current
+    except Exception as exc:
+        print(f"Could not read source status: {exc}")
+    return None
 
 
 def write_side_flip_prompt(

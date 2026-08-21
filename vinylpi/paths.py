@@ -34,6 +34,21 @@ def get_active_db_path() -> Path:
     return get_active_profile_dir() / "vinylpi.db"
 
 
+def get_profile_db_path(storage_key: str) -> Path:
+    """Return the SQLite path for one profile storage key.
+
+    Spotify OAuth callbacks use this to persist the account token for the
+    profile that initiated authorization, even if another profile becomes
+    active before Spotify redirects back.
+    """
+    key = str(storage_key or "").strip()
+    if not key:
+        return get_active_db_path()
+    if not PROFILE_REGISTRY_PATH.exists() and key == "default":
+        return DB_PATH
+    return PROFILES_DIR / key / "vinylpi.db"
+
+
 def get_active_display_refresh_path() -> Path:
     if not PROFILE_REGISTRY_PATH.exists():
         return DISPLAY_REFRESH_PATH

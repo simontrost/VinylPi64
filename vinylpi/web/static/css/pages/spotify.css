@@ -87,18 +87,6 @@
     background: linear-gradient(135deg, rgba(124, 58, 237, .25), rgba(239, 45, 143, .2));
 }
 
-.source-status-text {
-    min-width: 72px;
-    color: rgba(255, 255, 255, .58);
-    font-size: 11px;
-    text-align: right;
-    white-space: nowrap;
-}
-
-.source-status-text.is-off { color: #fca5a5; }
-.source-status-text.is-vinyl { color: var(--yellow); }
-.source-status-text.is-spotify { color: #7ee2a1; }
-
 .source-compat-hidden {
     display: none !important;
 }

@@ -70,6 +70,15 @@ class WebPageStructureTests(unittest.TestCase):
         self.assertIn('Add to Discogs', html)
         self.assertIn('target="_blank"', html)
 
+
+    def test_settings_contains_profile_specific_spotify_section(self):
+        response = self.client.get("/settings.html")
+        html = response.get_data(as_text=True)
+
+        self.assertIn('id="section-spotify"', html)
+        self.assertIn('id="spotifySettingsConnect"', html)
+        self.assertIn('Profile account connection', html)
+
     def test_stats_page_contains_share_button(self):
         response = self.client.get("/stats.html")
         html = response.get_data(as_text=True)

@@ -7,17 +7,14 @@ function statsScopeCopy(scope) {
         vinyl: {
             label: "Vinyl listening overview",
             description: "Calculated from confirmed vinyl recognitions.",
-            genreSource: "Shazam",
         },
         spotify: {
             label: "Spotify listening overview",
             description: "Calculated from Spotify playback progress while the Spotify source is enabled.",
-            genreSource: "Spotify",
         },
         combined: {
             label: "Combined listening overview",
             description: "Vinyl and Spotify listening data combined.",
-            genreSource: "Combined",
         },
     }[scope] || {};
 }
@@ -32,10 +29,8 @@ function updateStatsScopeUI() {
     const copy = statsScopeCopy(vinylPiStatsScope);
     const overview = document.getElementById("stats-overview-label");
     const description = document.getElementById("stats-description");
-    const genreSource = document.getElementById("stats-genre-source");
     if (overview) overview.textContent = copy.label || "Listening overview";
     if (description) description.textContent = copy.description || "";
-    if (genreSource) genreSource.textContent = copy.genreSource || "";
 
     const sharePanel = document.getElementById("stats-share-panel");
     if (sharePanel) sharePanel.classList.toggle("hidden", vinylPiStatsScope !== "vinyl");
@@ -91,6 +86,15 @@ renderStats = function renderScopedStats(data = {}) {
             ),
             "No albums recorded yet.",
         );
+    }
+
+    const genreEmpty = document.getElementById("genre-empty");
+    if (genreEmpty) {
+        genreEmpty.textContent = vinylPiStatsScope === "spotify"
+            ? "No genre data available yet. Spotify genres are supplemented with Last.fm tags when needed."
+            : (vinylPiStatsScope === "combined"
+                ? "No genre data available yet."
+                : "Genre statistics will appear after songs are recognized again.");
     }
 
     renderGenreChart(data.radar_genres || data.top_genres || []);

@@ -156,8 +156,91 @@ def add_spotify_listening_seconds(track_id: str, seconds: float) -> None:
         )
 
 
+
+def get_last_spotify_status_from_stats() -> dict[str, Any] | None:
+    """Return the most recently recorded Spotify track for source switching."""
+    init_spotify_stats()
+    with get_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT track_id, artist, title, artist_id, album, cover_url, genre,
+                   duration_ms, updated_at
+            FROM spotify_songs
+            WHERE play_count > 0
+            ORDER BY updated_at DESC
+            LIMIT 1
+            """
+        ).fetchone()
+    if not row:
+        return None
+    return {
+        "source": "spotify",
+        "artist": row["artist"],
+        "title": row["title"],
+        "album": row["album"],
+        "cover_url": row["cover_url"],
+        "genre": row["genre"],
+        "track_id": row["track_id"],
+        "artist_id": row["artist_id"],
+        "duration_ms": row["duration_ms"],
+        "updated_at": int(row["updated_at"] or 0) * 1000,
+    }
+
+
+def get_spotify_songs_missing_genre(limit: int = 50) -> list[dict[str, Any]]:
+    init_spotify_stats()
+    with get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT track_id, artist, title, artist_id
+            FROM spotify_songs
+            WHERE genre IS NULL OR TRIM(genre) = ''
+            ORDER BY updated_at DESC
+            LIMIT ?
+            """,
+            (max(1, int(limit)),),
+        ).fetchall()
+    return [{key: row[key] for key in row.keys()} for row in rows]
+
+
+def update_spotify_genre(track_id: str, genre: str | None) -> None:
+    clean = str(genre or "").strip()
+    if not track_id or not clean:
+        return
+    init_spotify_stats()
+    with get_connection() as conn:
+        conn.execute(
+            """
+            UPDATE spotify_songs
+            SET genre = ?, updated_at = strftime('%s', 'now')
+            WHERE track_id = ?
+            """,
+            (clean, track_id),
+        )
+
+def _backfill_missing_genres_for_stats(limit: int = 8) -> None:
+    # Spotify's artist genre field is deprecated and can be empty. Resolve any
+    # missing rows through the same Spotify -> Last.fm fallback used by the
+    # worker, then persist the result so this is normally a one-time lookup.
+    try:
+        from vinylpi.integrations.spotify_client import SpotifyClient
+
+        client = SpotifyClient()
+        for row in get_spotify_songs_missing_genre(limit=limit):
+            genre = client.get_artist_genre(
+                row.get("artist_id"),
+                artist=str(row.get("artist") or ""),
+                title=str(row.get("title") or ""),
+            )
+            if genre:
+                update_spotify_genre(str(row.get("track_id") or ""), genre)
+    except Exception:
+        pass
+
+
 def get_spotify_ranked_stats(limit: int = 10) -> dict[str, Any]:
     init_spotify_stats()
+    _backfill_missing_genres_for_stats()
     limit = max(1, int(limit))
     with get_connection() as conn:
         songs = [

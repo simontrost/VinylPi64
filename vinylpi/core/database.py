@@ -8,7 +8,7 @@ from vinylpi.paths import DB_PATH, get_active_db_path
 
 _LEGACY_DB_PATH = DB_PATH
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 _INIT_LOCK = threading.Lock()
 _INITIALIZED_PATHS: set[str] = set()
 
@@ -128,6 +128,8 @@ def _create_schema(conn: sqlite3.Connection) -> None:
             album TEXT,
             genre TEXT,
             bg_color TEXT,
+            source TEXT,
+            spotify_url TEXT,
             track_id TEXT,
             artist_id TEXT,
             duration_ms INTEGER,
@@ -153,6 +155,24 @@ def _create_schema(conn: sqlite3.Connection) -> None:
             side_flip_to_side TEXT,
             side_flip_next_title TEXT,
             side_flip_next_position TEXT,
+            updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
+        );
+
+
+        CREATE TABLE IF NOT EXISTS source_status (
+            source TEXT PRIMARY KEY,
+            status_json TEXT NOT NULL,
+            updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS spotify_account (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            refresh_token TEXT NOT NULL,
+            account_id TEXT,
+            spotify_user_id TEXT,
+            display_name TEXT,
+            external_url TEXT,
+            connected_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
             updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
         );
 
@@ -235,6 +255,8 @@ def _migrate_schema(conn: sqlite3.Connection) -> None:
 
     for column, declaration in (
         ("genre", "TEXT"),
+        ("source", "TEXT"),
+        ("spotify_url", "TEXT"),
         ("duration_ms", "INTEGER"),
         ("discogs_release_id", "INTEGER"),
         ("discogs_position", "TEXT"),
@@ -309,6 +331,24 @@ def _migrate_schema(conn: sqlite3.Connection) -> None:
         );
 
         INSERT OR IGNORE INTO discogs_sync_state (id) VALUES (1);
+
+
+        CREATE TABLE IF NOT EXISTS source_status (
+            source TEXT PRIMARY KEY,
+            status_json TEXT NOT NULL,
+            updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS spotify_account (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            refresh_token TEXT NOT NULL,
+            account_id TEXT,
+            spotify_user_id TEXT,
+            display_name TEXT,
+            external_url TEXT,
+            connected_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+            updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
+        );
 
         CREATE INDEX IF NOT EXISTS idx_songs_artist ON songs(artist);
         CREATE INDEX IF NOT EXISTS idx_songs_album ON songs(album);

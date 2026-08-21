@@ -1474,3 +1474,104 @@
         white-space: nowrap;
     }
 }
+
+
+/* Spotify account settings */
+.spotify-settings-status-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    margin-bottom: 12px;
+    padding: 16px;
+    border: 1px solid rgba(29, 185, 84, 0.18);
+    border-radius: 14px;
+    background: linear-gradient(135deg, rgba(29, 185, 84, 0.09), rgba(124, 58, 237, 0.035));
+}
+
+.spotify-settings-status-main {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+}
+
+.spotify-settings-status-dot {
+    width: 12px;
+    height: 12px;
+    flex: 0 0 auto;
+    border-radius: 999px;
+    background: #6b6b75;
+    box-shadow: 0 0 0 5px rgba(107, 107, 117, 0.12);
+}
+
+.spotify-settings-status-dot.connected {
+    background: #1db954;
+    box-shadow: 0 0 0 5px rgba(29, 185, 84, 0.13);
+}
+
+.spotify-settings-status-title {
+    color: var(--text);
+    font-size: 15px;
+    font-weight: 760;
+}
+
+.spotify-settings-status-copy {
+    margin-top: 4px;
+    color: var(--muted);
+    font-size: 12px;
+    overflow-wrap: anywhere;
+}
+
+.spotify-settings-profile-badge {
+    flex: 0 0 auto;
+    padding: 5px 9px;
+    border: 1px solid rgba(29, 185, 84, 0.28);
+    border-radius: 999px;
+    color: #a7f3bd;
+    background: rgba(29, 185, 84, 0.09);
+    font-size: 11px;
+    font-weight: 760;
+}
+
+.spotify-settings-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.spotify-settings-actions button {
+    min-width: 150px;
+}
+
+.spotify-settings-redirect {
+    margin-top: 10px;
+    padding: 9px 11px;
+    overflow-wrap: anywhere;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.12);
+    color: var(--muted);
+    font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+    font-size: 11px;
+}
+
+.spotify-settings-error {
+    color: #fca5a5 !important;
+}
+
+.spotify-env-card code {
+    color: #86efac;
+    border-color: rgba(29, 185, 84, 0.24);
+}
+
+@media (max-width: 700px) {
+    .spotify-settings-status-card {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .spotify-settings-actions button {
+        width: 100%;
+    }
+}
