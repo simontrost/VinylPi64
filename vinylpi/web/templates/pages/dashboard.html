@@ -4,10 +4,12 @@
 
 {% block page_styles %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/dashboard.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/spotify.css') }}">
 {% endblock %}
 
 {% block page_scripts %}
     <script src="{{ url_for('static', filename='js/pages/dashboard.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/pages/spotify_dashboard.js') }}" defer></script>
 {% endblock %}
 
 {% block content %}
@@ -24,16 +26,29 @@
             </div>
 
             <div class="song-copy">
-                <div class="song-topbar">
+                <div class="song-topbar spotify-song-topbar">
                     <span class="eyebrow" id="now-playing-label">Now playing</span>
-                    <div class="recognition-inline" aria-label="Music recognition">
-                        <div id="rec-status-text" class="rec-status-text">Loading status...</div>
-                        <label class="toggle-switch" aria-label="Toggle music recognition">
-                            <input type="checkbox" id="recognizerToggle">
-                            <span class="toggle-slider"></span>
-                        </label>
+                    <div class="source-control-wrap" aria-label="Playback source">
+                        <div class="source-control" role="group" aria-label="Music source">
+                            <button type="button" class="source-control-button" data-source-mode="off">Off</button>
+                            <button type="button" class="source-control-button" data-source-mode="vinyl">Vinyl</button>
+                            <button type="button" class="source-control-button" data-source-mode="spotify">Spotify</button>
+                        </div>
+                        <div id="source-status-text" class="source-status-text">Loading…</div>
+                    </div>
+
+                    {# Compatibility hooks for the existing dashboard.js recognizer polling. #}
+                    <div class="source-compat-hidden" aria-hidden="true">
+                        <div id="rec-status-text"></div>
+                        <input type="checkbox" id="recognizerToggle" tabindex="-1">
                     </div>
                 </div>
+
+                <div id="spotify-connect-row" class="spotify-connect-row hidden">
+                    <span id="spotify-connect-copy">Spotify is not connected yet.</span>
+                    <button id="spotify-connect-button" type="button" class="spotify-connect-button">Connect Spotify</button>
+                </div>
+                <div id="spotify-feedback" class="spotify-feedback hidden" role="status" aria-live="polite"></div>
 
                 <div id="song-artist" class="song-artist">–</div>
                 <div id="song-title" class="song-title">Loading...</div>

@@ -4,36 +4,43 @@
 
 {% block page_styles %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/stats.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/spotify.css') }}">
 {% endblock %}
 
 {% block page_scripts %}
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="{{ url_for('static', filename='js/pages/stats.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/pages/spotify_stats.js') }}" defer></script>
 {% endblock %}
 
 {% block content %}
 <main class="main">
-    <header class="main-header">
+    <header class="main-header stats-header-with-scope">
         <div class="header-title pixel-title">Statistics</div>
+        <div class="stats-scope-control" role="group" aria-label="Statistics source">
+            <button type="button" class="stats-scope-button active" data-stats-scope="vinyl">Vinyl</button>
+            <button type="button" class="stats-scope-button" data-stats-scope="spotify">Spotify</button>
+            <button type="button" class="stats-scope-button" data-stats-scope="combined">Combined</button>
+        </div>
         {% include "components/profile_control.html" %}
     </header>
 
     <section class="stats-summary-row">
         <div class="stats-minutes-card page-intro-copy">
-            <span class="eyebrow">Listening overview</span>
+            <span class="eyebrow" id="stats-overview-label">Vinyl listening overview</span>
             <div class="stats-value-row">
                 <strong id="stats-minutes" class="stats-minutes-value">—</strong>
                 <span class="stats-unit">minutes</span>
             </div>
-            <div class="stats-description">Calculated from confirmed recognitions.</div>
+            <div id="stats-description" class="stats-description">Calculated from confirmed vinyl recognitions.</div>
             <p id="stats-share-feedback" class="stats-share-feedback" role="status" aria-live="polite"></p>
         </div>
 
-        <aside class="stats-share-panel card">
+        <aside id="stats-share-panel" class="stats-share-panel card">
             <div class="stats-share-panel-copy">
                 <span class="eyebrow">Share</span>
                 <h2>Vinyl Wrapped</h2>
-                <p>Generate a shareable statistics card.</p>
+                <p>Generate a shareable vinyl statistics card.</p>
             </div>
             <button id="stats-share-button" class="btn-primary stats-share-button" type="button" aria-label="Create share preview">
                 <span class="stats-share-button-face">
@@ -62,7 +69,7 @@
             <article class="stats-card stats-chart-card">
                 <div class="stats-card-heading">
                     <h2>Top Genres</h2>
-                    <span class="stats-source">Shazam</span>
+                    <span id="stats-genre-source" class="stats-source">Shazam</span>
                 </div>
                 <div id="genre-empty" class="stats-empty hidden">Genre statistics will appear after songs are recognized again.</div>
                 <canvas id="genre-radar" aria-label="Genre radar chart"></canvas>

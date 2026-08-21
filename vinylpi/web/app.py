@@ -15,11 +15,14 @@ from vinylpi.web.routes.pixoo_api import pixoo_bp
 from vinylpi.web.routes.profiles_api import profiles_bp
 from vinylpi.web.routes.recognizer_api import recognizer_bp
 from vinylpi.web.routes.shazam_api import shazam_bp
+from vinylpi.web.routes.source_api import source_bp
+from vinylpi.web.routes.spotify_api import spotify_bp
 from vinylpi.web.routes.stats_api import stats_bp
 from vinylpi.web.routes.status_api import status_bp
 from vinylpi.web.routes.uploads_api import uploads_bp
 
-load_dotenv(BASE_DIR / "vinylpi.env")
+load_dotenv(BASE_DIR / "vinylpi.env", override=False)
+load_dotenv(BASE_DIR / ".env", override=True)
 
 _BLUEPRINTS = (
     pages_bp,
@@ -29,6 +32,8 @@ _BLUEPRINTS = (
     profiles_bp,
     discogs_bp,
     recognizer_bp,
+    source_bp,
+    spotify_bp,
     pixoo_bp,
     stats_bp,
     uploads_bp,
