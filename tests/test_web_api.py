@@ -23,7 +23,7 @@ if Flask is not None:
 class WebApiTests(unittest.TestCase):
     def setUp(self):
         app = Flask(__name__)
-        app.config.update(TESTING=True)
+        app.config.update(TESTING=True, SECRET_KEY="test-secret")
         for blueprint in (config_bp, genius_bp, pixoo_bp, profiles_bp, stats_bp, status_bp, uploads_bp):
             app.register_blueprint(blueprint)
         self.client = app.test_client()
@@ -184,17 +184,9 @@ class WebApiTests(unittest.TestCase):
         self.assertEqual(response.data, b"png-bytes")
         build_share_card_image_mock.assert_called_once_with()
 
-    @patch("vinylpi.web.routes.profiles_api.SYNC_MANAGER.is_syncing", return_value=False)
-    @patch("vinylpi.web.routes.profiles_api._switch_profile")
     @patch("vinylpi.web.routes.profiles_api.create_profile")
-    def test_create_profile_requires_password_and_can_activate(
-        self, create_profile_mock, switch_profile_mock, is_syncing_mock
-    ):
+    def test_create_profile_requires_password_and_can_activate(self, create_profile_mock):
         create_profile_mock.return_value = {"id": "abc", "name": "Simon"}
-        switch_profile_mock.return_value = (
-            {"id": "abc", "name": "Simon", "is_guest": False},
-            True,
-        )
 
         response = self.client.post(
             "/api/profiles",
@@ -215,6 +207,8 @@ class WebApiTests(unittest.TestCase):
             avatar_png=None,
         )
         self.assertTrue(response.get_json()["activated"])
+        with self.client.session_transaction() as browser_session:
+            self.assertEqual(browser_session["vinylpi_profile_id"], "abc")
 
     def test_create_profile_rejects_password_confirmation_mismatch(self):
         response = self.client.post(
@@ -229,12 +223,13 @@ class WebApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.get_json()["error"], "Passwords do not match")
 
-    @patch("vinylpi.web.routes.profiles_api._switch_profile")
-    def test_profile_login_passes_password_to_switch_action(self, switch_profile_mock):
-        switch_profile_mock.return_value = (
-            {"id": "abc", "name": "Simon", "is_guest": False},
-            False,
-        )
+    @patch("vinylpi.web.routes.profiles_api.authenticate_profile")
+    def test_profile_login_is_stored_in_browser_session(self, authenticate_profile_mock):
+        authenticate_profile_mock.return_value = {
+            "id": "abc",
+            "name": "Simon",
+            "is_guest": False,
+        }
 
         response = self.client.post(
             "/api/profiles/abc/activate",
@@ -242,18 +237,34 @@ class WebApiTests(unittest.TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        action = switch_profile_mock.call_args.args[0]
-        with patch("vinylpi.web.routes.profiles_api.activate_profile") as activate_mock:
-            activate_mock.return_value = {"id": "abc"}
-            action()
-            activate_mock.assert_called_once_with("abc", "secret")
+        authenticate_profile_mock.assert_called_once_with("abc", "secret")
+        with self.client.session_transaction() as browser_session:
+            self.assertEqual(browser_session["vinylpi_profile_id"], "abc")
 
-    @patch("vinylpi.web.routes.profiles_api._switch_profile")
-    def test_legacy_profile_can_initialize_password_and_log_in(self, switch_profile_mock):
-        switch_profile_mock.return_value = (
-            {"id": "legacy", "name": "Legacy", "password_configured": True},
-            False,
-        )
+    @patch("vinylpi.web.routes.profiles_api.authenticate_profile")
+    def test_two_browser_clients_keep_independent_profile_sessions(self, authenticate_profile_mock):
+        authenticate_profile_mock.side_effect = lambda profile_id, _password: {
+            "id": profile_id,
+            "name": profile_id,
+            "is_guest": False,
+        }
+        second_client = self.client.application.test_client()
+
+        self.client.post("/api/profiles/simon/activate", json={"password": "one"})
+        second_client.post("/api/profiles/test/activate", json={"password": "two"})
+
+        with self.client.session_transaction() as first_session:
+            self.assertEqual(first_session["vinylpi_profile_id"], "simon")
+        with second_client.session_transaction() as second_session:
+            self.assertEqual(second_session["vinylpi_profile_id"], "test")
+
+    @patch("vinylpi.web.routes.profiles_api.initialize_profile_password_for_session")
+    def test_legacy_profile_can_initialize_password_and_log_in(self, initialize_mock):
+        initialize_mock.return_value = {
+            "id": "legacy",
+            "name": "Legacy",
+            "password_configured": True,
+        }
 
         response = self.client.post(
             "/api/profiles/legacy/initialize-password",
@@ -261,11 +272,9 @@ class WebApiTests(unittest.TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        action = switch_profile_mock.call_args.args[0]
-        with patch("vinylpi.web.routes.profiles_api.initialize_profile_password") as initialize_mock:
-            initialize_mock.return_value = {"id": "legacy"}
-            action()
-            initialize_mock.assert_called_once_with("legacy", "secret")
+        initialize_mock.assert_called_once_with("legacy", "secret")
+        with self.client.session_transaction() as browser_session:
+            self.assertEqual(browser_session["vinylpi_profile_id"], "legacy")
 
     @patch("vinylpi.web.routes.profiles_api.update_profile")
     def test_active_profile_can_be_renamed_and_given_a_password(self, update_profile_mock):

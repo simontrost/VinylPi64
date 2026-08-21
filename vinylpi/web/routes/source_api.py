@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from flask import Blueprint, jsonify, request
 
-from vinylpi.web.services.source import get_status, set_mode
+from vinylpi.web.services.source import SourceBusyError, get_status, set_mode
 
 source_bp = Blueprint("source_api", __name__)
 
@@ -25,5 +25,15 @@ def api_source_set():
         return jsonify({"ok": False, "error": str(exc), "needs_auth": True, **get_status()}), 409
     except ConnectionError as exc:
         return jsonify({"ok": False, "error": str(exc), **get_status()}), 503
+    except SourceBusyError as exc:
+        return jsonify(
+            {
+                "ok": False,
+                "error": str(exc),
+                "busy": True,
+                "owner_name": exc.owner_name,
+                **get_status(),
+            }
+        ), 409
     except RuntimeError as exc:
         return jsonify({"ok": False, "error": str(exc), "needs_config": True, **get_status()}), 409

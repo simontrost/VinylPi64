@@ -9,6 +9,11 @@ from typing import Any
 from dotenv import load_dotenv
 
 from vinylpi.paths import BASE_DIR
+from vinylpi.profiles import (
+    get_active_storage_key,
+    reset_profile_storage_override,
+    set_profile_storage_override,
+)
 from vinylpi.config.runtime import read_config, write_config
 from vinylpi.core.discogs_db import (
     delete_releases_not_in,
@@ -248,15 +253,29 @@ class DiscogsSyncManager:
         with self._lock:
             if self._thread is not None and self._thread.is_alive():
                 return False
+            storage_key = get_active_storage_key()
             self._runtime = {
                 "syncing": True,
                 "current": 0,
                 "total": 0,
                 "message": "Connecting to Discogs…",
+                "profile_storage_key": storage_key,
             }
-            self._thread = threading.Thread(target=self._run, daemon=True, name="discogs-sync")
+            self._thread = threading.Thread(
+                target=self._run_for_profile,
+                args=(storage_key,),
+                daemon=True,
+                name="discogs-sync",
+            )
             self._thread.start()
             return True
+
+    def _run_for_profile(self, storage_key: str) -> None:
+        token = set_profile_storage_override(storage_key)
+        try:
+            self._run()
+        finally:
+            reset_profile_storage_override(token)
 
     def _progress(self, current: int, total: int, message: str) -> None:
         with self._lock:

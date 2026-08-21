@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import threading
-from pathlib import Path
-
 from vinylpi.config.runtime import read_config
 from vinylpi.core.display import show_fallback_image, start_scrolling_display
 from vinylpi.core.image_utils import load_image
@@ -15,12 +13,23 @@ from vinylpi.integrations.spotify_client import (
     SpotifyNotConfigured,
     spotify_env_status,
 )
-from vinylpi.paths import BASE_DIR, UPLOAD_DIR
+from vinylpi.paths import BASE_DIR
+from vinylpi.profiles import (
+    get_active_storage_key,
+    get_runtime_profile,
+    set_runtime_profile,
+)
 from vinylpi.web.services import recognizer, spotify
 
 _VALID_MODES = {"off", "vinyl", "spotify"}
 _lock = threading.RLock()
 _source_mode = "off"
+
+
+class SourceBusyError(RuntimeError):
+    def __init__(self, owner_name: str):
+        self.owner_name = owner_name or "another profile"
+        super().__init__(f"VinylPi playback is currently in use by {self.owner_name}.")
 
 
 def _debug_silence() -> bool:
@@ -42,22 +51,14 @@ def get_mode() -> str:
 
 
 def _fallback_status() -> dict:
-    cfg = read_config()
-    fallback_path = str((cfg.get("fallback") or {}).get("image_path") or "").strip()
-    cover_url = "/static/images/logo.png"
-    revision = 0
-
-    if fallback_path:
-        path = Path(fallback_path)
-        if not path.is_absolute():
-            path = BASE_DIR / path
-        try:
-            resolved = path.resolve()
-            resolved.relative_to(UPLOAD_DIR.resolve())
-            cover_url = f"/uploads/{resolved.name}"
-            revision = int(resolved.stat().st_mtime_ns // 1_000_000)
-        except (OSError, ValueError):
-            pass
+    # The Pixoo still receives the configured 64x64 fallback via
+    # ``show_fallback_image``. The website uses the dedicated high-resolution
+    # project logo instead, so the large dashboard artwork never looks pixelated.
+    logo_path = BASE_DIR / "assets" / "readme" / "Logo.png"
+    try:
+        revision = int(logo_path.stat().st_mtime_ns // 1_000_000)
+    except OSError:
+        revision = 0
 
     return {
         "source": "off",
@@ -65,7 +66,7 @@ def _fallback_status() -> dict:
         "title": "Playback off",
         "album": "",
         "genre": "",
-        "cover_url": cover_url,
+        "cover_url": "/assets/readme/Logo.png",
         "bg_color": "#2b2b34",
         "track_id": "",
         "artist_id": "",
@@ -79,6 +80,21 @@ def get_visible_status() -> dict:
     mode = get_mode()
     if mode == "off":
         return _fallback_status()
+
+    viewer_key = get_active_storage_key()
+    runtime = get_runtime_profile()
+    runtime_key = str(runtime.get("storage_key") or "_guest")
+    if viewer_key != runtime_key:
+        busy = _fallback_status()
+        busy.update(
+            {
+                "source": mode,
+                "artist": f"{runtime.get('name') or 'Another profile'} is using VinylPi",
+                "title": "Playback in use",
+                "album": "Switching sources is locked until playback is turned off.",
+            }
+        )
+        return busy
 
     current = get_current_status()
     if current:
@@ -114,11 +130,17 @@ def _restore_source_display(source: str) -> None:
 
 
 def get_status() -> dict:
+    mode = get_mode()
+    runtime = get_runtime_profile() if mode != "off" else None
+    viewer_key = get_active_storage_key()
+    runtime_key = str((runtime or {}).get("storage_key") or "")
     return {
-        "mode": get_mode(),
+        "mode": mode,
         "vinyl_running": recognizer.is_running(),
         "spotify_running": spotify.is_running(),
         "spotify": spotify_env_status(),
+        "owner": runtime,
+        "busy_for_viewer": bool(mode != "off" and runtime_key and runtime_key != viewer_key),
     }
 
 
@@ -129,14 +151,30 @@ def set_mode(mode: str) -> dict:
         raise ValueError(f"Unsupported source mode: {requested}")
 
     with _lock:
+        current_mode = get_mode()
+        viewer_key = get_active_storage_key()
+        runtime = get_runtime_profile()
+        runtime_key = str(runtime.get("storage_key") or "_guest")
+
+        if current_mode != "off" and viewer_key != runtime_key:
+            raise SourceBusyError(str(runtime.get("name") or "another profile"))
+
         if requested == "off":
             spotify.stop()
             recognizer.stop()
             show_fallback_image()
             _source_mode = "off"
-            return get_status()
+            status = get_status()
+            set_runtime_profile(None)
+            return status
 
         if requested == "vinyl":
+            # Claim the single physical playback/recognition pipeline for the
+            # browser profile that started it. Other signed-in devices keep
+            # their own sessions and data, but cannot run recognition at the
+            # same time.
+            if current_mode == "off":
+                set_runtime_profile(None if viewer_key == "_guest" else viewer_key)
             spotify.stop()
             _restore_source_display("vinyl")
             recognizer.start(silence_output=_debug_silence())
@@ -162,6 +200,8 @@ def set_mode(mode: str) -> dict:
         except SpotifyError as exc:
             raise ConnectionError(str(exc)) from exc
 
+        if current_mode == "off":
+            set_runtime_profile(None if viewer_key == "_guest" else viewer_key)
         recognizer.stop()
         _restore_source_display("spotify")
         spotify.start(silence_output=_debug_silence())

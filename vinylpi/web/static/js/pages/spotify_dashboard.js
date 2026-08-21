@@ -2,6 +2,7 @@
 
 let vinylPiSourceMode = "off";
 let vinylPiSourcePollTimer = null;
+let vinylPiSourceBusyForViewer = false;
 
 const vinylPiOriginalRenderDiscogsContext = renderDiscogsContext;
 const vinylPiOriginalShowTrackInfo = showTrackInfo;
@@ -78,7 +79,9 @@ function renderSpotifyConnection(spotify = {}) {
 
     const configured = Boolean(spotify.configured);
     const connected = Boolean(spotify.connected);
-    const shouldShow = vinylPiSourceMode === "spotify" && (!configured || !connected);
+    const shouldShow = !vinylPiSourceBusyForViewer
+        && vinylPiSourceMode === "spotify"
+        && (!configured || !connected);
     row.classList.toggle("hidden", !shouldShow);
     if (!shouldShow) return;
 
@@ -95,12 +98,24 @@ function renderSpotifyConnection(spotify = {}) {
 
 function updateSourceUI(data = {}) {
     vinylPiSourceMode = ["off", "vinyl", "spotify"].includes(data.mode) ? data.mode : "off";
+    vinylPiSourceBusyForViewer = Boolean(data.busy_for_viewer);
 
     document.querySelectorAll("[data-source-mode]").forEach((button) => {
         const active = button.dataset.sourceMode === vinylPiSourceMode;
         button.classList.toggle("active", active);
         button.setAttribute("aria-pressed", active ? "true" : "false");
+        button.disabled = vinylPiSourceBusyForViewer;
     });
+
+    if (vinylPiSourceBusyForViewer) {
+        const ownerName = data.owner?.name || "another profile";
+        setSpotifyFeedback(`Playback is currently in use by ${ownerName}.`, "error");
+    } else {
+        const feedback = document.getElementById("spotify-feedback");
+        if (feedback?.textContent?.startsWith("Playback is currently in use by ")) {
+            setSpotifyFeedback("");
+        }
+    }
 
     renderSpotifyConnection(data.spotify || {});
 
@@ -148,7 +163,9 @@ async function setSourceMode(mode) {
         updateSourceUI(data);
 
         if (!response.ok || !data.ok) {
-            if (data.needs_auth) {
+            if (data.busy) {
+                setSpotifyFeedback(data.error || "Playback is already in use by another profile.", "error");
+            } else if (data.needs_auth) {
                 setSpotifyFeedback("Connect Spotify for this profile first.", "error");
             } else if (data.needs_config) {
                 setSpotifyFeedback("Add the Spotify app credentials to vinylpi.env first.", "error");
@@ -162,7 +179,7 @@ async function setSourceMode(mode) {
         setSpotifyFeedback("Could not change the music source.", "error");
     } finally {
         document.querySelectorAll("[data-source-mode]").forEach((button) => {
-            button.disabled = false;
+            button.disabled = vinylPiSourceBusyForViewer;
         });
         await loadSourceStatus();
         await loadStatus();

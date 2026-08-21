@@ -47,6 +47,7 @@ class WebPageStructureTests(unittest.TestCase):
             "/static/js/pages/dashboard.js",
             "/static/js/profile.js",
             "/static/images/logo.png",
+            "/assets/readme/Logo.png",
             "/static/icons/favicon.svg",
             "/static/site.webmanifest",
         )

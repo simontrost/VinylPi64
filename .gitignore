@@ -16,3 +16,5 @@ vinylpi.env
 # Per-profile runtime data
 data/profiles.json
 data/profiles/
+
+data/.session_secret

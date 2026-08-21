@@ -1,75 +1,35 @@
 from __future__ import annotations
 
-import threading
 from collections.abc import Mapping
 from typing import Any
 
-from flask import Blueprint, jsonify, request, send_file
+from flask import Blueprint, jsonify, request, send_file, session
 
-from vinylpi.config.runtime import clear_config_cache, read_config
-from vinylpi.core.discogs_service import SYNC_MANAGER
-from vinylpi.core.storage import initialize_storage
 from vinylpi.profiles import (
     ProfileAuthenticationError,
     ProfilePasswordNotConfiguredError,
-    activate_profile,
+    authenticate_profile,
     create_profile,
     delete_profile,
+    get_active_profile,
     get_profile_avatar_path,
-    initialize_profile_password,
+    get_runtime_profile,
+    initialize_profile_password_for_session,
     list_profiles,
-    logout_to_guest,
     prepare_profile_avatar,
     update_profile,
 )
-from vinylpi.web.services.recognizer import is_running, start, stop
-from vinylpi.web.services import spotify as spotify_service
-from vinylpi.web.services.source import set_mode
+from vinylpi.web.services.source import get_mode, set_mode
 
 profiles_bp = Blueprint("profiles_api", __name__)
-_PROFILE_SWITCH_LOCK = threading.Lock()
 
 
-def _restart_recognizer_after_profile_change(was_running: bool) -> None:
-    clear_config_cache()
-    initialize_storage()
-    SYNC_MANAGER.reset_runtime()
-    if was_running:
-        debug_log = bool((read_config().get("debug") or {}).get("logs", False))
-        start(silence_output=not debug_log)
-
-
-def _switch_profile(action):
-    with _PROFILE_SWITCH_LOCK:
-        if SYNC_MANAGER.is_syncing():
-            raise RuntimeError("Wait for the current Discogs sync to finish before switching profiles")
-        was_running = is_running()
-        spotify_was_running = spotify_service.is_running()
-        if was_running:
-            stop()
-        if spotify_was_running:
-            spotify_service.stop()
-        try:
-            result = action()
-        except Exception:
-            _restart_recognizer_after_profile_change(was_running)
-            if spotify_was_running:
-                try:
-                    set_mode("spotify")
-                except Exception:
-                    pass
-            raise
-
-        _restart_recognizer_after_profile_change(was_running)
-        if spotify_was_running:
-            try:
-                # Each profile owns its own Spotify refresh token. Re-entering
-                # Spotify mode now binds the worker to the newly active account.
-                set_mode("spotify")
-            except Exception:
-                # The new profile may intentionally have no Spotify account yet.
-                set_mode("off")
-        return result, was_running
+def _set_browser_profile(profile_id: str | None) -> None:
+    if profile_id:
+        session["vinylpi_profile_id"] = str(profile_id)
+    else:
+        session.pop("vinylpi_profile_id", None)
+    session.modified = True
 
 
 def _request_data() -> Mapping[str, Any]:
@@ -106,9 +66,6 @@ def api_create_profile():
     password_confirmation = data.get("password_confirmation")
     if password_confirmation is not None and password != str(password_confirmation):
         return jsonify({"ok": False, "error": "Passwords do not match"}), 400
-    if activated and SYNC_MANAGER.is_syncing():
-        return jsonify({"ok": False, "error": "Wait for the current Discogs sync to finish before switching profiles"}), 409
-
     try:
         avatar_png = _avatar_from_request()
         profile = create_profile(
@@ -120,31 +77,15 @@ def api_create_profile():
     except ValueError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
 
-    recognizer_restarted = False
     if activated:
-        try:
-            profile, recognizer_restarted = _switch_profile(
-                lambda: activate_profile(profile["id"], password)
-            )
-        except (RuntimeError, ProfilePasswordNotConfiguredError) as exc:
-            try:
-                delete_profile(profile["id"])
-            except Exception:
-                pass
-            return jsonify({"ok": False, "error": str(exc)}), 409
-        except ProfileAuthenticationError as exc:
-            try:
-                delete_profile(profile["id"])
-            except Exception:
-                pass
-            return jsonify({"ok": False, "error": str(exc)}), 401
+        _set_browser_profile(profile["id"])
 
     return jsonify(
         {
             "ok": True,
             "profile": profile,
             "activated": activated,
-            "recognizer_restarted": recognizer_restarted,
+            "recognizer_restarted": False,
         }
     ), 201
 
@@ -154,16 +95,15 @@ def api_activate_profile(profile_id: str):
     data = request.get_json(silent=True) or {}
     password = str(data.get("password") or "")
     try:
-        profile, restarted = _switch_profile(lambda: activate_profile(profile_id, password))
+        profile = authenticate_profile(profile_id, password)
     except KeyError:
         return jsonify({"ok": False, "error": "Profile not found"}), 404
     except ProfileAuthenticationError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 401
     except ProfilePasswordNotConfiguredError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 409
-    except RuntimeError as exc:
-        return jsonify({"ok": False, "error": str(exc)}), 409
-    return jsonify({"ok": True, "profile": profile, "recognizer_restarted": restarted})
+    _set_browser_profile(profile_id)
+    return jsonify({"ok": True, "profile": profile, "recognizer_restarted": False})
 
 
 @profiles_bp.post("/api/profiles/<profile_id>/initialize-password")
@@ -174,27 +114,45 @@ def api_initialize_profile_password(profile_id: str):
     if confirmation is not None and password != str(confirmation):
         return jsonify({"ok": False, "error": "Passwords do not match"}), 400
     try:
-        profile, restarted = _switch_profile(
-            lambda: initialize_profile_password(profile_id, password)
-        )
+        profile = initialize_profile_password_for_session(profile_id, password)
     except KeyError:
         return jsonify({"ok": False, "error": "Profile not found"}), 404
     except ValueError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
-    except RuntimeError as exc:
-        return jsonify({"ok": False, "error": str(exc)}), 409
-    return jsonify({"ok": True, "profile": profile, "recognizer_restarted": restarted})
+    _set_browser_profile(profile_id)
+    return jsonify({"ok": True, "profile": profile, "recognizer_restarted": False})
 
 
 @profiles_bp.post("/api/profiles/logout")
 def api_logout_profile():
-    try:
-        profile, restarted = _switch_profile(logout_to_guest)
-    except ProfilePasswordNotConfiguredError as exc:
-        return jsonify({"ok": False, "error": str(exc)}), 409
-    except RuntimeError as exc:
-        return jsonify({"ok": False, "error": str(exc)}), 409
-    return jsonify({"ok": True, "profile": profile, "recognizer_restarted": restarted})
+    active = get_active_profile()
+    if not active.get("is_guest") and not active.get("password_configured"):
+        return jsonify({"ok": False, "error": "Set a password before signing out."}), 409
+    runtime = get_runtime_profile()
+    if (
+        get_mode() != "off"
+        and str(runtime.get("storage_key") or "")
+        == str(active.get("storage_key") or "")
+    ):
+        # Releasing the browser profile that owns the hardware also releases
+        # the single playback mutex, so the next household member can use it.
+        set_mode("off")
+
+    _set_browser_profile(None)
+    return jsonify(
+        {
+            "ok": True,
+            "profile": {
+                "id": None,
+                "name": "Guest",
+                "is_guest": True,
+                "storage_key": "_guest",
+                "password_configured": False,
+                "avatar_url": None,
+            },
+            "recognizer_restarted": False,
+        }
+    )
 
 
 @profiles_bp.patch("/api/profiles/<profile_id>")

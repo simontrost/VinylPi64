@@ -13,7 +13,7 @@ from vinylpi.integrations.spotify_client import (
     spotify_env_status,
 )
 from vinylpi.paths import get_profile_db_path
-from vinylpi.profiles import get_active_profile
+from vinylpi.profiles import get_active_profile, get_runtime_profile
 from vinylpi.web.services.source import get_mode, set_mode
 
 spotify_bp = Blueprint("spotify_api", __name__)
@@ -75,7 +75,8 @@ def api_spotify_disconnect():
     profile = get_active_profile()
     storage_key = str(profile.get("storage_key") or "").strip()
     clear_spotify_account(get_profile_db_path(storage_key))
-    if get_mode() == "spotify":
+    runtime_key = str(get_runtime_profile().get("storage_key") or "").strip()
+    if get_mode() == "spotify" and runtime_key == storage_key:
         set_mode("off")
     return jsonify({"ok": True, **spotify_env_status()})
 

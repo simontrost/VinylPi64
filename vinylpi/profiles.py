@@ -14,6 +14,7 @@ import threading
 import time
 import uuid
 from copy import deepcopy
+from contextvars import ContextVar, Token
 from pathlib import Path
 from typing import Any
 
@@ -39,6 +40,15 @@ _AVATAR_FILENAME = "avatar.png"
 _MAX_AVATAR_BYTES = 5 * 1024 * 1024
 _AVATAR_SIZE = 256
 _ALLOWED_AVATAR_FORMATS = {"JPEG", "PNG", "WEBP"}
+
+# Web requests can be scoped to a browser-local profile without changing the
+# single global playback owner. Worker processes run without this override and
+# therefore keep using the registry's ``active_profile_id`` as the runtime
+# profile for recognition/statistics.
+_PROFILE_STORAGE_OVERRIDE: ContextVar[str | None] = ContextVar(
+    "vinylpi_profile_storage_override",
+    default=None,
+)
 
 
 class ProfileAuthenticationError(PermissionError):
@@ -303,15 +313,104 @@ def _public_profile(profile: dict[str, Any], *, active_id: str | None = None) ->
     }
 
 
+def set_profile_storage_override(storage_key: str | None) -> Token:
+    key = str(storage_key or _GUEST_STORAGE_KEY).strip() or _GUEST_STORAGE_KEY
+    return _PROFILE_STORAGE_OVERRIDE.set(key)
+
+
+def reset_profile_storage_override(token: Token) -> None:
+    _PROFILE_STORAGE_OVERRIDE.reset(token)
+
+
+def get_profile_storage_override() -> str | None:
+    return _PROFILE_STORAGE_OVERRIDE.get()
+
+
+def profile_exists(profile_id: str | None) -> bool:
+    profile_id = str(profile_id or "").strip()
+    if not profile_id:
+        return False
+    registry = ensure_profiles_initialized()
+    return _find_profile(registry, profile_id) is not None
+
+
+def get_runtime_storage_key() -> str:
+    registry = ensure_profiles_initialized()
+    return str(registry.get("active_profile_id") or _GUEST_STORAGE_KEY)
+
+
+def set_runtime_profile(profile_id: str | None) -> dict[str, Any]:
+    """Select the one profile that owns the physical recognition pipeline."""
+    profile_id = str(profile_id or "").strip()
+    with _LOCK:
+        registry = ensure_profiles_initialized()
+        if profile_id:
+            profile = _find_profile(registry, profile_id)
+            if profile is None:
+                raise KeyError("Profile not found")
+            _profile_dir(profile_id).mkdir(parents=True, exist_ok=True)
+            registry["active_profile_id"] = profile_id
+            _atomic_write_json(PROFILE_REGISTRY_PATH, registry)
+            return {
+                **_public_profile(profile, active_id=profile_id),
+                "is_guest": False,
+                "storage_key": profile_id,
+            }
+
+        registry["active_profile_id"] = None
+        _atomic_write_json(PROFILE_REGISTRY_PATH, registry)
+        return {
+            "id": None,
+            "name": "Guest",
+            "is_guest": True,
+            "storage_key": _GUEST_STORAGE_KEY,
+            "password_configured": False,
+            "avatar_url": None,
+        }
+
+
+def get_runtime_profile() -> dict[str, Any]:
+    registry = ensure_profiles_initialized()
+    runtime_id = registry.get("active_profile_id")
+    if runtime_id is None:
+        return {
+            "id": None,
+            "name": "Guest",
+            "is_guest": True,
+            "storage_key": _GUEST_STORAGE_KEY,
+            "password_configured": False,
+            "avatar_url": None,
+        }
+    profile = _find_profile(registry, str(runtime_id))
+    if profile is None:
+        return {
+            "id": None,
+            "name": "Guest",
+            "is_guest": True,
+            "storage_key": _GUEST_STORAGE_KEY,
+            "password_configured": False,
+            "avatar_url": None,
+        }
+    return {
+        **_public_profile(profile, active_id=str(runtime_id)),
+        "is_guest": False,
+        "storage_key": str(profile["id"]),
+    }
+
+
 def get_active_storage_key() -> str:
+    override = get_profile_storage_override()
+    if override is not None:
+        return override
     registry = ensure_profiles_initialized()
     return str(registry.get("active_profile_id") or _GUEST_STORAGE_KEY)
 
 
 def get_active_profile() -> dict[str, Any]:
     registry = ensure_profiles_initialized()
-    active_id = registry.get("active_profile_id")
-    if active_id is None:
+    override = get_profile_storage_override()
+    active_id = override if override is not None else registry.get("active_profile_id")
+    if active_id in (None, _GUEST_STORAGE_KEY):
         return {
             "id": None,
             "name": "Guest",
@@ -334,13 +433,16 @@ def get_active_profile() -> dict[str, Any]:
 
 def list_profiles() -> dict[str, Any]:
     registry = ensure_profiles_initialized()
-    active_id = registry.get("active_profile_id")
+    override = get_profile_storage_override()
+    active_id = override if override is not None else registry.get("active_profile_id")
+    if active_id == _GUEST_STORAGE_KEY:
+        active_id = None
     profiles = [_public_profile(item, active_id=active_id) for item in registry["profiles"]]
     return {"active_profile": get_active_profile(), "profiles": profiles}
 
 
 def _active_config_path_unlocked(registry: dict[str, Any]) -> Path:
-    storage_key = str(registry.get("active_profile_id") or _GUEST_STORAGE_KEY)
+    storage_key = get_active_storage_key()
     return _profile_dir(storage_key) / "config.json"
 
 
@@ -461,6 +563,29 @@ def activate_profile(profile_id: str, password: str) -> dict[str, Any]:
         }
 
 
+def authenticate_profile(profile_id: str, password: str) -> dict[str, Any]:
+    """Authenticate a browser session without claiming the playback runtime."""
+    profile_id = str(profile_id or "").strip()
+    with _LOCK:
+        registry = ensure_profiles_initialized()
+        profile = _find_profile(registry, profile_id)
+        if profile is None:
+            raise KeyError("Profile not found")
+        password_hash = str(profile.get("password_hash") or "")
+        if not password_hash:
+            raise ProfilePasswordNotConfiguredError(
+                "This profile has no password yet. Set one before signing in."
+            )
+        if not _check_password(password_hash, str(password or "")):
+            raise ProfileAuthenticationError("Incorrect password")
+        _profile_dir(profile_id).mkdir(parents=True, exist_ok=True)
+        return {
+            **_public_profile(profile, active_id=profile_id),
+            "is_guest": False,
+            "storage_key": profile_id,
+        }
+
+
 def initialize_profile_password(profile_id: str, password: str) -> dict[str, Any]:
     profile_id = str(profile_id or "").strip()
     clean_password = _normalise_password(password)
@@ -475,6 +600,28 @@ def initialize_profile_password(profile_id: str, password: str) -> dict[str, Any
         profile["updated_at"] = _now()
         _profile_dir(profile_id).mkdir(parents=True, exist_ok=True)
         registry["active_profile_id"] = profile_id
+        _atomic_write_json(PROFILE_REGISTRY_PATH, registry)
+        return {
+            **_public_profile(profile, active_id=profile_id),
+            "is_guest": False,
+            "storage_key": profile_id,
+        }
+
+
+def initialize_profile_password_for_session(profile_id: str, password: str) -> dict[str, Any]:
+    """Set a legacy profile password and return it without changing playback owner."""
+    profile_id = str(profile_id or "").strip()
+    clean_password = _normalise_password(password)
+    with _LOCK:
+        registry = ensure_profiles_initialized()
+        profile = _find_profile(registry, profile_id)
+        if profile is None:
+            raise KeyError("Profile not found")
+        if profile.get("password_hash"):
+            raise ValueError("This profile already has a password")
+        profile["password_hash"] = _hash_password(clean_password)
+        profile["updated_at"] = _now()
+        _profile_dir(profile_id).mkdir(parents=True, exist_ok=True)
         _atomic_write_json(PROFILE_REGISTRY_PATH, registry)
         return {
             **_public_profile(profile, active_id=profile_id),
@@ -518,7 +665,7 @@ def update_profile(
         profile = _find_profile(registry, profile_id)
         if profile is None:
             raise KeyError("Profile not found")
-        if registry.get("active_profile_id") != profile_id:
+        if get_active_storage_key() != profile_id:
             raise ProfileAuthenticationError("Log in to this profile before editing it")
 
         existing_hash = str(profile.get("password_hash") or "")
@@ -589,4 +736,4 @@ def delete_profile(profile_id: str) -> None:
 
 
 def is_default_profile_active() -> bool:
-    return ensure_profiles_initialized().get("active_profile_id") == _DEFAULT_PROFILE_ID
+    return get_active_storage_key() == _DEFAULT_PROFILE_ID

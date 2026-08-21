@@ -263,14 +263,14 @@
         signedOutView.classList.toggle("hidden", signedIn);
 
         if (signedIn) {
-            setDialogCopy("Your profile", "Manage the profile currently used by VinylPi.");
+            setDialogCopy("Your profile", "Manage the profile signed in on this device.");
             activeName.textContent = active.name;
             setImage(activeImage, activeInitial, active.name, active.avatar_url);
             passwordState.textContent = active.password_configured
                 ? "Password protected"
                 : "Set a password before signing out";
             logoutHint.textContent = active.password_configured
-                ? "Signing out returns VinylPi to the profile selection."
+                ? "Signing out only affects this browser or device."
                 : "Set a password in Edit profile before signing out.";
             closeEditForm();
         } else {
