@@ -51,6 +51,9 @@ CONFIG_DEFAULTS = {
     "shazam": {
         "timeout_seconds": 15
     },
+    "spotify": {
+        "poll_seconds": 2.0
+    },
     "discogs": {
         "enabled": False,
         "username": "",
@@ -76,8 +79,7 @@ CONFIG_DEFAULTS = {
     "behavior": {
         "loop_delay_seconds": 1,
         "auto_sleep": 30,
-        "stats_min_consecutive": 3,
-        "stats_repeat_guard_seconds": 120
+        "stats_min_consecutive": 3
     },
     "homeassistant": {
         "use_ha": True,
@@ -117,5 +119,11 @@ def load_config(path: Path | str | None = None) -> dict:
     discogs = cfg.get("discogs")
     if isinstance(discogs, dict):
         discogs.pop("token", None)
+
+    # Older builds used a time-based repeat guard. Statistics are now strictly
+    # transition-based, so keeping this legacy value would be misleading.
+    behavior = cfg.get("behavior")
+    if isinstance(behavior, dict):
+        behavior.pop("stats_repeat_guard_seconds", None)
 
     return cfg

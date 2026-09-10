@@ -13,7 +13,7 @@ from vinylpi.core.statistics import (
     add_listen_time_minutes_for_confirmed_song,
     add_measured_listen_time_seconds,
 )
-from vinylpi.core.status import clear_side_flip_prompt, write_side_flip_prompt, write_status
+from vinylpi.core.status import clear_side_flip_prompt, get_last_source_status, write_side_flip_prompt, write_status
 from vinylpi.core.title_variants import canonicalize_title, variant_score
 from vinylpi.integrations.home_assistant import send_rgb
 
@@ -240,6 +240,21 @@ def handle_song_result(
     return info
 
 
+
+
+def restore_last_vinyl_song(st: StatsSwitchState, *, debug_log: bool = False) -> None:
+    """Keep the last recognized Vinyl song across recognizer restarts/off mode."""
+    status = get_last_source_status("vinyl") or {}
+    artist = str(status.get("artist") or "").strip()
+    title = canonicalize_title(str(status.get("title") or ""))
+    if not artist or not title:
+        return
+
+    st.current_song_id = (artist.casefold(), title.casefold())
+    if debug_log:
+        print(f"Restored last Vinyl song for stats guard: {artist} – {title}")
+
+
 def update_song_stats_on_switch(
     *,
     st: StatsSwitchState,
@@ -253,27 +268,18 @@ def update_song_stats_on_switch(
     artist_id: str | None,
     duration_ms: int | None,
     min_consecutive: int,
-    repeat_guard_seconds: float = 120.0,
     allow_confirmation: bool = True,
 ) -> bool:
     st.last_counted = False
 
     def confirm() -> None:
-        now = time.monotonic()
-        last_counted_at = st.last_counted_at_by_song.get(song_id)
-        should_count = (
-            last_counted_at is None
-            or repeat_guard_seconds <= 0
-            or (now - last_counted_at) >= repeat_guard_seconds
-        )
-
+        # Statistics are transition-based: the same song as the immediately
+        # previous recognized song is never counted twice. A real A -> B -> A
+        # transition may count A again; elapsed time alone never creates a play.
         st.current_song_id = song_id
         st.candidate_song_id = None
         st.candidate_streak = 0
-        st.last_counted = should_count
-
-        if not should_count:
-            return
+        st.last_counted = True
 
         _update_stats(
             artist,
@@ -285,7 +291,6 @@ def update_song_stats_on_switch(
             artist_id,
             duration_ms,
         )
-        st.last_counted_at_by_song[song_id] = now
 
     if st.current_song_id is None:
         if st.candidate_song_id == song_id:

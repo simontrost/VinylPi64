@@ -19,6 +19,7 @@ from vinylpi.core.loop_logic import (
     handle_no_result,
     handle_song_result,
     maybe_add_listen_time,
+    restore_last_vinyl_song,
     start_or_replace_timed_listen,
     update_album_session_on_switch,
     update_song_stats_on_switch,
@@ -40,6 +41,7 @@ MIN_TRACKS_FOR_ALBUM_SESSION = 2
 MIN_CONSECUTIVE_FOR_ALBUM_SWITCH = 2
 
 
+
 def main_loop() -> None:
     initialize_storage()
     cfg = LoopConfig.from_config(read_config())
@@ -49,6 +51,7 @@ def main_loop() -> None:
     display_state = DisplayState()
     album_state = AlbumState()
     stats_state = StatsSwitchState()
+    restore_last_vinyl_song(stats_state, debug_log=cfg.debug_log)
     timed_listen_state = TimedListenState()
     discogs_state = DiscogsPlaybackState()
     start_display_refresh_watcher(debug_log=cfg.debug_log)
@@ -174,7 +177,6 @@ def main_loop() -> None:
                 artist_id=info.get("artist_id"),
                 duration_ms=info.get("duration_ms"),
                 min_consecutive=cfg.stats_min_consecutive,
-                repeat_guard_seconds=cfg.stats_repeat_guard_seconds,
                 allow_confirmation=transition_ready,
             )
             counted_switch = did_confirm and stats_state.last_counted

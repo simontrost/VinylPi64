@@ -521,6 +521,7 @@ async function loadConfig() {
     const debug = cfg.debug || {};
     const behavior = cfg.behavior || {};
     const shazam = cfg.shazam || {};
+    const spotify = cfg.spotify || {};
     const discogs = cfg.discogs || {};
     const homeassistant = cfg.homeassistant || {};
 
@@ -631,6 +632,10 @@ async function loadConfig() {
     document.getElementById("discogsVinylOnly").checked = discogs.vinyl_only !== false;
     document.getElementById("discogsMinConfidence").value = discogs.min_match_confidence ?? 0.72;
 
+    // SPOTIFY
+    document.getElementById("spotifyPollSeconds").value =
+        spotify.poll_seconds ?? 2;
+
     // BEHAVIOR
     document.getElementById("behaviorLoopDelay").value =
         behavior.loop_delay_seconds ?? 1;
@@ -675,6 +680,7 @@ document.getElementById("settings-form").addEventListener("submit", async (e) =>
     cfg.debug = cfg.debug || {};
     cfg.behavior = cfg.behavior || {};
     cfg.shazam = cfg.shazam || {};
+    cfg.spotify = cfg.spotify || {};
     cfg.discogs = cfg.discogs || {};
     cfg.homeassistant = cfg.homeassistant || {};
 
@@ -687,6 +693,7 @@ document.getElementById("settings-form").addEventListener("submit", async (e) =>
     const debug = cfg.debug;
     const behavior = cfg.behavior;
     const shazam = cfg.shazam;
+    const spotify = cfg.spotify;
     const discogs = cfg.discogs;
     const homeassistant = cfg.homeassistant;
 
@@ -790,6 +797,12 @@ document.getElementById("settings-form").addEventListener("submit", async (e) =>
     discogs.min_match_confidence = Math.min(
         0.95,
         Math.max(0.5, parseFloat(document.getElementById("discogsMinConfidence").value) || 0.72),
+    );
+
+    // SPOTIFY
+    spotify.poll_seconds = Math.min(
+        60,
+        Math.max(1, parseFloat(document.getElementById("spotifyPollSeconds").value) || 2),
     );
 
     // BEHAVIOR

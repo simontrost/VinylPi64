@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import time
 
 from dotenv import load_dotenv
@@ -13,7 +12,7 @@ from vinylpi.core.spotify_stats import (
     record_spotify_play,
     update_spotify_genre,
 )
-from vinylpi.core.status import write_status
+from vinylpi.core.status import get_last_source_status, write_status
 from vinylpi.integrations.home_assistant import send_rgb
 from vinylpi.integrations.spotify_client import (
     SpotifyClient,
@@ -22,6 +21,7 @@ from vinylpi.integrations.spotify_client import (
     SpotifyNotConfigured,
 )
 from vinylpi.paths import BASE_DIR, get_active_db_path
+from vinylpi.config.runtime import read_config
 
 
 def _display_track(track) -> None:
@@ -77,49 +77,62 @@ def _backfill_missing_genres(client: SpotifyClient, *, limit: int = 30) -> None:
             update_spotify_genre(str(row.get("track_id") or ""), genre)
 
 
+def _poll_seconds() -> float:
+    """Return the live Spotify polling interval from the active profile config."""
+    try:
+        value = (read_config().get("spotify") or {}).get("poll_seconds", 2.0)
+        return max(1.0, float(value))
+    except (TypeError, ValueError):
+        return 2.0
+
+
+def _last_recognized_spotify_track_id() -> str | None:
+    """Restore the last Spotify track across pause/off/worker restarts."""
+    status = get_last_source_status("spotify") or {}
+    track_id = str(status.get("track_id") or "").strip()
+    return track_id or None
+
+
 def main() -> None:
     load_dotenv(BASE_DIR / "vinylpi.env", override=False)
     load_dotenv(BASE_DIR / ".env", override=True)
-    poll_seconds = max(1.0, float(os.getenv("SPOTIFY_POLL_SECONDS") or 2.0))
 
     client: SpotifyClient | None = None
     last_track_id: str | None = None
     last_progress_ms: int | None = None
     last_db_path: str | None = None
+    displayed_in_session = False
 
-    print(f"Spotify worker started (polling every {poll_seconds:g}s).")
+    print(f"Spotify worker started (polling every {_poll_seconds():g}s).")
 
     while True:
+        poll_seconds = _poll_seconds()
         try:
             active_db_path = str(get_active_db_path())
             if active_db_path != last_db_path or client is None:
-                # Spotify accounts are profile-specific. A profile switch gets a
-                # fresh client bound to that profile's refresh token/database.
+                # Spotify accounts and last-source status are profile-specific.
+                # Restore the previous track so Off -> Spotify cannot count the
+                # exact same song again merely because the worker restarted.
                 last_db_path = active_db_path
                 client = SpotifyClient(profile_db_path=active_db_path)
-                last_track_id = None
+                last_track_id = _last_recognized_spotify_track_id()
                 last_progress_ms = None
+                displayed_in_session = False
                 _backfill_missing_genres(client)
 
             track = client.get_currently_playing()
             if track is None:
-                last_track_id = None
+                # Losing the playback response (including a pause on clients that
+                # return no item) must not forget which song was last recognized.
+                # Only the progress baseline is discarded to avoid adding paused
+                # time when playback becomes available again.
                 last_progress_ms = None
                 time.sleep(poll_seconds)
                 continue
 
             new_play = track.track_id != last_track_id
-            restarted = False
-            if (
-                track.track_id == last_track_id
-                and track.is_playing
-                and track.progress_ms is not None
-                and last_progress_ms is not None
-                and track.progress_ms + 5000 < last_progress_ms
-            ):
-                restarted = True
 
-            if new_play or restarted:
+            if new_play:
                 record_spotify_play(
                     track_id=track.track_id,
                     artist=track.artist,
@@ -130,7 +143,13 @@ def main() -> None:
                     genre=track.genre,
                     duration_ms=track.duration_ms,
                 )
+
+            # A worker restart leaves the Pixoo on the fallback image. Even when
+            # the current track equals the persisted last track (and therefore
+            # must NOT be counted again), it still needs to be displayed once.
+            if new_play or not displayed_in_session:
                 _display_track(track)
+                displayed_in_session = True
 
             if (
                 track.is_playing

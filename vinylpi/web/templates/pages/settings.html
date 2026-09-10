@@ -7,7 +7,7 @@
 {% endblock %}
 
 {% block page_scripts %}
-    <script src="{{ url_for('static', filename='js/pages/settings.js') }}?v=20260803b" defer></script>
+    <script src="{{ url_for('static', filename='js/pages/settings.js') }}?v=20260910a" defer></script>
     <script src="{{ url_for('static', filename='js/pages/spotify_settings.js') }}" defer></script>
 {% endblock %}
 
@@ -408,6 +408,12 @@
                                 <button type="button" id="spotifySettingsDisconnect" disabled>Disconnect</button>
                             </div>
                             <div id="spotifySettingsFeedback" class="form-hint" role="status" aria-live="polite"></div>
+                        </div>
+
+                        <div class="form-group">
+                            <div class="group-title">Playback polling</div>
+                            <div class="form-row"><label for="spotifyPollSeconds">Poll interval (seconds)</label><input type="number" id="spotifyPollSeconds" min="1" max="60" step="0.5"></div>
+                            <div class="form-hint">How often VinylPi checks Spotify for the currently playing track. Default: 2 seconds. Changes apply while the Spotify worker is running.</div>
                         </div>
 
                         <div class="form-group">
