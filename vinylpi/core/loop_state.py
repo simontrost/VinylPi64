@@ -75,6 +75,9 @@ class StatsSwitchState:
     candidate_song_id: Optional[tuple[str, str]] = None
     candidate_streak: int = 0
     last_counted: bool = False
+    # Backward compatibility for callers/tests from before the transition-based
+    # de-duplication change. Production code no longer uses the time guard.
+    last_counted_at_by_song: dict[tuple[str, str], float] = field(default_factory=dict)
 
 @dataclass
 class TimedListenState:

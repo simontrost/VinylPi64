@@ -205,7 +205,6 @@ class StatisticsSwitchTests(unittest.TestCase):
             "artist_id": None,
             "duration_ms": None,
             "min_consecutive": 2,
-            "repeat_guard_seconds": 0,
         }
 
         self.assertFalse(update_song_stats_on_switch(**kwargs))
@@ -215,9 +214,8 @@ class StatisticsSwitchTests(unittest.TestCase):
         self.assertEqual(st.current_song_id, ("artist", "song"))
         self.assertEqual(st.candidate_streak, 0)
 
-    @patch("vinylpi.core.loop_logic.time.monotonic", side_effect=[100.0, 150.0, 250.0])
     @patch("vinylpi.core.loop_logic._update_stats")
-    def test_repeat_guard_prevents_rapid_recount(self, update_stats, monotonic):
+    def test_same_immediately_previous_song_is_never_recounted(self, update_stats):
         st = StatsSwitchState()
 
         def confirm(song_id):
@@ -233,18 +231,35 @@ class StatisticsSwitchTests(unittest.TestCase):
                 artist_id=None,
                 duration_ms=None,
                 min_consecutive=1,
-                repeat_guard_seconds=120,
             )
 
         self.assertTrue(confirm(("artist", "song")))
-        st.current_song_id = None
-        self.assertTrue(confirm(("artist", "song")))
-        st.current_song_id = None
-        self.assertTrue(confirm(("artist", "song")))
+        self.assertFalse(confirm(("artist", "song")))
+        self.assertEqual(update_stats.call_count, 1)
 
-        self.assertEqual(update_stats.call_count, 2)
-        self.assertTrue(st.last_counted)
-        self.assertEqual(monotonic.call_count, 3)
+    @patch("vinylpi.core.loop_logic._update_stats")
+    def test_real_song_transition_can_count_song_again(self, update_stats):
+        st = StatsSwitchState()
+
+        def confirm(song_id):
+            return update_song_stats_on_switch(
+                st=st,
+                song_id=song_id,
+                artist="Artist",
+                title=song_id[1],
+                album="Album",
+                cover_url=None,
+                genre=None,
+                track_id=None,
+                artist_id=None,
+                duration_ms=None,
+                min_consecutive=1,
+            )
+
+        self.assertTrue(confirm(("artist", "a")))
+        self.assertTrue(confirm(("artist", "b")))
+        self.assertTrue(confirm(("artist", "a")))
+        self.assertEqual(update_stats.call_count, 3)
 
     @patch("vinylpi.core.loop_logic._update_stats")
     def test_confirmation_can_be_delayed_without_losing_candidate(self, update_stats):
@@ -261,7 +276,6 @@ class StatisticsSwitchTests(unittest.TestCase):
             artist_id=None,
             duration_ms=None,
             min_consecutive=2,
-            repeat_guard_seconds=0,
         )
 
         self.assertFalse(update_song_stats_on_switch(**common, allow_confirmation=False))

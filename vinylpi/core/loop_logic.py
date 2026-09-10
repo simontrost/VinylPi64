@@ -268,18 +268,38 @@ def update_song_stats_on_switch(
     artist_id: str | None,
     duration_ms: int | None,
     min_consecutive: int,
+    repeat_guard_seconds: float | None = None,
     allow_confirmation: bool = True,
 ) -> bool:
     st.last_counted = False
 
     def confirm() -> None:
-        # Statistics are transition-based: the same song as the immediately
-        # previous recognized song is never counted twice. A real A -> B -> A
-        # transition may count A again; elapsed time alone never creates a play.
+        # Production behavior is transition-based: the same song as the
+        # immediately previous recognized song is never counted twice. A real
+        # A -> B -> A transition may count A again; elapsed time alone never
+        # creates a play.
+        #
+        # ``repeat_guard_seconds`` is accepted only as a compatibility bridge
+        # for older callers/tests. When explicitly supplied, preserve the old
+        # time-guard semantics so mixed-version deployments do not crash.
+        should_count = True
+        legacy_now: float | None = None
+        if repeat_guard_seconds is not None:
+            legacy_now = time.monotonic()
+            last_counted_at = st.last_counted_at_by_song.get(song_id)
+            should_count = (
+                last_counted_at is None
+                or repeat_guard_seconds <= 0
+                or (legacy_now - last_counted_at) >= repeat_guard_seconds
+            )
+
         st.current_song_id = song_id
         st.candidate_song_id = None
         st.candidate_streak = 0
-        st.last_counted = True
+        st.last_counted = should_count
+
+        if not should_count:
+            return
 
         _update_stats(
             artist,
@@ -291,6 +311,9 @@ def update_song_stats_on_switch(
             artist_id,
             duration_ms,
         )
+
+        if legacy_now is not None:
+            st.last_counted_at_by_song[song_id] = legacy_now
 
     if st.current_song_id is None:
         if st.candidate_song_id == song_id:

@@ -31,6 +31,7 @@ class ConfigLoaderTests(unittest.TestCase):
         self.assertEqual(cfg["audio"]["sample_seconds"], 7)
         self.assertEqual(cfg["audio"]["sample_rate"], CONFIG_DEFAULTS["audio"]["sample_rate"])
         self.assertIn("image", cfg)
+        self.assertEqual(cfg["spotify"]["poll_seconds"], 2.0)
 
     def test_load_config_returns_independent_defaults_for_missing_file(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -49,6 +50,19 @@ class ConfigLoaderTests(unittest.TestCase):
             cfg = load_config(path)
 
         self.assertEqual(cfg, CONFIG_DEFAULTS)
+
+
+    def test_load_config_removes_legacy_time_based_stats_repeat_guard(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "config.json"
+            path.write_text(
+                json.dumps({"behavior": {"stats_repeat_guard_seconds": 120}}),
+                encoding="utf-8",
+            )
+
+            cfg = load_config(path)
+
+        self.assertNotIn("stats_repeat_guard_seconds", cfg["behavior"])
 
     def test_load_config_removes_legacy_discogs_token(self):
         with tempfile.TemporaryDirectory() as temp_dir:

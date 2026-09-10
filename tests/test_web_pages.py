@@ -78,6 +78,7 @@ class WebPageStructureTests(unittest.TestCase):
 
         self.assertIn('id="section-spotify"', html)
         self.assertIn('id="spotifySettingsConnect"', html)
+        self.assertIn('id="spotifyPollSeconds"', html)
         self.assertIn('Profile account connection', html)
 
     def test_stats_page_contains_share_button(self):
