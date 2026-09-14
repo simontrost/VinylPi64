@@ -253,6 +253,27 @@ def find_exact_title_tracks(normalized_title: str, limit: int = 100) -> list[dic
     return [{key: row[key] for key in row.keys()} for row in rows]
 
 
+def find_compact_title_tracks(normalized_title: str, limit: int = 100) -> list[dict[str, Any]]:
+    """Find collection tracks while ignoring whitespace in the normalized title.
+
+    Shazam and Discogs occasionally disagree only about word boundaries, e.g.
+    ``highschool`` vs. ``high school``.  Normalization deliberately keeps spaces,
+    so an exact lookup alone misses those otherwise unambiguous collection hits.
+    """
+    compact_title = (normalized_title or "").replace(" ", "")
+    if not compact_title:
+        return []
+    init_db()
+    with get_connection() as conn:
+        rows = conn.execute(
+            _TRACK_SELECT
+            + " WHERE REPLACE(t.normalized_title, ' ', '') = ? "
+              "ORDER BY t.release_id, t.track_index LIMIT ?",
+            (compact_title, int(limit)),
+        ).fetchall()
+    return [{key: row[key] for key in row.keys()} for row in rows]
+
+
 def get_release_tracks(release_id: int) -> list[dict[str, Any]]:
     init_db()
     with get_connection() as conn:

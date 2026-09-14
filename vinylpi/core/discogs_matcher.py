@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from difflib import SequenceMatcher
+from functools import lru_cache
 import re
 import time
 from typing import Any
 
 from vinylpi.core.discogs_db import (
+    find_compact_title_tracks,
     find_exact_title_tracks,
     get_next_track,
     get_release_tracks,
@@ -28,6 +30,7 @@ _TRAILING_VARIANT = re.compile(
     r"\s+(?:mtv\s+unplugged|unplugged|live|acoustic|session)(?:\s+version)?\s*$",
     flags=re.IGNORECASE,
 )
+_TITLE_SEGMENT_SPLIT = re.compile(r"\s*(?:/|\|)\s*")
 
 
 def _similarity(left: str, right: str) -> float:
@@ -43,6 +46,24 @@ def _base_title_norm(value: str | None) -> str:
     title = _BRACKETED_VARIANT.sub("", title)
     title = _TRAILING_VARIANT.sub("", title)
     return normalize_text(title)
+
+
+def _lead_title_norm(value: str | None) -> str:
+    """Return the leading title segment used by some Shazam false positives.
+
+    A recurring pattern is a recognition like ``five degrees / cut (...)`` for
+    the actual vinyl track ``five degrees``.  The leading segment is useful as
+    supporting evidence, but only becomes decisive when the Discogs sequence
+    already points to that exact track.
+    """
+    title = canonicalize_title(value or "")
+    return normalize_text(_TITLE_SEGMENT_SPLIT.split(title, maxsplit=1)[0])
+
+
+@lru_cache(maxsize=8)
+def _load_discogs_cover(url: str):
+    """Cache a few release covers so matching every sample does not re-download them."""
+    return load_image(url)
 
 
 def _variant_tags(*values: str | None) -> set[str]:
@@ -83,6 +104,7 @@ def _score_candidate(
     *,
     title_norm: str,
     base_title_norm: str,
+    lead_title_norm: str,
     artist_norm: str,
     album_norm: str,
     observed_variant_tags: set[str],
@@ -93,7 +115,24 @@ def _score_candidate(
     candidate_base_title = _base_title_norm(candidate.get("track_title"))
     full_title_similarity = _similarity(title_norm, candidate_title_norm)
     base_title_similarity = _similarity(base_title_norm, candidate_base_title)
-    title_similarity = max(full_title_similarity, base_title_similarity)
+    lead_title_similarity = _similarity(lead_title_norm, candidate_title_norm)
+    compact_equivalent = bool(
+        title_norm
+        and candidate_title_norm
+        and title_norm.replace(" ", "") == candidate_title_norm.replace(" ", "")
+    )
+    lead_equivalent = bool(
+        lead_title_norm
+        and candidate_title_norm
+        and lead_title_norm.replace(" ", "") == candidate_title_norm.replace(" ", "")
+    )
+    title_similarity = max(
+        full_title_similarity,
+        base_title_similarity,
+        lead_title_similarity,
+    )
+    if compact_equivalent or lead_equivalent:
+        title_similarity = 1.0
     artist_similarity = _similarity(artist_norm, str(candidate.get("normalized_artist") or ""))
     album_similarity = _similarity(album_norm, normalize_text(candidate.get("release_title")))
 
@@ -160,6 +199,12 @@ def _score_candidate(
         "title_similarity": title_similarity,
         "full_title_similarity": full_title_similarity,
         "base_title_similarity": base_title_similarity,
+        "lead_title_similarity": lead_title_similarity,
+        "title_equivalent": bool(
+            title_norm == candidate_title_norm
+            or compact_equivalent
+            or lead_equivalent
+        ),
         "artist_similarity": artist_similarity,
         "album_similarity": album_similarity,
         "active_release": active_release,
@@ -180,7 +225,9 @@ def _is_plausible(
     album_similarity = float(metrics["album_similarity"])
     active_release = bool(metrics["active_release"])
     expected_next = bool(metrics["expected_next"])
+    transition_ready = bool(metrics["transition_ready"])
     variant_overlap = bool(metrics["variant_overlap"])
+    title_equivalent = bool(metrics.get("title_equivalent"))
     confidence = min(1.0, max(0.0, score / 140.0))
 
     if confidence < minimum_confidence:
@@ -189,11 +236,41 @@ def _is_plausible(
         return True
     if variant_overlap and title_similarity >= 0.84 and artist_similarity >= 0.55:
         return True
+    # Once a release is established, the title and physical track order are
+    # stronger evidence than Shazam's occasionally wrong artist attribution.
+    # This specifically catches covers/reuploads that Shazam identifies under a
+    # different artist while the record itself clearly points to the original.
+    if expected_next and transition_ready and title_equivalent:
+        return True
+    if active_release and title_equivalent and title_similarity >= 0.95:
+        return True
     if active_release and title_similarity >= 0.78 and artist_similarity >= 0.45:
         return True
-    if expected_next and title_similarity >= 0.60 and artist_similarity >= 0.45:
+    if expected_next and transition_ready and title_similarity >= 0.60 and artist_similarity >= 0.45:
         return True
     return False
+
+
+def _match_confidence(score: float, metrics: dict[str, Any]) -> float:
+    """Turn matcher evidence into a user-facing confidence value.
+
+    The old ``score / 140`` display made tiny formatting differences such as
+    ``highschool`` vs. ``high school`` look like materially weaker matches.  If
+    the normalized title is equivalent and the artist/release context confirms
+    it, report that as a full-confidence collection/sequence match.
+    """
+    confidence = min(1.0, max(0.0, score / 140.0))
+    title_equivalent = bool(metrics.get("title_equivalent"))
+    artist_similarity = float(metrics.get("artist_similarity") or 0.0)
+    album_similarity = float(metrics.get("album_similarity") or 0.0)
+    expected_next = bool(metrics.get("expected_next"))
+    transition_ready = bool(metrics.get("transition_ready"))
+
+    if title_equivalent and (artist_similarity >= 0.90 or album_similarity >= 0.90):
+        return 1.0
+    if title_equivalent and expected_next and transition_ready:
+        return 1.0
+    return confidence
 
 
 def apply_discogs_match(
@@ -211,6 +288,7 @@ def apply_discogs_match(
 
     title_norm = normalize_text(canonicalize_title(track.title))
     base_title_norm = _base_title_norm(track.title)
+    lead_title_norm = _lead_title_norm(track.title)
     artist_norm = normalize_artist(track.artist)
     album_norm = normalize_text(track.album)
     observed_variant_tags = _variant_tags(track.title, track.album)
@@ -221,11 +299,21 @@ def apply_discogs_match(
     for candidate in find_exact_title_tracks(title_norm):
         candidates[_candidate_key(candidate)] = candidate
 
+    # Discogs/Shazam sometimes differ only in whitespace ("high school" vs
+    # "highschool"). Include those collection candidates before falling back to
+    # sequence context so the very first track can already lock the release.
+    for candidate in find_compact_title_tracks(title_norm):
+        candidates[_candidate_key(candidate)] = candidate
+
     # Shazam often appends version information to the title while Discogs stores
     # the plain track title and the version on the release, e.g.
     # "Nutshell (Unplugged)" on "MTV Unplugged".
     if base_title_norm and base_title_norm != title_norm:
         for candidate in find_exact_title_tracks(base_title_norm):
+            candidates[_candidate_key(candidate)] = candidate
+
+    if lead_title_norm and lead_title_norm not in {title_norm, base_title_norm}:
+        for candidate in find_exact_title_tracks(lead_title_norm):
             candidates[_candidate_key(candidate)] = candidate
 
     sequence_enabled = bool(discogs_cfg.get("sequence_matching", True))
@@ -248,6 +336,7 @@ def apply_discogs_match(
             candidate,
             title_norm=title_norm,
             base_title_norm=base_title_norm,
+            lead_title_norm=lead_title_norm,
             artist_norm=artist_norm,
             album_norm=album_norm,
             observed_variant_tags=observed_variant_tags,
@@ -266,7 +355,7 @@ def apply_discogs_match(
             )
         return track
 
-    confidence = min(1.0, max(0.0, score / 140.0))
+    confidence = _match_confidence(score, metrics)
     source = (
         "sequence"
         if bool(metrics["expected_next"]) and bool(metrics["transition_ready"])
@@ -303,6 +392,19 @@ def apply_discogs_match(
         track.discogs_expected_next_artist = next_track.get("track_artist")
         track.discogs_expected_next_position = next_track.get("position")
         track.discogs_expected_next_side = next_track.get("side")
+
+    # A successful collection match should also stabilize the artwork.  Keeping
+    # Shazam's cover here meant that corrected Discogs metadata could still be
+    # shown with the cover of a cover/reupload or unrelated false positive.
+    collection_cover_url = str(best.get("cover_url") or "").strip()
+    if collection_cover_url:
+        try:
+            if collection_cover_url != (track.cover_url or ""):
+                track.cover_image = _load_discogs_cover(collection_cover_url).copy()
+            track.cover_url = collection_cover_url
+        except Exception as exc:
+            if debug_log:
+                print(f"Discogs: could not load collection cover, keeping Shazam image: {exc}")
 
     if debug_log:
         corrected = f"{track.artist} – {track.title} [{track.album or '-'}]"
