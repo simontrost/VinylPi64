@@ -11,6 +11,7 @@ except ModuleNotFoundError:  # Allows partial local test runs without optional C
 
 if Flask is not None:
     from vinylpi.web.routes.config_api import config_bp
+    from vinylpi.web.routes.discogs_api import discogs_bp
     from vinylpi.web.routes.genius_api import genius_bp
     from vinylpi.web.routes.pixoo_api import pixoo_bp
     from vinylpi.web.routes.profiles_api import profiles_bp
@@ -24,7 +25,7 @@ class WebApiTests(unittest.TestCase):
     def setUp(self):
         app = Flask(__name__)
         app.config.update(TESTING=True, SECRET_KEY="test-secret")
-        for blueprint in (config_bp, genius_bp, pixoo_bp, profiles_bp, stats_bp, status_bp, uploads_bp):
+        for blueprint in (config_bp, discogs_bp, genius_bp, pixoo_bp, profiles_bp, stats_bp, status_bp, uploads_bp):
             app.register_blueprint(blueprint)
         self.client = app.test_client()
 
@@ -102,6 +103,52 @@ class WebApiTests(unittest.TestCase):
         response = self.client.get("/api/status")
 
         self.assertEqual(response.get_json(), {"source": "vinyl", "artist": "Artist", "title": "Song"})
+
+    @patch("vinylpi.web.routes.discogs_api.get_release_tracks")
+    def test_discogs_tracklist_endpoint_returns_release_tracks(self, get_release_tracks):
+        get_release_tracks.return_value = [
+            {
+                "release_id": 123,
+                "track_index": 0,
+                "position": "A1",
+                "side": "A",
+                "track_title": "First Song",
+                "track_artist": "Artist",
+                "duration_seconds": 183,
+                "release_title": "Album",
+                "release_artist": "Artist",
+            },
+            {
+                "release_id": 123,
+                "track_index": 1,
+                "position": "A2",
+                "side": "A",
+                "track_title": "Second Song",
+                "track_artist": "Guest Artist",
+                "duration_seconds": None,
+                "release_title": "Album",
+                "release_artist": "Artist",
+            },
+        ]
+
+        response = self.client.get("/api/discogs/releases/123/tracklist")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["release_id"], 123)
+        self.assertEqual(payload["title"], "Album")
+        self.assertEqual(payload["track_count"], 2)
+        self.assertEqual(payload["tracks"][0]["position"], "A1")
+        self.assertEqual(payload["tracks"][1]["artist"], "Guest Artist")
+        get_release_tracks.assert_called_once_with(123)
+
+    @patch("vinylpi.web.routes.discogs_api.get_release_tracks", return_value=[])
+    def test_discogs_tracklist_endpoint_returns_404_for_unknown_release(self, _get_release_tracks):
+        response = self.client.get("/api/discogs/releases/999/tracklist")
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.get_json()["error"], "release_not_found")
 
     def test_lyrics_endpoint_requires_artist_and_title(self):
         response = self.client.get("/api/lyrics?artist=Artist")

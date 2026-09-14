@@ -69,6 +69,20 @@
                         <div id="discogs-side-flip-heading" class="discogs-side-flip-heading"></div>
                         <div id="discogs-side-flip-detail" class="discogs-side-flip-detail"></div>
                     </div>
+                    <button
+                        id="discogs-tracklist-toggle"
+                        class="discogs-tracklist-toggle"
+                        type="button"
+                        aria-expanded="false"
+                        aria-controls="discogs-tracklist-panel"
+                    >
+                        <span class="discogs-tracklist-toggle-copy">
+                            <strong>Tracklist</strong>
+                            <span id="discogs-tracklist-summary">Show full release</span>
+                        </span>
+                        <span class="discogs-tracklist-chevron" aria-hidden="true">⌄</span>
+                    </button>
+                    <div id="discogs-tracklist-panel" class="discogs-tracklist-panel hidden"></div>
                 </div>
 
                 <a

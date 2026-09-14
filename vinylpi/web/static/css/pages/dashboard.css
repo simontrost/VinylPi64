@@ -108,3 +108,58 @@
     .discogs-context-head, .discogs-track-line { align-items: flex-start; flex-direction: column; gap: 6px; }
     .discogs-add-link { width: 100%; justify-content: center; }
 }
+
+/* Expandable Discogs release tracklist */
+.discogs-tracklist-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    width: 100%;
+    min-height: 46px;
+    margin-top: 11px;
+    padding: 9px 10px 9px 12px;
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 11px;
+    background: rgba(255,255,255,.025);
+    color: var(--text);
+    text-align: left;
+    transition: border-color .18s ease, background .18s ease;
+}
+.discogs-tracklist-toggle:hover { border-color: rgba(245,197,66,.25); background: rgba(245,197,66,.055); }
+.discogs-tracklist-toggle:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(245,197,66,.13); }
+.discogs-tracklist-toggle-copy { display: flex; align-items: baseline; gap: 9px; min-width: 0; }
+.discogs-tracklist-toggle-copy strong { color: var(--text); font-size: 12px; font-weight: 780; }
+.discogs-tracklist-toggle-copy span { color: rgba(255,255,255,.5); font-size: 11px; }
+.discogs-tracklist-chevron { display: inline-grid; place-items: center; width: 26px; height: 26px; flex: 0 0 auto; border-radius: 8px; background: rgba(245,197,66,.08); color: var(--yellow); font-size: 17px; line-height: 1; transition: transform .2s ease, background .18s ease; }
+.discogs-tracklist-toggle.expanded .discogs-tracklist-chevron { transform: rotate(180deg); background: rgba(245,197,66,.14); }
+
+.discogs-tracklist-panel { margin-top: 10px; overflow: hidden; border: 1px solid rgba(255,255,255,.07); border-radius: 12px; background: rgba(7,7,11,.22); }
+.discogs-tracklist-panel.hidden { display: none; }
+.discogs-tracklist-message { padding: 14px; color: rgba(255,255,255,.58); font-size: 12px; }
+.discogs-tracklist-side + .discogs-tracklist-side { border-top: 1px solid rgba(255,255,255,.08); }
+.discogs-tracklist-side-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 11px; background: rgba(255,255,255,.025); }
+.discogs-tracklist-side-heading strong { color: var(--yellow); font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.discogs-tracklist-side-heading span { color: rgba(255,255,255,.4); font-size: 10px; }
+.discogs-tracklist-list { display: grid; }
+.discogs-tracklist-row { position: relative; display: grid; grid-template-columns: 36px minmax(0,1fr) auto; align-items: center; gap: 9px; min-height: 43px; padding: 7px 10px; border-top: 1px solid rgba(255,255,255,.055); transition: background .18s ease; }
+.discogs-tracklist-row:first-child { border-top: 0; }
+.discogs-tracklist-row.is-current { background: linear-gradient(90deg,rgba(245,197,66,.15),rgba(245,197,66,.055)); }
+.discogs-tracklist-row.is-current::before { content: ""; position: absolute; left: 0; top: 7px; bottom: 7px; width: 2px; border-radius: 999px; background: var(--yellow); box-shadow: 0 0 9px rgba(245,197,66,.35); }
+.discogs-tracklist-position { display: inline-flex; align-items: center; justify-content: center; min-width: 30px; min-height: 24px; padding: 3px 5px; border: 1px solid rgba(255,255,255,.08); border-radius: 7px; background: rgba(255,255,255,.03); color: rgba(255,255,255,.54); font-size: 10px; font-weight: 760; }
+.discogs-tracklist-row.is-current .discogs-tracklist-position { border-color: rgba(245,197,66,.28); background: rgba(245,197,66,.11); color: var(--yellow); }
+.discogs-tracklist-track-copy { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
+.discogs-tracklist-title { overflow: hidden; color: rgba(255,255,255,.78); font-size: 12px; font-weight: 650; line-height: 1.3; text-overflow: ellipsis; white-space: nowrap; }
+.discogs-tracklist-row.is-current .discogs-tracklist-title { color: #fff; font-weight: 780; }
+.discogs-tracklist-artist { overflow: hidden; color: rgba(255,255,255,.42); font-size: 10px; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
+.discogs-tracklist-trailing { display: inline-flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.discogs-tracklist-duration { color: rgba(255,255,255,.38); font-size: 10px; font-variant-numeric: tabular-nums; }
+.discogs-tracklist-playing { display: inline-flex; align-items: center; gap: 5px; color: var(--yellow); font-size: 9px; font-weight: 780; text-transform: uppercase; letter-spacing: .04em; }
+.discogs-tracklist-playing-dot { width: 6px; height: 6px; border-radius: 999px; background: var(--yellow); box-shadow: 0 0 0 3px rgba(245,197,66,.12); }
+
+@media (max-width: 560px) {
+    .discogs-tracklist-toggle-copy { align-items: flex-start; flex-direction: column; gap: 2px; }
+    .discogs-tracklist-row { grid-template-columns: 34px minmax(0,1fr) auto; gap: 7px; padding-inline: 8px; }
+    .discogs-tracklist-playing span:last-child { display: none; }
+    .discogs-tracklist-title { white-space: normal; }
+}

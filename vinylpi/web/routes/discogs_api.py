@@ -3,6 +3,7 @@ from __future__ import annotations
 from flask import Blueprint, jsonify
 
 from vinylpi.config.runtime import read_config, write_config
+from vinylpi.core.discogs_db import get_release_tracks
 from vinylpi.core.discogs_service import (
     DISCOGS_TOKEN_ENV,
     SYNC_MANAGER,
@@ -26,6 +27,37 @@ def _missing_token_response():
 @discogs_bp.get("/api/discogs/status")
 def api_discogs_status():
     return jsonify({"ok": True, **SYNC_MANAGER.status()})
+
+
+@discogs_bp.get("/api/discogs/releases/<int:release_id>/tracklist")
+def api_discogs_release_tracklist(release_id: int):
+    tracks = get_release_tracks(release_id)
+    if not tracks:
+        return jsonify({"ok": False, "error": "release_not_found"}), 404
+
+    first = tracks[0]
+    payload_tracks = [
+        {
+            "track_index": int(track.get("track_index") or 0),
+            "position": track.get("position") or "",
+            "side": track.get("side") or "",
+            "title": track.get("track_title") or "",
+            "artist": track.get("track_artist") or track.get("release_artist") or "",
+            "duration_seconds": track.get("duration_seconds"),
+        }
+        for track in tracks
+    ]
+
+    return jsonify(
+        {
+            "ok": True,
+            "release_id": int(release_id),
+            "title": first.get("release_title") or "",
+            "artist": first.get("release_artist") or "",
+            "track_count": len(payload_tracks),
+            "tracks": payload_tracks,
+        }
+    )
 
 
 @discogs_bp.post("/api/discogs/connect")

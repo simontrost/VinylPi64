@@ -39,6 +39,8 @@ let currentTrackKey = "";
 let lyricsAbortController = null;
 let trackInfoAbortController = null;
 let statusEventSource = null;
+const discogsTracklistCache = new Map();
+let discogsTracklistRequest = null;
 
 function setText(id, value) {
     const element = document.getElementById(id);
@@ -160,7 +162,12 @@ function renderDiscogsContext() {
         }
     }
 
-    if (!matched) return;
+    if (!matched) {
+        resetDiscogsTracklist();
+        return;
+    }
+
+    syncDiscogsTracklist();
 
     const confidence = Number(CURRENT_TRACK.discogsConfidence);
     const confidenceLabel = Number.isFinite(confidence)
@@ -200,6 +207,224 @@ function renderDiscogsContext() {
     renderSideFlipPrompt();
 }
 
+function formatTracklistDuration(seconds) {
+    const value = Number(seconds);
+    if (!Number.isFinite(value) || value <= 0) return "";
+    const totalSeconds = Math.round(value);
+    const minutes = Math.floor(totalSeconds / 60);
+    const remainder = String(totalSeconds % 60).padStart(2, "0");
+    return `${minutes}:${remainder}`;
+}
+
+function resetDiscogsTracklist({ preserveRelease = false } = {}) {
+    discogsTracklistRequest?.abort();
+    discogsTracklistRequest = null;
+
+    const toggle = document.getElementById("discogs-tracklist-toggle");
+    const panel = document.getElementById("discogs-tracklist-panel");
+    if (toggle) {
+        toggle.setAttribute("aria-expanded", "false");
+        toggle.classList.remove("expanded");
+        if (!preserveRelease) toggle.dataset.releaseId = "";
+    }
+    if (panel) {
+        panel.classList.add("hidden");
+        panel.replaceChildren();
+    }
+}
+
+function makeTracklistRow(track, releaseArtist) {
+    const row = document.createElement("div");
+    row.className = "discogs-tracklist-row";
+
+    const index = Number(track.track_index);
+    const isCurrent = CURRENT_TRACK.discogsTrackIndex !== null
+        && Number.isFinite(index)
+        && index === CURRENT_TRACK.discogsTrackIndex;
+    if (isCurrent) {
+        row.classList.add("is-current");
+        row.setAttribute("aria-current", "true");
+    }
+
+    const position = document.createElement("span");
+    position.className = "discogs-tracklist-position";
+    position.textContent = track.position || (Number.isFinite(index) ? String(index + 1) : "–");
+
+    const copy = document.createElement("span");
+    copy.className = "discogs-tracklist-track-copy";
+
+    const title = document.createElement("span");
+    title.className = "discogs-tracklist-title";
+    title.textContent = track.title || "Unknown track";
+    copy.appendChild(title);
+
+    const artist = String(track.artist || "").trim();
+    if (artist && artist.toLocaleLowerCase() !== String(releaseArtist || "").trim().toLocaleLowerCase()) {
+        const artistLine = document.createElement("span");
+        artistLine.className = "discogs-tracklist-artist";
+        artistLine.textContent = artist;
+        copy.appendChild(artistLine);
+    }
+
+    const trailing = document.createElement("span");
+    trailing.className = "discogs-tracklist-trailing";
+
+    const duration = formatTracklistDuration(track.duration_seconds);
+    if (duration) {
+        const durationElement = document.createElement("span");
+        durationElement.className = "discogs-tracklist-duration";
+        durationElement.textContent = duration;
+        trailing.appendChild(durationElement);
+    }
+
+    if (isCurrent) {
+        const playing = document.createElement("span");
+        playing.className = "discogs-tracklist-playing";
+        playing.innerHTML = '<span class="discogs-tracklist-playing-dot" aria-hidden="true"></span><span>Playing</span>';
+        trailing.appendChild(playing);
+    }
+
+    row.append(position, copy, trailing);
+    return row;
+}
+
+function renderDiscogsTracklist(data) {
+    const panel = document.getElementById("discogs-tracklist-panel");
+    if (!panel) return;
+
+    const tracks = Array.isArray(data?.tracks) ? data.tracks : [];
+    if (!tracks.length) {
+        panel.textContent = "No tracklist available for this release.";
+        panel.classList.add("discogs-tracklist-message");
+        return;
+    }
+    panel.classList.remove("discogs-tracklist-message");
+
+    const groups = [];
+    for (const track of tracks) {
+        const side = String(track.side || "").trim().toUpperCase();
+        let group = groups.length ? groups[groups.length - 1] : null;
+        if (!group || group.side !== side) {
+            group = { side, tracks: [] };
+            groups.push(group);
+        }
+        group.tracks.push(track);
+    }
+
+    const fragment = document.createDocumentFragment();
+    const showSideHeadings = groups.some((group) => group.side);
+
+    for (const group of groups) {
+        const section = document.createElement("section");
+        section.className = "discogs-tracklist-side";
+
+        if (showSideHeadings) {
+            const heading = document.createElement("div");
+            heading.className = "discogs-tracklist-side-heading";
+
+            const sideName = document.createElement("strong");
+            sideName.textContent = group.side ? `Side ${group.side}` : "Other";
+            const count = document.createElement("span");
+            count.textContent = `${group.tracks.length} ${group.tracks.length === 1 ? "track" : "tracks"}`;
+            heading.append(sideName, count);
+            section.appendChild(heading);
+        }
+
+        const list = document.createElement("div");
+        list.className = "discogs-tracklist-list";
+        for (const track of group.tracks) {
+            list.appendChild(makeTracklistRow(track, data.artist));
+        }
+        section.appendChild(list);
+        fragment.appendChild(section);
+    }
+
+    panel.replaceChildren(fragment);
+
+    const currentRow = panel.querySelector(".discogs-tracklist-row.is-current");
+    if (currentRow) {
+        window.requestAnimationFrame(() => {
+            currentRow.scrollIntoView({ block: "nearest", behavior: "smooth" });
+        });
+    }
+}
+
+function syncDiscogsTracklist() {
+    const toggle = document.getElementById("discogs-tracklist-toggle");
+    const panel = document.getElementById("discogs-tracklist-panel");
+    if (!toggle || !panel || !CURRENT_TRACK.discogsReleaseId) return;
+
+    const releaseId = String(CURRENT_TRACK.discogsReleaseId);
+    const releaseChanged = toggle.dataset.releaseId !== releaseId;
+    if (releaseChanged) {
+        resetDiscogsTracklist({ preserveRelease: true });
+        toggle.dataset.releaseId = releaseId;
+    }
+
+    const count = Number(CURRENT_TRACK.discogsTrackCount);
+    setText(
+        "discogs-tracklist-summary",
+        Number.isFinite(count) && count > 0 ? `${count} ${count === 1 ? "track" : "tracks"}` : "Show full release",
+    );
+
+    if (toggle.getAttribute("aria-expanded") !== "true") return;
+    const cached = discogsTracklistCache.get(releaseId);
+    if (cached) renderDiscogsTracklist(cached);
+}
+
+async function toggleDiscogsTracklist() {
+    const toggle = document.getElementById("discogs-tracklist-toggle");
+    const panel = document.getElementById("discogs-tracklist-panel");
+    if (!toggle || !panel || !CURRENT_TRACK.discogsReleaseId) return;
+
+    const expanded = toggle.getAttribute("aria-expanded") === "true";
+    if (expanded) {
+        toggle.setAttribute("aria-expanded", "false");
+        toggle.classList.remove("expanded");
+        panel.classList.add("hidden");
+        return;
+    }
+
+    const releaseId = String(CURRENT_TRACK.discogsReleaseId);
+    toggle.dataset.releaseId = releaseId;
+    toggle.setAttribute("aria-expanded", "true");
+    toggle.classList.add("expanded");
+    panel.classList.remove("hidden");
+
+    const cached = discogsTracklistCache.get(releaseId);
+    if (cached) {
+        renderDiscogsTracklist(cached);
+        return;
+    }
+
+    panel.classList.add("discogs-tracklist-message");
+    panel.textContent = "Loading tracklist…";
+
+    discogsTracklistRequest?.abort();
+    const controller = new AbortController();
+    discogsTracklistRequest = controller;
+
+    try {
+        const response = await fetch(`/api/discogs/releases/${encodeURIComponent(releaseId)}/tracklist`, {
+            cache: "no-store",
+            signal: controller.signal,
+        });
+        const data = await response.json();
+        if (!response.ok || !data.ok) throw new Error(data.error || `Tracklist request failed: ${response.status}`);
+        if (String(CURRENT_TRACK.discogsReleaseId || "") !== releaseId) return;
+
+        discogsTracklistCache.set(releaseId, data);
+        renderDiscogsTracklist(data);
+    } catch (error) {
+        if (error.name === "AbortError") return;
+        console.error(error);
+        panel.classList.add("discogs-tracklist-message");
+        panel.textContent = "Tracklist could not be loaded.";
+    } finally {
+        if (discogsTracklistRequest === controller) discogsTracklistRequest = null;
+    }
+}
+
 function renderSideFlipPrompt() {
     const box = document.getElementById("discogs-side-flip");
     if (!box) return;
@@ -235,6 +460,7 @@ function renderEmptyStatus(message = "No recognized song yet") {
     document.getElementById("discogs-context")?.classList.add("hidden");
     document.getElementById("discogs-add-link")?.classList.add("hidden");
     document.getElementById("discogs-side-flip")?.classList.add("hidden");
+    resetDiscogsTracklist();
 
     const songCard = document.querySelector(".song-card");
     if (songCard) songCard.style.setProperty("--song-bg", "#2b2b34");
@@ -279,6 +505,7 @@ function renderStatus(status) {
         document.getElementById("discogs-context")?.classList.add("hidden");
         document.getElementById("discogs-add-link")?.classList.add("hidden");
         document.getElementById("discogs-side-flip")?.classList.add("hidden");
+        resetDiscogsTracklist();
     } else {
         renderDiscogsContext();
     }
@@ -634,6 +861,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     document.getElementById("btn-lyrics")?.addEventListener("click", loadLyrics);
     document.getElementById("btn-track-info")?.addEventListener("click", showTrackInfo);
+    document.getElementById("discogs-tracklist-toggle")?.addEventListener("click", toggleDiscogsTracklist);
     document.getElementById("btn-track-info-close")?.addEventListener("click", closeTrackInfoDrawer);
     document.getElementById("info-backdrop")?.addEventListener("click", closeTrackInfoDrawer);
 

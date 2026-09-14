@@ -72,6 +72,15 @@ class WebPageStructureTests(unittest.TestCase):
         self.assertIn('target="_blank"', html)
 
 
+    def test_dashboard_contains_expandable_discogs_tracklist(self):
+        response = self.client.get("/")
+        html = response.get_data(as_text=True)
+
+        self.assertIn('id="discogs-tracklist-toggle"', html)
+        self.assertIn('aria-controls="discogs-tracklist-panel"', html)
+        self.assertIn('id="discogs-tracklist-panel"', html)
+
+
     def test_settings_contains_profile_specific_spotify_section(self):
         response = self.client.get("/settings.html")
         html = response.get_data(as_text=True)
