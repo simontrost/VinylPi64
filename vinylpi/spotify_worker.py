@@ -5,6 +5,7 @@ import time
 from dotenv import load_dotenv
 
 from vinylpi.core.display import start_scrolling_display
+from vinylpi.core.display_refresh import start_display_refresh_watcher
 from vinylpi.core.image_utils import dynamic_bg_color, load_image
 from vinylpi.core.spotify_stats import (
     add_spotify_listening_seconds,
@@ -102,6 +103,9 @@ def main() -> None:
     last_progress_ms: int | None = None
     last_db_path: str | None = None
     displayed_in_session = False
+
+    debug_log = bool((read_config().get("debug") or {}).get("logs", False))
+    start_display_refresh_watcher(debug_log=debug_log)
 
     print(f"Spotify worker started (polling every {_poll_seconds():g}s).")
 

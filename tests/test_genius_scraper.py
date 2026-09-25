@@ -3,7 +3,13 @@ from __future__ import annotations
 import unittest
 from unittest.mock import Mock, patch
 
-from vinylpi.core.genius_scraper import _tokens, fetch_lyrics, get_lyrics, search_genius
+from vinylpi.core.genius_scraper import (
+    _fetch_lyrics_payload,
+    _tokens,
+    fetch_lyrics,
+    get_lyrics,
+    search_genius,
+)
 
 
 class GeniusScraperTests(unittest.TestCase):
@@ -90,9 +96,12 @@ class GeniusScraperTests(unittest.TestCase):
         self.assertEqual(lyrics, "First line\nSecond line\n\nThird line")
         self.assertNotIn("Embed", lyrics)
 
-    @patch("vinylpi.core.genius_scraper.fetch_lyrics", return_value="Lyrics")
+    @patch(
+        "vinylpi.core.genius_scraper._fetch_lyrics_payload",
+        return_value={"lyrics": "Lyrics", "lyrics_html": "Lyrics"},
+    )
     @patch("vinylpi.core.genius_scraper.search_genius", return_value="https://genius.com/test-lyrics")
-    def test_get_lyrics_returns_success_payload(self, search, fetch):
+    def test_get_lyrics_returns_success_payload(self, search, fetch_payload):
         result = get_lyrics("Artist", "Song")
 
         self.assertEqual(
@@ -102,10 +111,37 @@ class GeniusScraperTests(unittest.TestCase):
                 "source": "genius",
                 "url": "https://genius.com/test-lyrics",
                 "lyrics": "Lyrics",
+                "lyrics_html": "Lyrics",
             },
         )
         search.assert_called_once_with("Artist", "Song")
-        fetch.assert_called_once_with("https://genius.com/test-lyrics")
+        fetch_payload.assert_called_once_with("https://genius.com/test-lyrics")
+
+
+    @patch("vinylpi.core.genius_scraper.requests.get")
+    def test_formatted_lyrics_preserve_emphasis_but_strip_unsafe_markup(self, requests_get):
+        response = Mock()
+        response.raise_for_status.return_value = None
+        response.text = """
+            <div data-lyrics-container="true">
+                [Verse 1: Main Artist]<br/>
+                Main line<br/>
+                <i>Featured artist line</i><br/>
+                <span style="font-style: italic; color: red" onclick="bad()">Styled feature line</span><br/>
+                <script>alert('bad')</script><strong>Shared line</strong>
+            </div>
+        """
+        requests_get.return_value = response
+
+        payload = _fetch_lyrics_payload("https://genius.com/test-lyrics")
+
+        self.assertIsNotNone(payload)
+        self.assertIn("<em>Featured artist line</em>", payload["lyrics_html"])
+        self.assertIn("<em>Styled feature line</em>", payload["lyrics_html"])
+        self.assertIn("<strong>Shared line</strong>", payload["lyrics_html"])
+        self.assertNotIn("onclick", payload["lyrics_html"])
+        self.assertNotIn("style=", payload["lyrics_html"])
+        self.assertNotIn("<script", payload["lyrics_html"])
 
     @patch("vinylpi.core.genius_scraper.search_genius", return_value=None)
     def test_get_lyrics_reports_not_found(self, search):

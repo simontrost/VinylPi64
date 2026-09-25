@@ -63,6 +63,14 @@ class WebPageStructureTests(unittest.TestCase):
         self.assertIn('href="/settings.html" class="active" aria-current="page"', html)
         self.assertNotIn('href="/" class="nav-center active"', html)
 
+
+    def test_lyrics_expand_button_is_rendered_below_lyrics_content(self):
+        response = self.client.get("/")
+        html = response.get_data(as_text=True)
+
+        self.assertLess(html.index('id="lyrics-box"'), html.index('id="btn-lyrics-toggle"'))
+        self.assertIn('class="lyrics-toggle hidden"', html)
+
     def test_dashboard_contains_discogs_add_release_link(self):
         response = self.client.get("/")
         html = response.get_data(as_text=True)

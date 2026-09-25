@@ -57,8 +57,9 @@ class PersistentPlaybackDedupTests(unittest.TestCase):
     @patch("vinylpi.spotify_worker._last_recognized_spotify_track_id", return_value="A")
     @patch("vinylpi.spotify_worker.get_active_db_path", return_value="/tmp/profile.db")
     @patch("vinylpi.spotify_worker._poll_seconds", return_value=2.0)
+    @patch("vinylpi.spotify_worker.start_display_refresh_watcher")
     def test_spotify_pause_or_missing_response_does_not_recount_same_track(
-        self, poll, db_path, last_track, record_play, display, backfill, dotenv
+        self, watcher, poll, db_path, last_track, record_play, display, backfill, dotenv
     ):
         from vinylpi import spotify_worker
 
@@ -93,8 +94,9 @@ class PersistentPlaybackDedupTests(unittest.TestCase):
     @patch("vinylpi.spotify_worker._last_recognized_spotify_track_id", return_value="A")
     @patch("vinylpi.spotify_worker.get_active_db_path", return_value="/tmp/profile.db")
     @patch("vinylpi.spotify_worker._poll_seconds", return_value=2.0)
+    @patch("vinylpi.spotify_worker.start_display_refresh_watcher")
     def test_spotify_real_a_b_a_transition_counts_b_and_a(
-        self, poll, db_path, last_track, record_play, display, backfill, dotenv
+        self, watcher, poll, db_path, last_track, record_play, display, backfill, dotenv
     ):
         from vinylpi import spotify_worker
 

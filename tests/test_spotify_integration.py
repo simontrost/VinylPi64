@@ -5,6 +5,7 @@ from unittest.mock import Mock, patch
 
 from vinylpi.integrations.spotify_client import (
     SpotifyClient,
+    SpotifyNotAuthorized,
     clear_spotify_account,
     get_spotify_account,
     save_spotify_account,
@@ -89,6 +90,34 @@ class SpotifyProfileAccountTests(unittest.TestCase):
                 )
 
             self.assertEqual(genre, "indie rock")
+
+
+class SpotifyWorkerDisplayRefreshTests(unittest.TestCase):
+    @patch("vinylpi.spotify_worker.load_dotenv")
+    @patch("vinylpi.spotify_worker.get_last_source_status", return_value=None)
+    @patch("vinylpi.spotify_worker._backfill_missing_genres")
+    @patch("vinylpi.spotify_worker.get_active_db_path", return_value=Path("/tmp/vinylpi-test.db"))
+    @patch("vinylpi.spotify_worker.read_config", return_value={"debug": {"logs": True}, "spotify": {"poll_seconds": 2}})
+    @patch("vinylpi.spotify_worker.start_display_refresh_watcher")
+    @patch("vinylpi.spotify_worker.SpotifyClient")
+    def test_worker_starts_display_refresh_watcher(
+        self,
+        spotify_client,
+        start_watcher,
+        read_config,
+        get_db_path,
+        backfill,
+        get_last_status,
+        load_dotenv,
+    ):
+        spotify_client.return_value.get_currently_playing.side_effect = SpotifyNotAuthorized("stop")
+
+        from vinylpi.spotify_worker import main
+
+        main()
+
+        start_watcher.assert_called_once_with(debug_log=True)
+
 
 
 if __name__ == "__main__":

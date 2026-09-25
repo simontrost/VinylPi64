@@ -55,6 +55,9 @@
 .lyrics-inline { width: 100%; }
 .lyrics-box { margin: 14px 0 0; padding: 16px; border: 1px solid var(--border); border-radius: 14px; background: rgba(12,12,16,.5); color: #eee; font-family: inherit; font-size: 14px; line-height: 1.55; white-space: pre-wrap; }
 .lyrics-box.collapsed { max-height: 190px; overflow: hidden; -webkit-mask-image: linear-gradient(to bottom,#000 70%,transparent); mask-image: linear-gradient(to bottom,#000 70%,transparent); }
+.lyrics-box em, .lyrics-box i { font-style: italic; }
+.lyrics-box strong, .lyrics-box b { font-weight: 760; }
+.lyrics-toggle { width: 100%; margin-top: 10px; }
 
 .discogs-context { margin-top: 16px; padding: 13px 14px; border: 1px solid rgba(245,197,66,.2); border-radius: 14px; background: rgba(12,12,16,.24); backdrop-filter: blur(4px); }
 .discogs-context-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
@@ -104,7 +107,6 @@
     .toggle-switch input:checked + .toggle-slider::before { transform: translateX(24px); }
     .song-actions { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); }
     .song-actions button { min-width: 0; width: 100%; }
-    #btn-lyrics-toggle { grid-column: 1 / -1; }
     .discogs-context-head, .discogs-track-line { align-items: flex-start; flex-direction: column; gap: 6px; }
     .discogs-add-link { width: 100%; justify-content: center; }
 }

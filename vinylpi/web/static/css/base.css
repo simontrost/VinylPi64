@@ -553,6 +553,7 @@ textarea:focus-visible {
     }
 
     .nav a.nav-center.active .nav-orb {
+        color: var(--yellow);
         border-color: rgba(255, 76, 178, 0.96);
         box-shadow:
             0 9px 22px rgba(0, 0, 0, 0.38),

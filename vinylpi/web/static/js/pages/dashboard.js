@@ -626,7 +626,14 @@ async function loadLyrics() {
             return;
         }
 
-        box.textContent = result.lyrics;
+        if (result.lyrics_html) {
+            // The API only returns a small, server-sanitized formatting subset
+            // (<em>/<strong>/<br>) from Genius. This preserves performer-specific
+            // emphasis without exposing arbitrary third-party HTML.
+            box.innerHTML = result.lyrics_html;
+        } else {
+            box.textContent = result.lyrics;
+        }
         toggleButton.classList.remove("hidden");
         toggleButton.textContent = "More";
     } catch (error) {
