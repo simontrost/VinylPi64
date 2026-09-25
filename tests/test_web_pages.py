@@ -69,7 +69,26 @@ class WebPageStructureTests(unittest.TestCase):
         html = response.get_data(as_text=True)
 
         self.assertLess(html.index('id="lyrics-box"'), html.index('id="btn-lyrics-toggle"'))
+        self.assertIn('class="lyrics-inline hidden" id="lyrics-card"', html)
         self.assertIn('class="lyrics-toggle hidden"', html)
+        self.assertIn('aria-label="Expand lyrics"', html)
+        self.assertIn('m7 10 5 5 5-5', html)
+
+
+    def test_settings_contains_constrained_64px_display_designer(self):
+        response = self.client.get("/settings.html")
+        html = response.get_data(as_text=True)
+
+        self.assertIn('id="displayPreview"', html)
+        self.assertIn('id="displayFitUsage"', html)
+        self.assertIn('id="imageShowCover"', html)
+        self.assertIn('id="imageShowArtist"', html)
+        self.assertIn('id="imageShowTitle"', html)
+        self.assertIn('id="imageShowAlbum"', html)
+        self.assertIn('data-display-preset="cover-only"', html)
+        self.assertNotIn('id="imageCanvasSize"', html)
+        self.assertNotIn('id="imagePreviewScale"', html)
+        self.assertNotIn('id="imageSleepSeconds"', html)
 
     def test_dashboard_contains_discogs_add_release_link(self):
         response = self.client.get("/")

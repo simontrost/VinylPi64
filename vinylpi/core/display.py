@@ -6,6 +6,7 @@ from typing import Optional
 
 from PIL import Image, ImageDraw
 
+from vinylpi.core.display_layout import normalize_image_config
 from vinylpi.core.image_utils import (
     _get_font_for_config,
     resolve_display_colors,
@@ -44,14 +45,19 @@ def stop_scrolling_display() -> None:
         _scroll_stop_event = threading.Event()
 
 
-def _prepare_base_canvas(cover_img: Image.Image, bg_color: tuple[int, int, int]) -> Image.Image:
-    img_cfg = read_config()["image"]
+def _prepare_base_canvas(
+    cover_img: Image.Image,
+    bg_color: tuple[int, int, int],
+    img_cfg: dict,
+) -> Image.Image:
     canvas_size = int(img_cfg["canvas_size"])
-    cover_size = int(img_cfg["cover_size"])
-    top_margin = int(img_cfg["top_margin"])
-
     canvas = Image.new("RGB", (canvas_size, canvas_size), bg_color)
 
+    if not bool(img_cfg.get("show_cover", True)):
+        return canvas
+
+    cover_size = int(img_cfg["cover_size"])
+    top_margin = int(img_cfg["top_margin"])
     width, height = cover_img.size
     side = min(width, height)
     left = (width - side) // 2
@@ -67,39 +73,79 @@ def _prepare_base_canvas(cover_img: Image.Image, bg_color: tuple[int, int, int])
     return canvas
 
 
-def _prepare_scroll_resources(cover_img: Image.Image, artist: str, title: str) -> dict:
-    img_cfg = read_config()["image"]
+def _prepare_scroll_resources(
+    cover_img: Image.Image,
+    artist: str,
+    title: str,
+    album: str | None = None,
+    *,
+    img_cfg: dict | None = None,
+) -> dict:
+    source_cfg = img_cfg if img_cfg is not None else read_config()["image"]
+    img_cfg = normalize_image_config(source_cfg)
     canvas_size = int(img_cfg["canvas_size"])
     gap_between_lines = int(img_cfg["line_spacing_margin"])
     gap_after_cover = int(img_cfg["margin_image_text"])
     top_margin = int(img_cfg["top_margin"])
-    cover_size = int(img_cfg["cover_size"])
 
+    values = {
+        "artist": str(artist or ""),
+        "title": str(title or ""),
+        "album": str(album or ""),
+    }
     if img_cfg.get("uppercase", False):
-        artist = artist.upper()
-        title = title.upper()
+        values = {key: value.upper() for key, value in values.items()}
+
+    visible = [
+        key
+        for key in ("artist", "title", "album")
+        if bool(img_cfg.get(f"show_{key}", key != "album")) and values[key]
+    ]
 
     bg_color, text_color = resolve_display_colors(cover_img, img_cfg)
+    font, glyph_height = _get_font_for_config(img_cfg)
 
-    base_canvas = _prepare_base_canvas(cover_img, bg_color)
-    font, glyph_height = _get_font_for_config()
-    artist_width, _ = text_size(artist, font)
-    title_width, _ = text_size(title, font)
+    # Font metrics are discrete and can differ by a pixel from the requested
+    # target height. Reserve real glyph height here and trim the cover locally
+    # if necessary so no rendered row can leave the 64x64 canvas.
+    effective_cfg = dict(img_cfg)
+    used_height = top_margin
+    if effective_cfg.get("show_cover", True):
+        used_height += int(effective_cfg["cover_size"])
+    if effective_cfg.get("show_cover", True) and visible:
+        used_height += gap_after_cover
+    if visible:
+        used_height += len(visible) * glyph_height
+        used_height += max(0, len(visible) - 1) * gap_between_lines
+    overflow = max(0, used_height - canvas_size)
+    if overflow and effective_cfg.get("show_cover", True):
+        effective_cfg["cover_size"] = max(1, int(effective_cfg["cover_size"]) - overflow)
 
-    artist_y = top_margin + cover_size + gap_after_cover
-    title_y = artist_y + glyph_height + gap_between_lines
+    base_canvas = _prepare_base_canvas(cover_img, bg_color, effective_cfg)
+
+    y = top_margin
+    if effective_cfg.get("show_cover", True):
+        y += int(effective_cfg["cover_size"])
+        if visible:
+            y += gap_after_cover
+
+    lines = []
+    for index, key in enumerate(visible):
+        text = values[key]
+        width, _ = text_size(text, font)
+        lines.append({"key": key, "text": text, "width": width, "y": y})
+        y += glyph_height
+        if index < len(visible) - 1:
+            y += gap_between_lines
 
     return {
-        "artist": artist,
-        "title": title,
         "base_canvas": base_canvas,
         "font": font,
-        "artist_width": artist_width,
-        "title_width": title_width,
-        "artist_y": artist_y,
-        "title_y": title_y,
+        "glyph_height": glyph_height,
+        "lines": lines,
         "text_color": text_color,
         "canvas_size": canvas_size,
+        "image_config": effective_cfg,
     }
 
 
@@ -112,7 +158,43 @@ def _text_x(width: int, tick: int, *, canvas_size: int, shared_range: int | None
     return canvas_size - (tick % scroll_range)
 
 
-def _scroll_loop(cover_img: Image.Image, artist: str, title: str) -> None:
+def _render_scroll_frame(resources: dict, tick: int) -> Image.Image:
+    frame = resources["base_canvas"].copy()
+    draw = ImageDraw.Draw(frame)
+    canvas_size = int(resources["canvas_size"])
+    scrolling_widths = [
+        int(line["width"])
+        for line in resources["lines"]
+        if int(line["width"]) > canvas_size
+    ]
+    shared_range = (
+        max(scrolling_widths) + canvas_size
+        if len(scrolling_widths) >= 2
+        else None
+    )
+
+    for line in resources["lines"]:
+        x = _text_x(
+            int(line["width"]),
+            tick,
+            canvas_size=canvas_size,
+            shared_range=shared_range,
+        )
+        draw.text(
+            (x, int(line["y"])),
+            str(line["text"]),
+            font=resources["font"],
+            fill=resources["text_color"],
+        )
+    return frame
+
+
+def _scroll_loop(
+    cover_img: Image.Image,
+    artist: str,
+    title: str,
+    album: str | None = None,
+) -> None:
     cfg = read_config()
     debug_log = bool(cfg["debug"]["logs"])
     debug_cfg = cfg["debug"]
@@ -125,15 +207,10 @@ def _scroll_loop(cover_img: Image.Image, artist: str, title: str) -> None:
         _reset_pixoo_client()
         return
 
-    resources = _prepare_scroll_resources(cover_img, artist, title)
+    resources = _prepare_scroll_resources(cover_img, artist, title, album)
     speed_px_per_s = float(img_cfg.get("marquee_speed", 18))
     sleep_seconds = max(0.01, float(img_cfg.get("sleep_seconds", 0.05)))
-
-    artist_width = resources["artist_width"]
-    title_width = resources["title_width"]
-    canvas_size = resources["canvas_size"]
-    both_scroll = artist_width > canvas_size and title_width > canvas_size
-    shared_range = max(artist_width, title_width) + canvas_size if both_scroll else None
+    canvas_size = int(resources["canvas_size"])
 
     first_frame_saved = False
     tick_float = 0.0
@@ -145,33 +222,7 @@ def _scroll_loop(cover_img: Image.Image, artist: str, title: str) -> None:
         last_time = now
         tick = int(tick_float)
 
-        frame = resources["base_canvas"].copy()
-        draw = ImageDraw.Draw(frame)
-        artist_x = _text_x(
-            artist_width,
-            tick,
-            canvas_size=canvas_size,
-            shared_range=shared_range,
-        )
-        title_x = _text_x(
-            title_width,
-            tick,
-            canvas_size=canvas_size,
-            shared_range=shared_range,
-        )
-
-        draw.text(
-            (artist_x, resources["artist_y"]),
-            resources["artist"],
-            font=resources["font"],
-            fill=resources["text_color"],
-        )
-        draw.text(
-            (title_x, resources["title_y"]),
-            resources["title"],
-            font=resources["font"],
-            fill=resources["text_color"],
-        )
+        frame = _render_scroll_frame(resources, tick)
 
         if not first_frame_saved:
             pixoo_frame_path = debug_cfg.get("pixoo_frame_path") or ""
@@ -181,7 +232,7 @@ def _scroll_loop(cover_img: Image.Image, artist: str, title: str) -> None:
                 if debug_log:
                     print(f"Finished: {pixoo_frame_path} created.")
             if preview_path:
-                scale = int(img_cfg["preview_scale"])
+                scale = int(img_cfg.get("preview_scale", 8))
                 preview = frame.resize(
                     (canvas_size * scale, canvas_size * scale),
                     Image.Resampling.NEAREST,
@@ -202,7 +253,12 @@ def _scroll_loop(cover_img: Image.Image, artist: str, title: str) -> None:
             break
 
 
-def start_scrolling_display(cover_img: Image.Image, artist: str, title: str) -> None:
+def start_scrolling_display(
+    cover_img: Image.Image,
+    artist: str,
+    title: str,
+    album: str | None = None,
+) -> None:
     global _scroll_thread, _scroll_stop_event
 
     with _display_lock:
@@ -210,7 +266,7 @@ def start_scrolling_display(cover_img: Image.Image, artist: str, title: str) -> 
         _scroll_stop_event = threading.Event()
         _scroll_thread = threading.Thread(
             target=_scroll_loop,
-            args=(cover_img, artist, title),
+            args=(cover_img, artist, title, album),
             name="vinylpi-pixoo-scroll",
             daemon=True,
         )
@@ -258,7 +314,9 @@ def _generate_side_flip_prompt_frame(
     draw.arc((10, 3, 34, 27), 320, 80, fill=pink, width=2)
     draw.polygon([(33, 6), (39, 9), (34, 13)], fill=pink)
 
-    font, _ = _get_font_for_config()
+    side_font_cfg = dict(cfg["image"])
+    side_font_cfg["font_size"] = 5
+    font, _ = _get_font_for_config(side_font_cfg)
     label_one = "TURN"
     label_two = "RECORD"
     side_text = f"SIDE {str(next_side or '?').upper()}"
@@ -324,7 +382,9 @@ def _overlay_side_letter(frame: Image.Image, next_side: str | None) -> Image.Ima
     draw = ImageDraw.Draw(frame)
     draw.rectangle((slot_left, slot_top, slot_right, slot_bottom), fill=badge_background)
 
-    font, _ = _get_font_for_config()
+    side_font_cfg = dict(read_config()["image"])
+    side_font_cfg["font_size"] = 5
+    font, _ = _get_font_for_config(side_font_cfg)
     bbox = draw.textbbox((0, 0), side, font=font)
     text_width = bbox[2] - bbox[0]
     text_height = bbox[3] - bbox[1]

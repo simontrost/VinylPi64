@@ -55,7 +55,7 @@ def refresh_current_display() -> bool:
         return False
 
     cover_image = load_image(cover_url)
-    start_scrolling_display(cover_image, artist, title)
+    start_scrolling_display(cover_image, artist, title, status.get("album"))
     return True
 
 

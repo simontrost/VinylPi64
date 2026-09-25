@@ -82,10 +82,12 @@ function resetTrackDependentUI() {
     const lyricsToggle = document.getElementById("btn-lyrics-toggle");
     if (lyricsToggle) {
         lyricsToggle.classList.add("hidden");
-        lyricsToggle.textContent = "More";
+        setLyricsToggleState(true);
     }
 
-    document.getElementById("lyrics-card")?.classList.remove("expanded");
+    const lyricsCard = document.getElementById("lyrics-card");
+    lyricsCard?.classList.remove("expanded");
+    lyricsCard?.classList.add("hidden");
     closeTrackInfoDrawer();
 
     const infoContent = document.getElementById("track-info-content");
@@ -583,6 +585,16 @@ async function setRecognizerRunning(shouldRun) {
     }
 }
 
+function setLyricsToggleState(collapsed) {
+    const button = document.getElementById("btn-lyrics-toggle");
+    if (!button) return;
+
+    const expanded = !collapsed;
+    button.setAttribute("aria-expanded", String(expanded));
+    button.setAttribute("aria-label", expanded ? "Collapse lyrics" : "Expand lyrics");
+    button.title = expanded ? "Collapse lyrics" : "Expand lyrics";
+}
+
 async function loadLyrics() {
     const box = document.getElementById("lyrics-box");
     const toggleButton = document.getElementById("btn-lyrics-toggle");
@@ -593,7 +605,10 @@ async function loadLyrics() {
     box.classList.add("collapsed");
     box.textContent = "Loading lyrics…";
     toggleButton.classList.add("hidden");
-    if (card) card.classList.remove("expanded");
+    setLyricsToggleState(true);
+    if (card) {
+        card.classList.remove("hidden", "expanded");
+    }
 
     const artist = CURRENT_TRACK.artist.trim();
     const title = CURRENT_TRACK.title.trim();
@@ -635,7 +650,7 @@ async function loadLyrics() {
             box.textContent = result.lyrics;
         }
         toggleButton.classList.remove("hidden");
-        toggleButton.textContent = "More";
+        setLyricsToggleState(true);
     } catch (error) {
         if (error.name === "AbortError") return;
         console.error(error);
@@ -880,7 +895,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const collapsed = box.classList.toggle("collapsed");
         card?.classList.toggle("expanded", !collapsed);
-        button.textContent = collapsed ? "More" : "Less";
+        setLyricsToggleState(collapsed);
     });
 
     document.addEventListener("keydown", (event) => {

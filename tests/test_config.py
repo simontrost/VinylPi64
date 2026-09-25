@@ -31,6 +31,11 @@ class ConfigLoaderTests(unittest.TestCase):
         self.assertEqual(cfg["audio"]["sample_seconds"], 7)
         self.assertEqual(cfg["audio"]["sample_rate"], CONFIG_DEFAULTS["audio"]["sample_rate"])
         self.assertIn("image", cfg)
+        self.assertTrue(cfg["image"]["show_cover"])
+        self.assertTrue(cfg["image"]["show_artist"])
+        self.assertTrue(cfg["image"]["show_title"])
+        self.assertFalse(cfg["image"]["show_album"])
+        self.assertEqual(cfg["image"]["canvas_size"], 64)
         self.assertEqual(cfg["spotify"]["poll_seconds"], 2.0)
 
     def test_load_config_returns_independent_defaults_for_missing_file(self):

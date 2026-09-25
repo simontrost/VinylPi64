@@ -1,7 +1,7 @@
 from flask import Blueprint, jsonify, request, send_file, send_from_directory
 
 from vinylpi.config.runtime import normalize_fallback_kind
-from vinylpi.paths import UPLOAD_DIR
+from vinylpi.paths import FONTS_DIR, UPLOAD_DIR
 from vinylpi.web.services.uploads import (
     build_font_preview,
     delete_fallback_image,
@@ -70,6 +70,13 @@ def api_font_preview(filename):
     if preview is None:
         return jsonify({"ok": False, "error": "font not found or invalid"}), 404
     return send_file(preview, mimetype="image/png", max_age=300)
+
+
+@uploads_bp.get("/api/font-file/<path:filename>")
+def api_font_file(filename):
+    # send_from_directory keeps font selection usable in the browser-side
+    # 64x64 designer without exposing arbitrary filesystem paths.
+    return send_from_directory(FONTS_DIR, filename, max_age=300)
 
 
 @uploads_bp.post("/api/font")

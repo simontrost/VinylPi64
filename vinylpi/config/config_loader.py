@@ -2,6 +2,7 @@ import json
 from copy import deepcopy
 from pathlib import Path
 from vinylpi.paths import CONFIG_PATH, get_active_config_path
+from vinylpi.core.display_layout import normalize_image_config
 
 _LEGACY_CONFIG_PATH = CONFIG_PATH
 
@@ -18,6 +19,10 @@ CONFIG_DEFAULTS = {
     },
     "image": {
         "canvas_size": 64,
+        "show_cover": True,
+        "show_artist": True,
+        "show_title": True,
+        "show_album": False,
         "top_margin": 1,
         "cover_size": 46,
         "margin_image_text": 3,
@@ -113,6 +118,8 @@ def load_config(path: Path | str | None = None) -> dict:
         pass
     except Exception:
         pass
+
+    cfg["image"] = normalize_image_config(cfg.get("image"))
 
     # Discogs credentials are environment-only. This also removes a legacy
     # token from the in-memory config so the next config write cleans it up.

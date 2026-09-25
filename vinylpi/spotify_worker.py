@@ -41,7 +41,7 @@ def _display_track(track) -> None:
         return
 
     cover = load_image(track.cover_url)
-    start_scrolling_display(cover, track.artist, track.title)
+    start_scrolling_display(cover, track.artist, track.title, track.album)
 
     bg_color = None
     try:

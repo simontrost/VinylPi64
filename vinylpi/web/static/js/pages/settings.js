@@ -108,6 +108,360 @@ function setSelectedFontPath(path) {
         label.textContent = normalized || "No font selected";
         label.title = normalized;
     }
+    loadDisplayPreviewFont(normalized);
+}
+
+
+const DISPLAY_LAYOUT_PRESETS = {
+    classic: {
+        showCover: true, showArtist: true, showTitle: true, showAlbum: false,
+        topMargin: 1, coverSize: 46, coverGap: 3, lineGap: 3, fontSize: 5,
+    },
+    "large-text": {
+        showCover: true, showArtist: true, showTitle: true, showAlbum: false,
+        topMargin: 1, coverSize: 42, coverGap: 3, lineGap: 2, fontSize: 7,
+    },
+    "album-info": {
+        showCover: true, showArtist: true, showTitle: true, showAlbum: true,
+        topMargin: 1, coverSize: 37, coverGap: 2, lineGap: 2, fontSize: 5,
+    },
+    "cover-only": {
+        showCover: true, showArtist: false, showTitle: false, showAlbum: false,
+        topMargin: 0, coverSize: 64, coverGap: 0, lineGap: 0, fontSize: 5,
+    },
+    "text-only": {
+        showCover: false, showArtist: true, showTitle: true, showAlbum: true,
+        topMargin: 10, coverSize: 46, coverGap: 0, lineGap: 4, fontSize: 10,
+    },
+};
+
+const DISPLAY_LAYOUT_FIELDS = {
+    showCover: "imageShowCover",
+    showArtist: "imageShowArtist",
+    showTitle: "imageShowTitle",
+    showAlbum: "imageShowAlbum",
+    topMargin: "imageTopMargin",
+    coverSize: "imageCoverSize",
+    coverGap: "imageMarginImageText",
+    lineGap: "imageLineSpacingMargin",
+    fontSize: "imageFontSize",
+};
+
+const DISPLAY_LAYOUT_OUTPUTS = {
+    topMargin: "imageTopMarginValue",
+    coverSize: "imageCoverSizeValue",
+    coverGap: "imageMarginImageTextValue",
+    lineGap: "imageLineSpacingMarginValue",
+    fontSize: "imageFontSizeValue",
+};
+
+let DISPLAY_PREVIEW_TRACK = {
+    artist: "ARTIST",
+    title: "TRACK TITLE",
+    album: "ALBUM",
+};
+let DISPLAY_PREVIEW_IMAGE = null;
+let DISPLAY_PREVIEW_IMAGE_FAILED = false;
+let DISPLAY_PREVIEW_FONT_FAMILY = "monospace";
+let DISPLAY_PREVIEW_FONT_REQUEST = 0;
+
+async function loadDisplayPreviewFont(path) {
+    const requestId = ++DISPLAY_PREVIEW_FONT_REQUEST;
+    const filename = String(path || "").split(/[\\/]/).pop();
+    if (!filename || typeof FontFace === "undefined" || !document.fonts) {
+        DISPLAY_PREVIEW_FONT_FAMILY = "monospace";
+        renderDisplayPreview();
+        return;
+    }
+
+    const family = `VinylPiPreview${requestId}`;
+    try {
+        const face = new FontFace(
+            family,
+            `url(/api/font-file/${encodeURIComponent(filename)})`,
+        );
+        await face.load();
+        if (requestId !== DISPLAY_PREVIEW_FONT_REQUEST) return;
+        document.fonts.add(face);
+        DISPLAY_PREVIEW_FONT_FAMILY = `"${family}"`;
+    } catch (error) {
+        if (requestId !== DISPLAY_PREVIEW_FONT_REQUEST) return;
+        DISPLAY_PREVIEW_FONT_FAMILY = "monospace";
+        console.debug("Display preview font unavailable", error);
+    }
+    renderDisplayPreview();
+}
+
+function clampDisplayNumber(value, minimum, maximum, fallback) {
+    const parsed = Number.parseInt(value, 10);
+    const safe = Number.isFinite(parsed) ? parsed : fallback;
+    return Math.max(minimum, Math.min(maximum, safe));
+}
+
+function readDisplayDesigner() {
+    const checked = (key, fallback) => {
+        const element = document.getElementById(DISPLAY_LAYOUT_FIELDS[key]);
+        return element ? Boolean(element.checked) : fallback;
+    };
+    const value = (key, fallback) => {
+        const element = document.getElementById(DISPLAY_LAYOUT_FIELDS[key]);
+        return element ? element.value : fallback;
+    };
+
+    return {
+        showCover: checked("showCover", true),
+        showArtist: checked("showArtist", true),
+        showTitle: checked("showTitle", true),
+        showAlbum: checked("showAlbum", false),
+        topMargin: clampDisplayNumber(value("topMargin", 1), 0, 16, 1),
+        coverSize: clampDisplayNumber(value("coverSize", 46), 12, 64, 46),
+        coverGap: clampDisplayNumber(value("coverGap", 3), 0, 8, 3),
+        lineGap: clampDisplayNumber(value("lineGap", 3), 0, 8, 3),
+        fontSize: clampDisplayNumber(value("fontSize", 5), 3, 12, 5),
+    };
+}
+
+function displayTextCount(state) {
+    return [state.showArtist, state.showTitle, state.showAlbum].filter(Boolean).length;
+}
+
+function displayUsedHeight(state) {
+    const textCount = displayTextCount(state);
+    let used = state.topMargin;
+    if (state.showCover) used += state.coverSize;
+    if (state.showCover && textCount) used += state.coverGap;
+    if (textCount) {
+        used += textCount * state.fontSize;
+        used += Math.max(0, textCount - 1) * state.lineGap;
+    }
+    return used;
+}
+
+function writeDisplayDesigner(state) {
+    for (const [key, id] of Object.entries(DISPLAY_LAYOUT_FIELDS)) {
+        const element = document.getElementById(id);
+        if (!element) continue;
+        if (key.startsWith("show")) element.checked = Boolean(state[key]);
+        else element.value = String(state[key]);
+    }
+}
+
+function fitDisplayDesigner(state, changedKey = null) {
+    state = { ...state };
+    const notes = [];
+    const visibleKeys = ["showCover", "showArtist", "showTitle", "showAlbum"];
+    if (!visibleKeys.some((key) => state[key])) {
+        if (changedKey && visibleKeys.includes(changedKey)) state[changedKey] = true;
+        else state.showTitle = true;
+        notes.push("At least one display element must stay enabled.");
+    }
+
+    const textCount = () => displayTextCount(state);
+    const canShrink = (key) => {
+        if (key === "coverSize") return state.showCover && state.coverSize > 12;
+        if (key === "topMargin") return state.topMargin > 0;
+        if (key === "coverGap") return state.showCover && textCount() > 0 && state.coverGap > 0;
+        if (key === "lineGap") return textCount() > 1 && state.lineGap > 0;
+        if (key === "fontSize") return textCount() > 0 && state.fontSize > 3;
+        return false;
+    };
+
+    let order;
+    if (changedKey === "coverSize") {
+        order = ["topMargin", "coverGap", "lineGap", "coverSize", "fontSize"];
+    } else if (changedKey === "fontSize") {
+        order = ["coverSize", "topMargin", "coverGap", "lineGap", "fontSize"];
+    } else {
+        order = ["coverSize", "topMargin", "coverGap", "lineGap", "fontSize"];
+        if (changedKey && order.includes(changedKey)) {
+            order = order.filter((key) => key !== changedKey).concat(changedKey);
+        }
+    }
+
+    const before = { ...state };
+    let guard = 256;
+    while (displayUsedHeight(state) > 64 && guard-- > 0) {
+        const key = order.find(canShrink);
+        if (!key) break;
+        state[key] -= 1;
+    }
+
+    const changed = [];
+    for (const key of ["coverSize", "fontSize", "topMargin", "coverGap", "lineGap"]) {
+        if (state[key] !== before[key]) changed.push(`${key} ${before[key]}→${state[key]} px`);
+    }
+    if (changed.length) notes.push(`Auto-fit adjusted ${changed.join(", ")}.`);
+    return { state, note: notes.join(" ") };
+}
+
+function setDisplayDesignerEnabledState(state) {
+    const textCount = displayTextCount(state);
+    const rows = {
+        cover: state.showCover,
+        text: textCount > 0,
+        "cover-gap": state.showCover && textCount > 0,
+        "line-gap": textCount > 1,
+    };
+    for (const [name, enabled] of Object.entries(rows)) {
+        const row = document.querySelector(`[data-display-control="${name}"]`);
+        if (!row) continue;
+        row.classList.toggle("is-disabled", !enabled);
+        row.querySelectorAll("input").forEach((input) => { input.disabled = !enabled; });
+    }
+}
+
+function updateDisplayDesignerOutputs(state) {
+    for (const [key, id] of Object.entries(DISPLAY_LAYOUT_OUTPUTS)) {
+        const output = document.getElementById(id);
+        if (output) output.textContent = `${state[key]} px`;
+    }
+
+    const used = displayUsedHeight(state);
+    const usage = document.getElementById("displayFitUsage");
+    const status = document.getElementById("displayFitStatus");
+    const bar = document.getElementById("displayFitBar");
+    if (usage) usage.textContent = `${used} / 64 px`;
+    if (status) status.textContent = used <= 64 ? "Fits display" : "Layout too tall";
+    if (bar) bar.style.width = `${Math.min(100, Math.max(0, (used / 64) * 100))}%`;
+}
+
+function currentDisplayColors() {
+    const dynamicBg = document.getElementById("useDynamicBg")?.checked ?? true;
+    const dynamicText = document.getElementById("useDynamicText")?.checked ?? true;
+    const inverted = document.getElementById("invertDynamicColors")?.checked ?? false;
+    const manualBg = document.getElementById("bgColor")?.value || "#000000";
+    const manualText = document.getElementById("textColor")?.value || "#ffffff";
+
+    // Automatic colors depend on cover-art analysis performed on the Pi. The
+    // designer uses representative colors while preserving manual colors exactly.
+    const autoCoverColor = "#31536b";
+    const autoContrast = "#ffffff";
+    return {
+        bg: dynamicBg ? (inverted ? autoContrast : autoCoverColor) : manualBg,
+        text: dynamicText ? (inverted ? autoCoverColor : autoContrast) : manualText,
+    };
+}
+
+function renderDisplayPreview(state = readDisplayDesigner()) {
+    const canvas = document.getElementById("displayPreview");
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const colors = currentDisplayColors();
+    ctx.save();
+    ctx.clearRect(0, 0, 64, 64);
+    ctx.fillStyle = colors.bg;
+    ctx.fillRect(0, 0, 64, 64);
+    ctx.beginPath();
+    ctx.rect(0, 0, 64, 64);
+    ctx.clip();
+    ctx.imageSmoothingEnabled = false;
+
+    let y = state.topMargin;
+    if (state.showCover) {
+        const size = state.coverSize;
+        const x = Math.floor((64 - size) / 2);
+        if (DISPLAY_PREVIEW_IMAGE && DISPLAY_PREVIEW_IMAGE.complete && !DISPLAY_PREVIEW_IMAGE_FAILED) {
+            const iw = DISPLAY_PREVIEW_IMAGE.naturalWidth || DISPLAY_PREVIEW_IMAGE.width;
+            const ih = DISPLAY_PREVIEW_IMAGE.naturalHeight || DISPLAY_PREVIEW_IMAGE.height;
+            const side = Math.min(iw, ih);
+            const sx = Math.floor((iw - side) / 2);
+            const sy = Math.floor((ih - side) / 2);
+            ctx.drawImage(DISPLAY_PREVIEW_IMAGE, sx, sy, side, side, x, y, size, size);
+        } else {
+            const gradient = ctx.createLinearGradient(x, y, x + size, y + size);
+            gradient.addColorStop(0, "#ef2d8f");
+            gradient.addColorStop(1, "#f5c542");
+            ctx.fillStyle = gradient;
+            ctx.fillRect(x, y, size, size);
+        }
+        y += size;
+    }
+
+    const lines = [];
+    if (state.showArtist) lines.push(DISPLAY_PREVIEW_TRACK.artist || "ARTIST");
+    if (state.showTitle) lines.push(DISPLAY_PREVIEW_TRACK.title || "TRACK TITLE");
+    if (state.showAlbum) lines.push(DISPLAY_PREVIEW_TRACK.album || "ALBUM");
+    if (state.showCover && lines.length) y += state.coverGap;
+
+    const uppercase = document.getElementById("imageUppercase")?.checked ?? true;
+    ctx.fillStyle = colors.text;
+    ctx.font = `${state.fontSize}px ${DISPLAY_PREVIEW_FONT_FAMILY}, monospace`;
+    ctx.textBaseline = "top";
+
+    lines.forEach((rawText, index) => {
+        const text = uppercase ? String(rawText).toUpperCase() : String(rawText);
+        const width = ctx.measureText(text).width;
+        const x = width <= 63 ? Math.max(0, Math.floor((64 - width) / 2)) : 1;
+        ctx.fillText(text, x, y, Math.max(64, width));
+        y += state.fontSize;
+        if (index < lines.length - 1) y += state.lineGap;
+    });
+    ctx.restore();
+}
+
+function markDisplayPreset(state) {
+    document.querySelectorAll("[data-display-preset]").forEach((button) => {
+        const preset = DISPLAY_LAYOUT_PRESETS[button.dataset.displayPreset];
+        const matches = preset && Object.entries(preset).every(([key, value]) => state[key] === value);
+        button.classList.toggle("is-active", Boolean(matches));
+    });
+}
+
+function syncDisplayDesigner({ changedKey = null, announce = false, note = "" } = {}) {
+    const fitted = fitDisplayDesigner(readDisplayDesigner(), changedKey);
+    writeDisplayDesigner(fitted.state);
+    setDisplayDesignerEnabledState(fitted.state);
+    updateDisplayDesignerOutputs(fitted.state);
+    renderDisplayPreview(fitted.state);
+    markDisplayPreset(fitted.state);
+
+    const noteElement = document.getElementById("displayConstraintNote");
+    const message = fitted.note || note || "The designer automatically keeps the vertical layout inside 64 pixels. Long text scrolls horizontally.";
+    if (noteElement) noteElement.textContent = message;
+    if (announce && fitted.note) showToast(fitted.note);
+    return fitted.state;
+}
+
+function applyDisplayPreset(name) {
+    const preset = DISPLAY_LAYOUT_PRESETS[name];
+    if (!preset) return;
+    writeDisplayDesigner(preset);
+    syncDisplayDesigner({ note: `${name.replace(/-/g, " ")} layout applied.` });
+}
+
+async function loadDisplayPreviewTrack() {
+    try {
+        const response = await fetch("/api/status", { cache: "no-store" });
+        const status = await response.json();
+        if (response.ok && status && !status.error && status.status !== null) {
+            DISPLAY_PREVIEW_TRACK = {
+                artist: status.artist || DISPLAY_PREVIEW_TRACK.artist,
+                title: status.title || DISPLAY_PREVIEW_TRACK.title,
+                album: status.album || DISPLAY_PREVIEW_TRACK.album,
+            };
+        }
+
+        const image = new Image();
+        DISPLAY_PREVIEW_IMAGE_FAILED = false;
+        image.onload = () => {
+            DISPLAY_PREVIEW_IMAGE = image;
+            renderDisplayPreview();
+        };
+        image.onerror = () => {
+            if (image.src.endsWith("/static/images/logo.png")) {
+                DISPLAY_PREVIEW_IMAGE_FAILED = true;
+                renderDisplayPreview();
+                return;
+            }
+            image.src = "/static/images/logo.png";
+        };
+        image.src = (response.ok && status?.cover_url) ? status.cover_url : "/static/images/logo.png";
+    } catch (error) {
+        console.debug("Display preview track unavailable", error);
+        renderDisplayPreview();
+    }
 }
 
 
@@ -393,6 +747,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const selectFont = () => {
           setSelectedFontPath(font.path);
+          renderDisplayPreview();
           fontGallery.querySelectorAll(".font-gallery-item").forEach((entry) => entry.classList.remove("current"));
           item.classList.add("current");
           showToast(`Font selected: ${font.name || font.filename}`);
@@ -458,6 +813,7 @@ document.addEventListener("DOMContentLoaded", () => {
         throw new Error(data.error || "unknown error");
       }
       setSelectedFontPath(data.font_path);
+      renderDisplayPreview();
       fontUpload.value = "";
       if (fontGallery && !fontGallery.classList.contains("hidden")) await loadFontGallery();
       showToast("Font uploaded and selected.");
@@ -487,8 +843,35 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   ["useDynamicBg", "useDynamicText"].forEach((id) => {
-    document.getElementById(id)?.addEventListener("change", syncAllManualColorStates);
+    document.getElementById(id)?.addEventListener("change", () => {
+      syncAllManualColorStates();
+      renderDisplayPreview();
+    });
   });
+
+  ["invertDynamicColors", "imageUppercase"].forEach((id) => {
+    document.getElementById(id)?.addEventListener("change", () => renderDisplayPreview());
+  });
+  ["bgColor", "textColor"].forEach((id) => {
+    document.getElementById(id)?.addEventListener("input", () => renderDisplayPreview());
+  });
+
+  const reverseDisplayFields = Object.fromEntries(
+    Object.entries(DISPLAY_LAYOUT_FIELDS).map(([key, id]) => [id, key]),
+  );
+  Object.values(DISPLAY_LAYOUT_FIELDS).forEach((id) => {
+    const control = document.getElementById(id);
+    if (!control) return;
+    const eventName = control.type === "checkbox" ? "change" : "input";
+    control.addEventListener(eventName, () => {
+      syncDisplayDesigner({ changedKey: reverseDisplayFields[id], announce: true });
+    });
+  });
+
+  document.querySelectorAll("[data-display-preset]").forEach((button) => {
+    button.addEventListener("click", () => applyDisplayPreset(button.dataset.displayPreset));
+  });
+  loadDisplayPreviewTrack();
   [
     "adaptiveSampleEnabled",
     "fallbackEnabled",
@@ -547,19 +930,16 @@ async function loadConfig() {
     syncAdaptiveSampleState();
 
     // IMAGE / DISPLAY
-    document.getElementById("imageCanvasSize").value =
-        image.canvas_size ?? 64;
-    document.getElementById("imageTopMargin").value =
-        image.top_margin ?? 1;
-    document.getElementById("imageCoverSize").value =
-        image.cover_size ?? 46;
-    document.getElementById("imageMarginImageText").value =
-        image.margin_image_text ?? 3;
-    document.getElementById("imageLineSpacingMargin").value =
-        image.line_spacing_margin ?? 3;
+    document.getElementById("imageShowCover").checked = image.show_cover !== false;
+    document.getElementById("imageShowArtist").checked = image.show_artist !== false;
+    document.getElementById("imageShowTitle").checked = image.show_title !== false;
+    document.getElementById("imageShowAlbum").checked = !!image.show_album;
+    document.getElementById("imageTopMargin").value = image.top_margin ?? 1;
+    document.getElementById("imageCoverSize").value = image.cover_size ?? 46;
+    document.getElementById("imageMarginImageText").value = image.margin_image_text ?? 3;
+    document.getElementById("imageLineSpacingMargin").value = image.line_spacing_margin ?? 3;
     setSelectedFontPath(image.font_path || "");
-    document.getElementById("imageFontSize").value =
-        image.font_size ?? 5;
+    document.getElementById("imageFontSize").value = image.font_size ?? 5;
 
     document.getElementById("textColor").value =
         rgbToHex(image.text_color || [255, 255, 255]);
@@ -576,12 +956,9 @@ async function loadConfig() {
         !!image.invert_dynamic_colors;
     syncAllManualColorStates();
 
-    document.getElementById("imagePreviewScale").value =
-        image.preview_scale ?? 8;
     document.getElementById("marqueeSpeed").value =
         image.marquee_speed ?? 20;
-    document.getElementById("imageSleepSeconds").value =
-        image.sleep_seconds ?? 0.01;
+    syncDisplayDesigner();
 
     // FALLBACK
     document.getElementById("fallbackEnabled").checked =
@@ -714,20 +1091,18 @@ document.getElementById("settings-form").addEventListener("submit", async (e) =>
     ];
 
     // IMAGE / DISPLAY
-    image.canvas_size =
-        parseInt(document.getElementById("imageCanvasSize").value) || 64;
-    image.top_margin =
-        parseInt(document.getElementById("imageTopMargin").value) || 1;
-    image.cover_size =
-        parseInt(document.getElementById("imageCoverSize").value) || 46;
-    image.margin_image_text =
-        parseInt(document.getElementById("imageMarginImageText").value) || 3;
-    image.line_spacing_margin =
-        parseInt(document.getElementById("imageLineSpacingMargin").value) || 3;
-    image.font_path =
-        document.getElementById("imageFontPath").value;
-    image.font_size =
-        parseInt(document.getElementById("imageFontSize").value) || 5;
+    const fittedDisplay = syncDisplayDesigner();
+    image.canvas_size = 64;
+    image.show_cover = fittedDisplay.showCover;
+    image.show_artist = fittedDisplay.showArtist;
+    image.show_title = fittedDisplay.showTitle;
+    image.show_album = fittedDisplay.showAlbum;
+    image.top_margin = fittedDisplay.topMargin;
+    image.cover_size = fittedDisplay.coverSize;
+    image.margin_image_text = fittedDisplay.coverGap;
+    image.line_spacing_margin = fittedDisplay.lineGap;
+    image.font_path = document.getElementById("imageFontPath").value;
+    image.font_size = fittedDisplay.fontSize;
 
     image.text_color =
         hexToRgb(document.getElementById("textColor").value);
@@ -743,12 +1118,8 @@ document.getElementById("settings-form").addEventListener("submit", async (e) =>
     image.invert_dynamic_colors =
         document.getElementById("invertDynamicColors").checked;
 
-    image.preview_scale =
-        parseInt(document.getElementById("imagePreviewScale").value) || 8;
     image.marquee_speed =
         parseInt(document.getElementById("marqueeSpeed").value) || 20;
-    image.sleep_seconds =
-        parseFloat(document.getElementById("imageSleepSeconds").value) || 0.01;
 
     // FALLBACK
     fallback.enabled =

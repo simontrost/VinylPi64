@@ -5,6 +5,7 @@ import requests
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 from vinylpi.config.runtime import read_config
+from vinylpi.core.display_layout import normalize_image_config
 
 def load_image(path_or_url: str) -> Image.Image:
     if not path_or_url:
@@ -38,10 +39,9 @@ def text_size(text: str, font: ImageFont.FreeTypeFont) -> tuple[int, int]:
 _font_cache: dict[tuple[str, int], ImageFont.FreeTypeFont] = {}
 
 
-def _load_font(size: int) -> ImageFont.FreeTypeFont:
-    CONFIG = read_config()
-    img_cfg = CONFIG["image"]
-    font_path = img_cfg["font_path"]
+def _load_font(size: int, font_path: str | None = None) -> ImageFont.FreeTypeFont:
+    if font_path is None:
+        font_path = str(read_config()["image"]["font_path"])
     cache_key = (font_path, size)
 
     if cache_key in _font_cache:
@@ -62,20 +62,20 @@ def _measure_text_height(font: ImageFont.FreeTypeFont, text: str = "A") -> int:
     bbox = d.textbbox((0, 0), text, font=font)
     return bbox[3] - bbox[1]
 
-def _get_font_for_config() -> tuple[ImageFont.FreeTypeFont, int]:
-    CONFIG = read_config()
-    img_cfg = CONFIG["image"]
-    TARGET_GLYPH_HEIGHT = img_cfg["font_size"]
+def _get_font_for_config(img_cfg: dict | None = None) -> tuple[ImageFont.FreeTypeFont, int]:
+    img_cfg = img_cfg or read_config()["image"]
+    target_glyph_height = int(img_cfg["font_size"])
+    font_path = str(img_cfg["font_path"])
 
-    best_font = _load_font(5)
+    best_font = _load_font(5, font_path)
     best_h = _measure_text_height(best_font)
 
     for size in range(1, 25):
-        f = _load_font(size)
+        f = _load_font(size, font_path)
         h_test = _measure_text_height(f)
-        if h_test == TARGET_GLYPH_HEIGHT:
+        if h_test == target_glyph_height:
             return f, h_test
-        if abs(h_test - TARGET_GLYPH_HEIGHT) < abs(best_h - TARGET_GLYPH_HEIGHT):
+        if abs(h_test - target_glyph_height) < abs(best_h - target_glyph_height):
             best_font = f
             best_h = h_test
 
@@ -188,75 +188,65 @@ def build_static_frame(
     title: str,
     tick: int = 0,
     bg_color: tuple[int, int, int] | None = None,
+    album: str | None = None,
 ) -> Image.Image:
-    CONFIG = read_config()
-    img_cfg = CONFIG["image"]
+    img_cfg = normalize_image_config(read_config()["image"])
+    canvas_size = int(img_cfg["canvas_size"])
+    top_margin = int(img_cfg["top_margin"])
+    cover_size = int(img_cfg["cover_size"])
+    cover_gap = int(img_cfg["margin_image_text"])
+    line_gap = int(img_cfg["line_spacing_margin"])
+    bg_color, text_color = resolve_display_colors(cover_img, img_cfg, bg_color=bg_color)
 
-    CANVAS_SIZE = img_cfg["canvas_size"]
-    COVER_SIZE = img_cfg["cover_size"]
-    TOP_MARGIN = img_cfg["top_margin"]
-    GAP_BETWEEN_COVER_AND_BAND = img_cfg["margin_image_text"]
-    GAP_BETWEEN_LINES = img_cfg["line_spacing_margin"]
-    bg_color, TEXT_COLOR = resolve_display_colors(
-        cover_img,
-        img_cfg,
-        bg_color=bg_color,
-    )
+    canvas = Image.new("RGB", (canvas_size, canvas_size), bg_color)
+    if img_cfg.get("show_cover", True):
+        width, height = cover_img.size
+        side = min(width, height)
+        left = (width - side) // 2
+        top = (height - side) // 2
+        cover_square = cover_img.crop((left, top, left + side, top + side))
+        cover_resized = cover_square.resize((cover_size, cover_size), Image.Resampling.BILINEAR)
+        canvas.paste(cover_resized, ((canvas_size - cover_size) // 2, top_margin))
 
-    canvas = Image.new("RGB", (CANVAS_SIZE, CANVAS_SIZE), bg_color)
-
-    w, h = cover_img.size
-    side = min(w, h)
-    left = (w - side) // 2
-    top = (h - side) // 2
-    cover_square = cover_img.crop((left, top, left + side, top + side))
-    cover_resized = cover_square.resize((COVER_SIZE, COVER_SIZE), Image.Resampling.BILINEAR)
-
-    x_cover = (CANVAS_SIZE - COVER_SIZE) // 2
-    y_cover = TOP_MARGIN
-    canvas.paste(cover_resized, (x_cover, y_cover))
-
-    font, glyph_h = _get_font_for_config()
-
+    values = {
+        "artist": str(artist or ""),
+        "title": str(title or ""),
+        "album": str(album or ""),
+    }
     if img_cfg.get("uppercase", False):
-        artist = artist.upper()
-        title = title.upper()
-    w1, _ = text_size(artist, font)
-    w2, _ = text_size(title, font)
+        values = {key: value.upper() for key, value in values.items()}
 
+    font, glyph_height = _get_font_for_config(img_cfg)
+    lines = [
+        (key, values[key])
+        for key in ("artist", "title", "album")
+        if img_cfg.get(f"show_{key}", key != "album") and values[key]
+    ]
+
+    y = top_margin + (cover_size if img_cfg.get("show_cover", True) else 0)
+    if img_cfg.get("show_cover", True) and lines:
+        y += cover_gap
+
+    prepared = []
+    for index, (key, text) in enumerate(lines):
+        width, _ = text_size(text, font)
+        prepared.append((key, text, width, y))
+        y += glyph_height
+        if index < len(lines) - 1:
+            y += line_gap
+
+    scrolling = [width for _, _, width, _ in prepared if width > canvas_size]
+    shared_range = max(scrolling) + canvas_size if len(scrolling) >= 2 else None
     draw = ImageDraw.Draw(canvas)
 
-    y_band = TOP_MARGIN + COVER_SIZE + GAP_BETWEEN_COVER_AND_BAND
-    y_title = y_band + glyph_h + GAP_BETWEEN_LINES
-
-    both_scroll = (w1 > CANVAS_SIZE) and (w2 > CANVAS_SIZE)
-    if both_scroll:
-        sync_range = max(w1, w2) + CANVAS_SIZE
-
-    CENTER_SPACING_CORR = 1
-
-    def compute_x(w_text: int, tick_val: int) -> int:
-        if w_text <= CANVAS_SIZE:
-            if w_text < CANVAS_SIZE and CENTER_SPACING_CORR > 0:
-                effective_w = max(0, w_text - CENTER_SPACING_CORR)
-            else:
-                effective_w = w_text
-
-            return (CANVAS_SIZE - effective_w) // 2
-
-        if both_scroll:
-            scroll_range = sync_range
+    for _, text, width, line_y in prepared:
+        if width <= canvas_size:
+            effective_width = max(0, width - 1) if width < canvas_size else width
+            x = (canvas_size - effective_width) // 2
         else:
-            scroll_range = w_text + CANVAS_SIZE
-
-        offset = tick_val % scroll_range
-        return CANVAS_SIZE - offset
-
-
-    x_band = compute_x(w1, tick)
-    x_title = compute_x(w2, tick)
-
-    draw.text((x_band, y_band), artist, font=font, fill=TEXT_COLOR)
-    draw.text((x_title, y_title), title, font=font, fill=TEXT_COLOR)
+            scroll_range = shared_range or (width + canvas_size)
+            x = canvas_size - (tick % scroll_range)
+        draw.text((x, line_y), text, font=font, fill=text_color)
 
     return canvas
+

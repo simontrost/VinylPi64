@@ -3,11 +3,11 @@
 {% block title %}VinylPi Settings{% endblock %}
 
 {% block page_styles %}
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/settings.css') }}?v=20260803b">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/settings.css') }}?v=20260925b">
 {% endblock %}
 
 {% block page_scripts %}
-    <script src="{{ url_for('static', filename='js/pages/settings.js') }}?v=20260910a" defer></script>
+    <script src="{{ url_for('static', filename='js/pages/settings.js') }}?v=20260925b" defer></script>
     <script src="{{ url_for('static', filename='js/pages/spotify_settings.js') }}" defer></script>
 {% endblock %}
 
@@ -172,68 +172,123 @@
                         <span class="chevron">⌄</span>
                     </button>
                     <div class="settings-card-content">
-                        <div class="form-group">
-                            <div class="group-title">Canvas</div>
-                            <div class="form-row"><label for="imageCanvasSize">Canvas size</label><input type="number" id="imageCanvasSize"></div>
-                            <div class="form-row"><label for="imageTopMargin">Top margin</label><input type="number" id="imageTopMargin"></div>
-                            <div class="form-row"><label for="imageCoverSize">Cover size</label><input type="number" id="imageCoverSize"></div>
-                            <div class="form-row"><label for="imageMarginImageText">Margin Cover/Text</label><input type="number" id="imageMarginImageText"></div>
-                        </div>
-
-                        <div class="form-group">
-                            <div class="group-title">Typography</div>
-                            <input type="hidden" id="imageFontPath">
-                            <div class="form-row path-row">
-                                <label>Selected font</label>
-                                <code class="selected-image-path" id="imageFontPathLabel">No font selected</code>
-                            </div>
-                            <div class="form-row"><label for="fontUpload">Upload font</label><input type="file" id="fontUpload" accept=".ttf,.otf,font/ttf,font/otf"></div>
-                            <div class="form-row"><label>Font gallery</label><button type="button" id="openFontGallery">Open font gallery</button></div>
-                            <div id="fontGallery" class="font-gallery hidden"></div>
-                            <div class="form-row"><label for="imageFontSize">Font size</label><input type="number" id="imageFontSize"></div>
-                            <div class="form-row"><label for="imageLineSpacingMargin">Line spacing</label><input type="number" id="imageLineSpacingMargin"></div>
-                            <div class="form-row"><label for="imageUppercase">Uppercase</label><input type="checkbox" id="imageUppercase"></div>
-                        </div>
-
-                        <div class="form-group">
-                            <div class="group-title">Colors</div>
-                            <div class="form-row color-mode-row">
-                                <label for="useDynamicBg">Background color</label>
-                                <div class="color-setting-control">
-                                    <div class="color-mode-switch" aria-label="Background color mode">
-                                        <span class="color-mode-label color-mode-label-manual">Manual</span>
-                                        <input type="checkbox" id="useDynamicBg" aria-label="Use automatic background color">
-                                        <span class="color-mode-label color-mode-label-auto">Automatic</span>
+                        <div class="display-designer">
+                            <div class="display-preview-panel">
+                                <div class="display-preview-heading">
+                                    <div>
+                                        <div class="group-title">Live layout preview</div>
+                                        <p>Every square is the fixed 64 × 64 Pixoo canvas.</p>
                                     </div>
-                                    <input type="color" id="bgColor" aria-label="Manual background color">
+                                    <span class="display-pixel-badge">64×64</span>
+                                </div>
+                                <div class="display-preview-stage">
+                                    <canvas id="displayPreview" width="64" height="64" aria-label="Pixoo layout preview"></canvas>
+                                </div>
+                                <div class="display-fit-card">
+                                    <div class="display-fit-copy">
+                                        <span id="displayFitStatus" class="display-fit-status">Fits display</span>
+                                        <strong id="displayFitUsage">63 / 64 px</strong>
+                                    </div>
+                                    <div class="display-fit-track" aria-hidden="true"><span id="displayFitBar"></span></div>
+                                    <p id="displayConstraintNote">The designer automatically keeps the vertical layout inside 64 pixels. Long text scrolls horizontally.</p>
                                 </div>
                             </div>
-                            <div class="form-row color-mode-row">
-                                <label for="useDynamicText">Text color</label>
-                                <div class="color-setting-control">
-                                    <div class="color-mode-switch" aria-label="Text color mode">
-                                        <span class="color-mode-label color-mode-label-manual">Manual</span>
-                                        <input type="checkbox" id="useDynamicText" aria-label="Use automatic text color">
-                                        <span class="color-mode-label color-mode-label-auto">Automatic</span>
-                                    </div>
-                                    <input type="color" id="textColor" aria-label="Manual text color">
-                                </div>
-                            </div>
-                            <div class="form-row color-invert-row">
-                                <label for="invertDynamicColors">Invert automatic colors</label>
-                                <input type="checkbox" id="invertDynamicColors">
-                                <div class="form-hint">Automatic text uses the cover color; automatic background becomes black or white. Manual colors stay unchanged.</div>
-                            </div>
-                        </div>
 
-                        <div class="form-group">
-                            <div class="group-title">Preview & Scroll</div>
-                            <div class="form-row"><label for="imagePreviewScale">Preview scale</label><input type="number" id="imagePreviewScale" min="1"></div>
-                            <div class="form-row"><label for="marqueeSpeed">Scroll speed</label><input type="number" id="marqueeSpeed" min="1" max="200"></div>
-                            <div class="form-row">
-                                <label for="imageSleepSeconds">Scroll sleep seconds</label>
-                                <input type="number" id="imageSleepSeconds" step="0.001">
-                                <div class="form-hint">Frame delay in the scrolling loop.</div>
+                            <div class="display-designer-controls">
+                                <div class="form-group display-presets-group">
+                                    <div class="group-title">Quick layouts</div>
+                                    <div class="display-preset-grid">
+                                        <button type="button" class="display-preset" data-display-preset="classic"><strong>Classic</strong><span>Large cover + artist + title</span></button>
+                                        <button type="button" class="display-preset" data-display-preset="large-text"><strong>Large text</strong><span>Smaller cover, larger typography</span></button>
+                                        <button type="button" class="display-preset" data-display-preset="album-info"><strong>Album info</strong><span>Cover + artist + title + album</span></button>
+                                        <button type="button" class="display-preset" data-display-preset="cover-only"><strong>Cover only</strong><span>Full 64 × 64 artwork</span></button>
+                                        <button type="button" class="display-preset" data-display-preset="text-only"><strong>Text only</strong><span>Artist + title + album</span></button>
+                                    </div>
+                                </div>
+
+                                <div class="form-group">
+                                    <div class="group-title">Visible elements</div>
+                                    <div class="display-element-grid">
+                                        <label class="display-element-toggle"><input type="checkbox" id="imageShowCover"><span>Cover</span></label>
+                                        <label class="display-element-toggle"><input type="checkbox" id="imageShowArtist"><span>Artist</span></label>
+                                        <label class="display-element-toggle"><input type="checkbox" id="imageShowTitle"><span>Title</span></label>
+                                        <label class="display-element-toggle"><input type="checkbox" id="imageShowAlbum"><span>Album</span></label>
+                                    </div>
+                                </div>
+
+                                <div class="form-group">
+                                    <div class="group-title">Layout</div>
+                                    <div class="display-range-row" data-display-control="cover">
+                                        <div class="display-range-label"><label for="imageCoverSize">Cover size</label><output id="imageCoverSizeValue" for="imageCoverSize">46 px</output></div>
+                                        <input type="range" id="imageCoverSize" min="12" max="64" step="1">
+                                    </div>
+                                    <div class="display-range-row" data-display-control="text">
+                                        <div class="display-range-label"><label for="imageFontSize">Text height</label><output id="imageFontSizeValue" for="imageFontSize">5 px</output></div>
+                                        <input type="range" id="imageFontSize" min="3" max="12" step="1">
+                                    </div>
+                                    <div class="display-range-row">
+                                        <div class="display-range-label"><label for="imageTopMargin">Top margin</label><output id="imageTopMarginValue" for="imageTopMargin">1 px</output></div>
+                                        <input type="range" id="imageTopMargin" min="0" max="16" step="1">
+                                    </div>
+                                    <div class="display-range-row" data-display-control="cover-gap">
+                                        <div class="display-range-label"><label for="imageMarginImageText">Cover / text gap</label><output id="imageMarginImageTextValue" for="imageMarginImageText">3 px</output></div>
+                                        <input type="range" id="imageMarginImageText" min="0" max="8" step="1">
+                                    </div>
+                                    <div class="display-range-row" data-display-control="line-gap">
+                                        <div class="display-range-label"><label for="imageLineSpacingMargin">Text line gap</label><output id="imageLineSpacingMarginValue" for="imageLineSpacingMargin">3 px</output></div>
+                                        <input type="range" id="imageLineSpacingMargin" min="0" max="8" step="1">
+                                    </div>
+                                    <div class="form-hint display-layout-hint">If a change would exceed 64 px, the designer automatically reduces other dimensions. The saved config is validated again on the Raspberry Pi.</div>
+                                </div>
+
+                                <div class="form-group">
+                                    <div class="group-title">Typography</div>
+                                    <input type="hidden" id="imageFontPath">
+                                    <div class="form-row path-row">
+                                        <label>Selected font</label>
+                                        <code class="selected-image-path" id="imageFontPathLabel">No font selected</code>
+                                    </div>
+                                    <div class="form-row"><label for="fontUpload">Upload font</label><input type="file" id="fontUpload" accept=".ttf,.otf,font/ttf,font/otf"></div>
+                                    <div class="form-row"><label>Font gallery</label><button type="button" id="openFontGallery">Open font gallery</button></div>
+                                    <div id="fontGallery" class="font-gallery hidden"></div>
+                                    <div class="form-row"><label for="imageUppercase">Uppercase</label><input type="checkbox" id="imageUppercase"></div>
+                                </div>
+
+                                <div class="form-group">
+                                    <div class="group-title">Colors</div>
+                                    <div class="form-row color-mode-row">
+                                        <label for="useDynamicBg">Background color</label>
+                                        <div class="color-setting-control">
+                                            <div class="color-mode-switch" aria-label="Background color mode">
+                                                <span class="color-mode-label color-mode-label-manual">Manual</span>
+                                                <input type="checkbox" id="useDynamicBg" aria-label="Use automatic background color">
+                                                <span class="color-mode-label color-mode-label-auto">Automatic</span>
+                                            </div>
+                                            <input type="color" id="bgColor" aria-label="Manual background color">
+                                        </div>
+                                    </div>
+                                    <div class="form-row color-mode-row">
+                                        <label for="useDynamicText">Text color</label>
+                                        <div class="color-setting-control">
+                                            <div class="color-mode-switch" aria-label="Text color mode">
+                                                <span class="color-mode-label color-mode-label-manual">Manual</span>
+                                                <input type="checkbox" id="useDynamicText" aria-label="Use automatic text color">
+                                                <span class="color-mode-label color-mode-label-auto">Automatic</span>
+                                            </div>
+                                            <input type="color" id="textColor" aria-label="Manual text color">
+                                        </div>
+                                    </div>
+                                    <div class="form-row color-invert-row">
+                                        <label for="invertDynamicColors">Invert automatic colors</label>
+                                        <input type="checkbox" id="invertDynamicColors">
+                                        <div class="form-hint">Automatic text uses the cover color; automatic background becomes black or white. Manual colors stay unchanged.</div>
+                                    </div>
+                                </div>
+
+                                <div class="form-group">
+                                    <div class="group-title">Animation</div>
+                                    <div class="form-row"><label for="marqueeSpeed">Scroll speed</label><input type="number" id="marqueeSpeed" min="1" max="200"><div class="form-hint">Pixels per second for text that is wider than the display.</div></div>
+                                </div>
                             </div>
                         </div>
                     </div>

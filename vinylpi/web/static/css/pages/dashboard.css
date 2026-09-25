@@ -165,3 +165,53 @@
     .discogs-tracklist-playing span:last-child { display: none; }
     .discogs-tracklist-title { white-space: normal; }
 }
+
+/* Lyrics expansion lives inside the lyrics card rather than looking like a
+   third song-action button. */
+.lyrics-inline {
+    width: 100%;
+    margin-top: 14px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: rgba(12,12,16,.5);
+}
+.lyrics-box {
+    margin: 0;
+    padding: 16px 16px 12px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+}
+.lyrics-box.collapsed {
+    max-height: 190px;
+    overflow: hidden;
+    -webkit-mask-image: linear-gradient(to bottom,#000 70%,transparent);
+    mask-image: linear-gradient(to bottom,#000 70%,transparent);
+}
+.lyrics-toggle {
+    display: grid;
+    place-items: center;
+    width: 100%;
+    min-height: 34px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-top: 1px solid rgba(255,255,255,.07);
+    border-radius: 0;
+    background: linear-gradient(180deg, rgba(255,255,255,.015), rgba(255,255,255,.045));
+    box-shadow: none;
+    color: rgba(255,255,255,.55);
+}
+.lyrics-toggle:hover {
+    border-color: rgba(255,255,255,.1);
+    background: rgba(255,255,255,.055);
+    color: var(--yellow);
+    transform: none;
+}
+.lyrics-toggle:focus-visible {
+    outline: none;
+    box-shadow: inset 0 0 0 2px rgba(245,197,66,.34);
+}
+.lyrics-toggle svg { transition: transform .18s ease; }
+.lyrics-inline.expanded .lyrics-toggle svg { transform: rotate(180deg); }

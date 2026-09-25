@@ -3,12 +3,12 @@
 {% block title %}VinylPi Dashboard{% endblock %}
 
 {% block page_styles %}
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/dashboard.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/dashboard.css') }}?v=20260925b">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/spotify.css') }}">
 {% endblock %}
 
 {% block page_scripts %}
-    <script src="{{ url_for('static', filename='js/pages/dashboard.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/pages/dashboard.js') }}?v=20260925b" defer></script>
     <script src="{{ url_for('static', filename='js/pages/spotify_dashboard.js') }}" defer></script>
 {% endblock %}
 
@@ -106,9 +106,20 @@
                     <button id="btn-track-info" type="button">Info</button>
                 </div>
 
-                <div class="lyrics-inline" id="lyrics-card">
+                <div class="lyrics-inline hidden" id="lyrics-card">
                     <pre id="lyrics-box" class="lyrics-box hidden collapsed"></pre>
-                    <button id="btn-lyrics-toggle" type="button" class="lyrics-toggle hidden">More</button>
+                    <button
+                        id="btn-lyrics-toggle"
+                        type="button"
+                        class="lyrics-toggle hidden"
+                        aria-expanded="false"
+                        aria-label="Expand lyrics"
+                        title="Expand lyrics"
+                    >
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="m7 10 5 5 5-5"></path>
+                        </svg>
+                    </button>
                 </div>
             </div>
         </section>

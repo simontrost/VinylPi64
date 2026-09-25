@@ -9,6 +9,7 @@ from typing import Any, Dict
 
 from vinylpi.config.config_loader import CONFIG_DEFAULTS, deep_update, load_config
 from vinylpi.paths import CONFIG_PATH, get_active_config_path
+from vinylpi.core.display_layout import normalize_image_config
 
 _LEGACY_CONFIG_PATH = CONFIG_PATH
 
@@ -58,6 +59,8 @@ def write_config(data: Dict[str, Any] | None) -> Dict[str, Any]:
 
     if isinstance(data, dict):
         deep_update(new_cfg, data)
+
+    new_cfg["image"] = normalize_image_config(new_cfg.get("image"))
 
     path = _current_config_path()
     _atomic_write_json(path, new_cfg)

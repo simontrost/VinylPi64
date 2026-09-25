@@ -193,7 +193,7 @@ def handle_song_result(
         is_same_song=is_same_song,
     )
 
-    start_scrolling_display(track.cover_image, track.artist, canonical_title)
+    start_scrolling_display(track.cover_image, track.artist, canonical_title, track.album)
     bg_color = None
     try:
         rgb = dynamic_bg_color(track.cover_image)
