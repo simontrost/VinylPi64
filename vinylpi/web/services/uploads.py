@@ -25,11 +25,20 @@ from vinylpi.paths import (
 
 
 def _safe_child_path(directory: Path, filename: str) -> Path | None:
-    safe_name = secure_filename(filename or "")
-    if not safe_name or safe_name != filename:
+    # Existing bundled fonts may legitimately contain spaces or non-ASCII
+    # characters. Reject path traversal instead of requiring Werkzeug's
+    # normalized upload filename to equal the on-disk name.
+    raw_name = str(filename or "")
+    if (
+        not raw_name
+        or "/" in raw_name
+        or "\\" in raw_name
+        or Path(raw_name).name != raw_name
+        or raw_name in {".", ".."}
+    ):
         return None
 
-    candidate = (directory / safe_name).resolve()
+    candidate = (directory / raw_name).resolve()
     try:
         candidate.relative_to(directory.resolve())
     except ValueError:
@@ -184,10 +193,20 @@ def build_font_preview(filename: str) -> BytesIO | None:
     image = Image.new("RGB", (width, height), (18, 18, 25))
     draw = ImageDraw.Draw(image)
 
-    try:
-        font_large = ImageFont.truetype(str(path), 30)
-        font_small = ImageFont.truetype(str(path), 18)
-    except Exception:
+    def load_preview_font(sizes: tuple[int, ...]):
+        for size in sizes:
+            try:
+                return ImageFont.truetype(str(path), size)
+            except Exception:
+                continue
+        return None
+
+    # Some pixel/bitmap-flavoured TTFs only expose usable strikes at a subset
+    # of sizes. The Pixoo renderer uses very small glyphs, so a gallery preview
+    # should not fail merely because 30 px is unsupported.
+    font_large = load_preview_font((30, 26, 24, 20, 18, 16, 14, 12, 10, 8, 6, 5))
+    font_small = load_preview_font((18, 16, 14, 12, 10, 9, 8, 7, 6, 5))
+    if font_large is None or font_small is None:
         return None
 
     accent = (245, 197, 66)

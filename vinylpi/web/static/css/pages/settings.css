@@ -1819,3 +1819,365 @@
     .display-preset-grid { grid-template-columns: 1fr; }
     .display-element-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* --------------------------------------------------------------------------
+   Settings polish: compact display controls + mobile persistent actions
+   -------------------------------------------------------------------------- */
+.chevron {
+    display: inline-grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    flex: 0 0 28px;
+    color: var(--muted);
+    transition: transform 0.18s ease, color 0.18s ease;
+}
+
+.chevron svg,
+.mobile-settings-arrow svg,
+.mobile-settings-back svg,
+.mobile-display-preview-trigger svg,
+.mobile-display-preview-close svg {
+    width: 100%;
+    height: 100%;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.settings-card.is-open .chevron {
+    transform: rotate(180deg);
+    color: var(--pink);
+}
+
+.mobile-settings-arrow {
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    color: var(--muted-2);
+}
+
+.mobile-settings-back span {
+    display: inline-grid;
+    place-items: center;
+    width: 18px;
+    height: 18px;
+    margin-right: 5px;
+    color: var(--yellow);
+    vertical-align: -4px;
+}
+
+/* The layout designer should feel like an editor, not a stack of gradients. */
+.display-preview-panel {
+    background: rgba(15, 15, 20, 0.92);
+}
+
+.display-designer .form-group {
+    padding: 14px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.022);
+}
+
+.display-fit-track span {
+    background: var(--yellow);
+}
+
+.display-preset {
+    background: rgba(255, 255, 255, 0.018);
+}
+
+.display-preset:hover {
+    background: rgba(255, 255, 255, 0.045);
+}
+
+.display-preset.is-active {
+    border-color: rgba(245, 197, 66, 0.58);
+    background: rgba(245, 197, 66, 0.075);
+}
+
+.display-element-toggle span {
+    min-height: 38px;
+    background: rgba(255, 255, 255, 0.018);
+}
+
+.display-element-toggle input:checked + span {
+    border-color: rgba(239, 45, 143, 0.58);
+    background: rgba(239, 45, 143, 0.095);
+}
+
+.display-range-row {
+    margin-bottom: 12px;
+}
+
+.display-range-label {
+    margin-bottom: 2px;
+}
+
+/* Explicit track/thumb styling avoids the oversized filled-pill appearance on Safari. */
+.display-range-row input[type="range"] {
+    width: 100%;
+    height: 24px;
+    margin: 0;
+    padding: 0;
+    appearance: none;
+    -webkit-appearance: none;
+    border: 0;
+    outline: none;
+    background: transparent;
+    cursor: pointer;
+}
+
+.display-range-row input[type="range"]::-webkit-slider-runnable-track {
+    height: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.display-range-row input[type="range"]::-webkit-slider-thumb {
+    width: 20px;
+    height: 20px;
+    margin-top: -8px;
+    appearance: none;
+    -webkit-appearance: none;
+    border: 2px solid #f3eef5;
+    border-radius: 50%;
+    background: var(--pink);
+    box-shadow: 0 2px 7px rgba(0, 0, 0, 0.42);
+}
+
+.display-range-row input[type="range"]::-moz-range-track {
+    height: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.display-range-row input[type="range"]::-moz-range-progress {
+    height: 6px;
+    border-radius: 999px;
+    background: rgba(239, 45, 143, 0.72);
+}
+
+.display-range-row input[type="range"]::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border: 2px solid #f3eef5;
+    border-radius: 50%;
+    background: var(--pink);
+    box-shadow: 0 2px 7px rgba(0, 0, 0, 0.42);
+}
+
+.display-range-row.is-disabled input[type="range"]::-webkit-slider-thumb,
+.display-range-row.is-disabled input[type="range"]::-moz-range-thumb {
+    background: var(--muted-2);
+}
+
+.mobile-display-preview-trigger,
+.mobile-display-preview-modal {
+    display: none;
+}
+
+body.mobile-display-preview-open {
+    overflow: hidden;
+}
+
+@media (max-width: 900px) {
+    /* Category pages are already always expanded on mobile, so no accordion affordance. */
+    .settings-card-header .chevron {
+        display: none;
+    }
+
+    .settings-card-header {
+        cursor: default;
+    }
+
+    #settings-form.mobile-category-open .settings-panels {
+        padding-bottom: 82px;
+    }
+
+    #settings-form.mobile-category-open .settings-actions {
+        position: fixed;
+        left: 14px;
+        right: 14px;
+        bottom: calc(92px + env(safe-area-inset-bottom));
+        z-index: 39;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 8px;
+        margin: 0;
+        padding: 8px;
+        border-radius: 16px;
+        background: rgba(18, 18, 24, 0.96);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.42);
+        backdrop-filter: blur(16px);
+    }
+
+    #settings-form.mobile-category-open .settings-actions > button {
+        min-height: 46px;
+        margin: 0;
+    }
+
+    #settings-form.mobile-category-open .settings-actions .btn-primary {
+        min-width: 0;
+    }
+
+    #settings-form.mobile-display-category-open .mobile-display-preview-trigger:not([hidden]) {
+        position: fixed;
+        right: 18px;
+        bottom: calc(160px + env(safe-area-inset-bottom));
+        z-index: 39;
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        min-height: 42px;
+        padding: 8px 12px;
+        border: 1px solid rgba(245, 197, 66, 0.36);
+        border-radius: 999px;
+        background: rgba(18, 18, 24, 0.96);
+        color: var(--yellow);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.38);
+        backdrop-filter: blur(14px);
+    }
+
+    .mobile-display-preview-trigger svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    .mobile-display-preview-trigger span {
+        color: var(--text);
+        font-size: 12px;
+        font-weight: 760;
+    }
+
+    .mobile-display-preview-modal:not(.hidden) {
+        position: fixed;
+        inset: 0;
+        z-index: 1200;
+        display: grid;
+        align-items: end;
+    }
+
+    .mobile-display-preview-backdrop {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        min-height: 0;
+        padding: 0;
+        border: 0;
+        border-radius: 0;
+        background: rgba(0, 0, 0, 0.68);
+        backdrop-filter: blur(3px);
+    }
+
+    .mobile-display-preview-sheet {
+        position: relative;
+        z-index: 1;
+        width: 100%;
+        max-height: calc(92vh - env(safe-area-inset-bottom));
+        overflow: auto;
+        padding: 18px 18px calc(20px + env(safe-area-inset-bottom));
+        border: 1px solid var(--border);
+        border-bottom: 0;
+        border-radius: 24px 24px 0 0;
+        background: #17171e;
+        box-shadow: 0 -18px 50px rgba(0, 0, 0, 0.5);
+    }
+
+    .mobile-display-preview-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 14px;
+    }
+
+    .mobile-display-preview-header h2 {
+        margin: 2px 0 0;
+        font-size: 20px;
+    }
+
+    .mobile-preview-eyebrow {
+        color: var(--yellow);
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+    }
+
+    .mobile-display-preview-close {
+        display: grid;
+        place-items: center;
+        width: 40px;
+        height: 40px;
+        min-height: 40px;
+        padding: 10px;
+        border-radius: 12px;
+        color: var(--muted);
+        background: rgba(255, 255, 255, 0.045);
+    }
+
+    .mobile-display-preview-stage {
+        display: grid;
+        place-items: center;
+        padding: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.07);
+        border-radius: 16px;
+        background: #0d0d12;
+    }
+
+    #displayPreviewMobile {
+        width: min(74vw, 280px);
+        aspect-ratio: 1 / 1;
+        height: auto;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 6px;
+        background: #000;
+        image-rendering: pixelated;
+        image-rendering: crisp-edges;
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.34);
+    }
+
+    .mobile-display-preview-fit {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-top: 12px;
+        color: #bbf7d0;
+        font-size: 12px;
+        font-weight: 750;
+    }
+
+    .mobile-display-preview-fit strong {
+        color: var(--text);
+        font-size: 11px;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .mobile-display-preview-sheet > p {
+        margin: 8px 0 0;
+        color: var(--muted-2);
+        font-size: 11px;
+        line-height: 1.45;
+    }
+
+    .settings-toast {
+        bottom: calc(166px + env(safe-area-inset-bottom));
+    }
+
+    /* The in-page preview remains available at the top of Display; the floating
+       button is the fast path when editing lower controls. */
+    .display-designer .form-group {
+        padding: 13px;
+    }
+
+    .display-range-row {
+        margin-bottom: 10px;
+    }
+}

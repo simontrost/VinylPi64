@@ -317,11 +317,17 @@ function updateDisplayDesignerOutputs(state) {
     }
 
     const used = displayUsedHeight(state);
+    const fitText = used <= 64 ? "Fits display" : "Layout too tall";
+    const usageText = `${used} / 64 px`;
     const usage = document.getElementById("displayFitUsage");
     const status = document.getElementById("displayFitStatus");
+    const mobileUsage = document.getElementById("mobileDisplayFitUsage");
+    const mobileStatus = document.getElementById("mobileDisplayFitStatus");
     const bar = document.getElementById("displayFitBar");
-    if (usage) usage.textContent = `${used} / 64 px`;
-    if (status) status.textContent = used <= 64 ? "Fits display" : "Layout too tall";
+    if (usage) usage.textContent = usageText;
+    if (status) status.textContent = fitText;
+    if (mobileUsage) mobileUsage.textContent = usageText;
+    if (mobileStatus) mobileStatus.textContent = fitText;
     if (bar) bar.style.width = `${Math.min(100, Math.max(0, (used / 64) * 100))}%`;
 }
 
@@ -399,6 +405,14 @@ function renderDisplayPreview(state = readDisplayDesigner()) {
         if (index < lines.length - 1) y += state.lineGap;
     });
     ctx.restore();
+
+    const mobileCanvas = document.getElementById("displayPreviewMobile");
+    const mobileCtx = mobileCanvas?.getContext("2d");
+    if (mobileCtx) {
+        mobileCtx.clearRect(0, 0, 64, 64);
+        mobileCtx.imageSmoothingEnabled = false;
+        mobileCtx.drawImage(canvas, 0, 0);
+    }
 }
 
 function markDisplayPreset(state) {
@@ -1246,10 +1260,12 @@ if (resetBtn) {
     });
 }
 
-// Minimal UI accordion behavior
+// Desktop accordion behavior. Mobile uses the category-first navigation and
+// keeps the selected category permanently expanded.
 document.addEventListener("DOMContentLoaded", () => {
     document.querySelectorAll(".settings-card-header").forEach((btn) => {
         btn.addEventListener("click", () => {
+            if (window.matchMedia("(max-width: 900px)").matches) return;
             const card = btn.closest(".settings-card");
             if (!card) return;
             const isOpen = card.classList.toggle("is-open");
@@ -1266,8 +1282,38 @@ document.addEventListener("DOMContentLoaded", () => {
     const currentLabel = form?.querySelector(".mobile-settings-current");
     const backButton = form?.querySelector(".mobile-settings-back");
     const categoryButtons = form?.querySelectorAll("[data-settings-target]") || [];
+    const previewButton = document.getElementById("mobileDisplayPreviewButton");
+    const previewModal = document.getElementById("mobileDisplayPreviewModal");
+    const previewCloseButtons = previewModal?.querySelectorAll("[data-display-preview-close]") || [];
 
     if (!form || !detailHeader || !backButton) return;
+
+    const isMobileSettings = () => window.matchMedia("(max-width: 900px)").matches;
+
+    const closeDisplayPreview = () => {
+        if (!previewModal) return;
+        previewModal.classList.add("hidden");
+        previewModal.setAttribute("aria-hidden", "true");
+        previewButton?.setAttribute("aria-expanded", "false");
+        document.body.classList.remove("mobile-display-preview-open");
+    };
+
+    const openDisplayPreview = () => {
+        if (!previewModal || !previewButton || !isMobileSettings()) return;
+        syncDisplayDesigner();
+        previewModal.classList.remove("hidden");
+        previewModal.setAttribute("aria-hidden", "false");
+        previewButton.setAttribute("aria-expanded", "true");
+        document.body.classList.add("mobile-display-preview-open");
+        previewModal.querySelector(".mobile-display-preview-close")?.focus();
+    };
+
+    const setDisplayPreviewAvailability = (targetId) => {
+        const enabled = targetId === "section-display" && isMobileSettings();
+        form.classList.toggle("mobile-display-category-open", enabled);
+        if (previewButton) previewButton.hidden = !enabled;
+        if (!enabled) closeDisplayPreview();
+    };
 
     const openCategory = (targetId, label) => {
         const target = document.getElementById(targetId);
@@ -1281,12 +1327,15 @@ document.addEventListener("DOMContentLoaded", () => {
         form.classList.add("mobile-category-open");
         detailHeader.hidden = false;
         if (currentLabel) currentLabel.textContent = label || "Settings";
+        setDisplayPreviewAvailability(targetId);
         window.scrollTo({ top: 0, behavior: "smooth" });
     };
 
     const closeCategory = () => {
-        form.classList.remove("mobile-category-open");
+        form.classList.remove("mobile-category-open", "mobile-display-category-open");
         detailHeader.hidden = true;
+        if (previewButton) previewButton.hidden = true;
+        closeDisplayPreview();
         form.querySelectorAll(".settings-card.mobile-selected-category").forEach((card) => {
             card.classList.remove("mobile-selected-category");
         });
@@ -1303,9 +1352,17 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     backButton.addEventListener("click", closeCategory);
+    previewButton?.addEventListener("click", openDisplayPreview);
+    previewCloseButtons.forEach((button) => button.addEventListener("click", closeDisplayPreview));
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && !previewModal?.classList.contains("hidden")) {
+            closeDisplayPreview();
+            previewButton?.focus();
+        }
+    });
 
     const hashTarget = window.location.hash.replace("#", "");
-    if (window.matchMedia("(max-width: 760px)").matches && hashTarget) {
+    if (isMobileSettings() && hashTarget) {
         const matchingButton = [...categoryButtons].find(
             (button) => button.dataset.settingsTarget === hashTarget,
         );

@@ -89,6 +89,11 @@ class WebPageStructureTests(unittest.TestCase):
         self.assertNotIn('id="imageCanvasSize"', html)
         self.assertNotIn('id="imagePreviewScale"', html)
         self.assertNotIn('id="imageSleepSeconds"', html)
+        self.assertIn('id="mobileDisplayPreviewButton"', html)
+        self.assertIn('id="mobileDisplayPreviewModal"', html)
+        self.assertIn('id="displayPreviewMobile"', html)
+        self.assertIn('<span class="chevron" aria-hidden="true"><svg', html)
+        self.assertNotIn('<span class="chevron">⌄</span>', html)
 
     def test_dashboard_contains_discogs_add_release_link(self):
         response = self.client.get("/")
