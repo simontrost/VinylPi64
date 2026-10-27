@@ -94,7 +94,7 @@ impl Config {
                 32.,
             ),
             ("margin_image_text", self.image.margin_image_text, 0., 64.),
-            ("marquee_speed", self.image.marquee_speed, 1., 120.),
+            ("marquee_speed", self.image.marquee_speed, 1., 200.),
             ("sleep_seconds", self.image.sleep_seconds, 0.001, 5.),
             ("preview_scale", self.image.preview_scale, 1., 32.),
             ("loop delay", self.behavior.loop_delay_seconds, 0.1, 60.),
@@ -276,6 +276,11 @@ mod tests {
         ] {
             assert!(Config::from_value(v).is_err());
         }
+    }
+    #[test]
+    fn scroll_speed_matches_the_dashboard_range() {
+        assert!(Config::from_value(json!({"image":{"marquee_speed":200}})).is_ok());
+        assert!(Config::from_value(json!({"image":{"marquee_speed":201}})).is_err());
     }
     #[test]
     fn legacy_sleep_and_secret_cleanup() {

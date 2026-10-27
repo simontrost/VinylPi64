@@ -102,6 +102,25 @@ pub fn dominant(cover: &RgbImage) -> [u8; 3] {
         .map(|(c, _)| c)
         .unwrap_or([40, 40, 40])
 }
+/// A marquee position is measured in pixels from the start of playback,
+/// rather than in frames sent to the Pixoo. HTTP latency can be substantial,
+/// so a fixed one-pixel step per request makes scroll speed ineffective.
+fn marquee_offset(elapsed: Duration, pixels_per_second: f64) -> u32 {
+    (elapsed.as_secs_f64() * pixels_per_second)
+        .floor()
+        .clamp(0.0, u32::MAX as f64) as u32
+}
+
+/// Wait only until the next distinct pixel. This avoids repeatedly sending
+/// identical frames at slow speeds, while allowing fast speeds to use all
+/// throughput available from the Pixoo's HTTP endpoint.
+fn time_to_next_pixel(elapsed: Duration, pixels_per_second: f64) -> Duration {
+    let current = marquee_offset(elapsed, pixels_per_second);
+    let seconds = ((current as f64 + 1.0) / pixels_per_second - elapsed.as_secs_f64())
+        .clamp(0.001, 0.250);
+    Duration::from_secs_f64(seconds)
+}
+
 pub struct Composition {
     pub base: RgbImage,
     pub lines: Vec<(RgbImage, u32)>,
@@ -582,25 +601,53 @@ impl Display {
                     }
                     return Ok(());
                 }
-                let mut offset = 0;
+                let animated = composition.as_ref().is_some_and(Composition::animated);
+                let scroll_started = Instant::now();
+                let mut last_sent_offset = None;
+                // Optional, low-overhead diagnostics. Enable on the Pi using
+                // VINYLPI_PERF_LOG=1 to report *actual* successful Pixoo FPS.
+                let perf_enabled = std::env::var_os("VINYLPI_PERF_LOG").is_some();
+                let mut perf_started = Instant::now();
+                let mut perf_frames = 0u64;
+                let mut perf_send_duration = Duration::ZERO;
                 loop {
                     if self.generation.load(Ordering::SeqCst) != revision || cancel.is_cancelled() {
                         break;
                     };
+                    let elapsed = scroll_started.elapsed();
+                    let offset = marquee_offset(elapsed, cfg.image.marquee_speed);
+                    if animated && last_sent_offset == Some(offset) {
+                        tokio::time::sleep(time_to_next_pixel(elapsed, cfg.image.marquee_speed))
+                            .await;
+                        continue;
+                    }
                     let frame = if let Some(c) = &composition {
                         c.frame(offset)
                     } else {
                         still.as_ref().context("No frame")?.clone()
                     };
+                    let send_started = Instant::now();
                     self.pixoo.frame(&frame, revision, &self.generation).await?;
-                    if !composition.as_ref().is_some_and(Composition::animated) {
+                    last_sent_offset = Some(offset);
+                    if perf_enabled && animated {
+                        perf_frames += 1;
+                        perf_send_duration += send_started.elapsed();
+                        if perf_started.elapsed() >= Duration::from_secs(10) {
+                            tracing::info!(
+                                fps = perf_frames as f64 / perf_started.elapsed().as_secs_f64(),
+                                avg_send_ms = perf_send_duration.as_secs_f64() * 1000.0
+                                    / perf_frames as f64,
+                                requested_px_s = cfg.image.marquee_speed,
+                                "Pixoo live-frame performance"
+                            );
+                            perf_started = Instant::now();
+                            perf_frames = 0;
+                            perf_send_duration = Duration::ZERO;
+                        }
+                    }
+                    if !animated {
                         break;
                     };
-                    offset += 1;
-                    tokio::time::sleep(Duration::from_secs_f64(
-                        (1. / cfg.image.marquee_speed).max(0.05),
-                    ))
-                    .await;
                 }
                 Ok(())
             };
@@ -652,6 +699,25 @@ mod tests {
     #[test]
     fn rejects_invalid_image() {
         assert!(decode(b"not an image").is_err());
+    }
+    #[test]
+    fn marquee_speed_is_elapsed_time_based_and_supports_200_px_s() {
+        let elapsed = Duration::from_millis(125);
+        assert_eq!(marquee_offset(elapsed, 20.0), 2);
+        assert_eq!(marquee_offset(elapsed, 40.0), 5);
+        assert_eq!(marquee_offset(elapsed, 200.0), 25);
+        // Sending a frame must not increment the offset by a fixed one pixel.
+        assert_eq!(marquee_offset(Duration::from_millis(260), 40.0), 10);
+    }
+
+    #[test]
+    fn marquee_waits_until_an_actual_pixel_change() {
+        assert_eq!(
+            time_to_next_pixel(Duration::from_millis(125), 20.0),
+            Duration::from_millis(25)
+        );
+        assert!(time_to_next_pixel(Duration::ZERO, 200.0) <= Duration::from_millis(5));
+        assert!(time_to_next_pixel(Duration::ZERO, 1.0) <= Duration::from_millis(250));
     }
 }
 
