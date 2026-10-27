@@ -1,0 +1,201 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}VinylPi Dashboard{% endblock %}
+
+{% block page_styles %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/vinyl-loader.css') }}?v=20261022">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/dashboard.css') }}?v=20261025-logo">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/spotify.css') }}">
+{% endblock %}
+
+{% block page_scripts %}
+    <script src="{{ url_for('static', filename='js/pages/dashboard.js') }}?v=20261025-logo" defer></script>
+    <script src="{{ url_for('static', filename='js/pages/spotify_dashboard.js') }}?v=20261008a" defer></script>
+    <script src="{{ url_for('static', filename='js/pages/random_record.js') }}?v=20261008b" defer></script>
+{% endblock %}
+
+{% block content %}
+<main class="main">
+    <header class="main-header">
+        <div class="dashboard-heading">
+            <div class="header-title pixel-title">Dashboard</div>
+        </div>
+        <div class="dashboard-header-actions">
+            <button id="random-record-button" class="random-record-trigger" type="button"
+                    aria-label="Suggest a record" aria-haspopup="dialog" aria-controls="random-record-dialog"
+                    title="Checking playback source…" disabled>
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                    <rect x="3" y="3" width="18" height="18" rx="4"></rect>
+                    <g fill="currentColor" stroke="none">
+                        <circle cx="7.5" cy="7.5" r="1.3"></circle><circle cx="16.5" cy="7.5" r="1.3"></circle>
+                        <circle cx="12" cy="12" r="1.3"></circle>
+                        <circle cx="7.5" cy="16.5" r="1.3"></circle><circle cx="16.5" cy="16.5" r="1.3"></circle>
+                    </g>
+                </svg>
+            </button>
+        </div>
+    </header>
+
+    <section class="dashboard-shell">
+        <section class="song-card">
+            <div class="song-art">
+                <img id="song-cover" class="song-cover" src="{{ url_for('static', filename='images/logo.webp') }}" alt="Album Cover">
+            </div>
+
+            <div class="song-copy">
+                <div class="song-topbar spotify-song-topbar">
+                    <span class="eyebrow" id="now-playing-label">Now playing</span>
+                    <div class="source-control-wrap" aria-label="Playback source">
+                        <div class="source-control" role="group" aria-label="Music source">
+                            <button type="button" class="source-control-button" data-source-mode="off">Off</button>
+                            <button type="button" class="source-control-button" data-source-mode="vinyl">Vinyl</button>
+                            <button type="button" class="source-control-button" data-source-mode="spotify">Spotify</button>
+                        </div>
+                    </div>
+
+                    {# Compatibility hooks for the existing dashboard.js recognizer polling. #}
+                    <div class="source-compat-hidden" aria-hidden="true">
+                        <div id="rec-status-text"></div>
+                        <input type="checkbox" id="recognizerToggle" tabindex="-1">
+                    </div>
+                </div>
+
+                <div id="spotify-connect-row" class="spotify-connect-row hidden">
+                    <span id="spotify-connect-copy">Spotify is not connected yet.</span>
+                    <button id="spotify-connect-button" type="button" class="spotify-connect-button">Connect Spotify</button>
+                </div>
+                <div id="spotify-feedback" class="spotify-feedback hidden" role="status" aria-live="polite"></div>
+
+                <div id="song-artist" class="song-artist">–</div>
+                <div id="song-title" class="song-title">Loading...</div>
+                <div id="song-album" class="song-album"></div>
+                <div id="song-genre" class="song-genre hidden"></div>
+
+                <div id="discogs-context" class="discogs-context hidden">
+                    <div class="discogs-context-head">
+                        <span class="discogs-collection-badge">In your collection</span>
+                        <span id="discogs-match-label" class="discogs-match-label"></span>
+                    </div>
+                    <div class="discogs-track-line">
+                        <strong id="discogs-position"></strong>
+                        <span id="discogs-track-progress"></span>
+                    </div>
+                    <div id="discogs-next-track" class="discogs-next-track hidden"></div>
+                    <div id="discogs-side-flip" class="discogs-side-flip hidden">
+                        <div class="discogs-side-flip-eyebrow">Turn record</div>
+                        <div id="discogs-side-flip-heading" class="discogs-side-flip-heading"></div>
+                        <div id="discogs-side-flip-detail" class="discogs-side-flip-detail"></div>
+                    </div>
+                    <button
+                        id="discogs-tracklist-toggle"
+                        class="discogs-tracklist-toggle"
+                        type="button"
+                        aria-expanded="false"
+                        aria-controls="discogs-tracklist-panel"
+                    >
+                        <span class="discogs-tracklist-toggle-copy">
+                            <strong>Tracklist</strong>
+                            <span id="discogs-tracklist-summary">Show full release</span>
+                        </span>
+                        <span class="discogs-tracklist-chevron" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="m7 10 5 5 5-5"></path>
+                            </svg>
+                        </span>
+                    </button>
+                    <div id="discogs-tracklist-panel" class="discogs-tracklist-panel hidden"></div>
+                </div>
+
+                <a
+                    id="discogs-add-link"
+                    class="discogs-add-link hidden"
+                    href="https://www.discogs.com/search/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                >
+                    <span class="discogs-add-plus" aria-hidden="true">+</span>
+                    <span>Add to Discogs</span>
+                    <span class="discogs-add-external" aria-hidden="true">↗</span>
+                </a>
+
+                <div class="song-actions">
+                    <button id="btn-lyrics" type="button">Lyrics</button>
+                    <button id="btn-track-info" type="button">Info</button>
+                </div>
+
+                <div class="lyrics-inline hidden" id="lyrics-card">
+                    <div id="lyrics-loading" class="lyrics-loading hidden" role="status" aria-live="polite">
+                        <span class="vinyl-loader" aria-hidden="true"></span>
+                        <span>Looking up lyrics…</span>
+                    </div>
+                    <pre id="lyrics-box" class="lyrics-box hidden collapsed"></pre>
+                    <button
+                        id="btn-lyrics-toggle"
+                        type="button"
+                        class="lyrics-toggle hidden"
+                        aria-expanded="false"
+                        aria-label="Expand lyrics"
+                        title="Expand lyrics"
+                    >
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="m7 10 5 5 5-5"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </section>
+    </section>
+</main>
+
+<dialog id="random-record-dialog" class="random-record-dialog" aria-labelledby="random-record-heading">
+    <div class="random-record-header">
+        <div>
+            <h2 id="random-record-heading">What should I play?</h2>
+        </div>
+        <button id="random-record-close" class="random-record-close" type="button" aria-label="Close record suggestion" autofocus>
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                <path d="m6 6 12 12M18 6 6 18"></path>
+            </svg>
+        </button>
+    </div>
+    <div class="random-record-folder">
+        <label for="random-record-folder-select">Discogs folder</label>
+        <div class="random-record-folder-select-wrap">
+            <select id="random-record-folder-select" aria-label="Choose Discogs collection folder">
+                <option value="0">All records</option>
+            </select>
+        </div>
+    </div>
+    <div id="random-record-result" class="random-record-result hidden">
+        <div class="random-record-art">
+            <div id="random-record-placeholder" class="random-record-placeholder">
+                <svg viewBox="0 0 100 100" width="110" height="110" fill="none" stroke="currentColor" aria-hidden="true">
+                    <circle cx="50" cy="50" r="44" stroke-width="2"></circle>
+                    <circle cx="50" cy="50" r="34"></circle><circle cx="50" cy="50" r="27"></circle>
+                    <circle cx="50" cy="50" r="13" stroke-width="2"></circle><circle cx="50" cy="50" r="3" fill="currentColor"></circle>
+                </svg>
+                <span id="random-record-cover-status">Loading cover…</span>
+            </div>
+            <img id="random-record-cover" class="hidden" alt="">
+        </div>
+        <h3 id="random-record-title"></h3>
+        <p id="random-record-artist"></p>
+    </div>
+    <p id="random-record-message" class="random-record-message" role="status" aria-live="polite"></p>
+    <a id="random-record-settings" class="random-record-settings hidden" href="/settings.html#section-discogs">Open Discogs settings</a>
+    <button id="random-record-reroll" class="btn-primary random-record-reroll" type="button">Reroll</button>
+</dialog>
+
+<div id="info-backdrop" class="info-backdrop hidden"></div>
+
+<aside id="track-info-drawer" class="track-info-drawer">
+    <div class="track-info-header">
+        <div>
+            <div class="track-info-label">Shazam Info</div>
+            <h2 id="track-info-heading">Track Info</h2>
+        </div>
+        <button id="btn-track-info-close" type="button" class="track-info-close">×</button>
+    </div>
+    <div id="track-info-content" class="track-info-content">No data loaded.</div>
+</aside>
+{% endblock %}

@@ -1,0 +1,282 @@
+use crate::model::{Mode, Track};
+use anyhow::{Context, Result, ensure};
+use chrono::{Datelike, Local, Utc};
+use rusqlite::{Connection, OptionalExtension, params, types::ValueRef};
+use serde_json::{Value, json};
+use std::{
+    path::Path,
+    sync::{Arc, Mutex},
+    time::Duration,
+};
+
+#[derive(Clone)]
+pub struct Db(Arc<Mutex<Connection>>);
+pub fn rows(c: &Connection, sql: &str, args: impl rusqlite::Params) -> Result<Vec<Value>> {
+    let mut stmt = c.prepare(sql)?;
+    let names = stmt
+        .column_names()
+        .iter()
+        .map(|s| s.to_string())
+        .collect::<Vec<_>>();
+    let result = stmt
+        .query_map(args, |r| {
+            let mut obj = serde_json::Map::new();
+            for (i, n) in names.iter().enumerate() {
+                let v = match r.get_ref(i)? {
+                    ValueRef::Null => Value::Null,
+                    ValueRef::Integer(v) => json!(v),
+                    ValueRef::Real(v) => json!(v),
+                    ValueRef::Text(v) => json!(String::from_utf8_lossy(v)),
+                    ValueRef::Blob(_) => Value::Null,
+                };
+                obj.insert(n.clone(), v);
+            }
+            Ok(Value::Object(obj))
+        })?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    Ok(result)
+}
+pub fn snapshot(source: &Path, dest: &Path) -> Result<()> {
+    let c = Connection::open_with_flags(source, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+    let mut to = Connection::open(dest)?;
+    rusqlite::backup::Backup::new(&c, &mut to)?.run_to_completion(
+        128,
+        Duration::from_millis(10),
+        None,
+    )?;
+    let check: String = to.query_row("PRAGMA integrity_check", [], |r| r.get(0))?;
+    ensure!(check == "ok", "Database integrity check failed");
+    Ok(())
+}
+impl Db {
+    pub fn open(path: &Path) -> Result<Self> {
+        if let Some(p) = path.parent() {
+            std::fs::create_dir_all(p)?;
+        }
+        let c = Connection::open(path)?;
+        c.busy_timeout(Duration::from_secs(5))?;
+        c.execute_batch("PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL;")?;
+        let initialized = c
+            .query_row(
+                "SELECT value FROM meta WHERE key='rust_schema_version'",
+                [],
+                |r| r.get::<_, String>(0),
+            )
+            .optional()
+            .ok()
+            .flatten()
+            .is_some();
+        if !initialized && path.metadata()?.len() > 4096 {
+            snapshot(
+                path,
+                &path.with_extension(format!("pre-rust-{}.db", uuid::Uuid::new_v4())),
+            )?;
+        }
+        let db = Self(Arc::new(Mutex::new(c)));
+        db.with(|c|{
+            let tx=c.transaction()?;
+            tx.execute_batch(include_str!("../migrations/001_compatible.sql"))?;
+            // Compare against the reference schema to apply additive pre-v7 columns.
+            let reference=Connection::open_in_memory()?;reference.execute_batch(include_str!("../migrations/001_compatible.sql"))?;
+            let tables=rows(&reference,"SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'",[])?;
+            for table in tables {let name=table["name"].as_str().context("table name")?;let expected=rows(&reference,&format!("PRAGMA table_info({name})"),[])?;let actual=rows(&tx,&format!("PRAGMA table_info({name})"),[])?;
+                for col in expected { if actual.iter().any(|x|x["name"]==col["name"]){continue};let key=col["name"].as_str().context("column")?;let ty=col["type"].as_str().context("column type")?;
+                    ensure!(col["pk"].as_i64()==Some(0),"Cannot migrate missing key {name}.{key}");
+                    // SQLite cannot ADD a column with a non-constant default. Timestamp
+                    // columns in older schemas are filled explicitly after adding.
+                    tx.execute_batch(&format!("ALTER TABLE {name} ADD COLUMN {key} {ty}"))?;
+                    if let Some(default)=col["dflt_value"].as_str(){tx.execute_batch(&format!("UPDATE {name} SET {key}={default} WHERE {key} IS NULL"))?;}
+                }
+            }
+            tx.execute_batch("CREATE TABLE IF NOT EXISTS runtime_logs(id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp REAL NOT NULL, level TEXT NOT NULL, logger TEXT NOT NULL, message TEXT NOT NULL, details TEXT); CREATE TABLE IF NOT EXISTS rust_cache(key TEXT PRIMARY KEY,payload TEXT NOT NULL,expires INTEGER NOT NULL); INSERT OR REPLACE INTO meta(key,value) VALUES('rust_schema_version','1');")?;
+            for (source,table,key,albums,count,usage) in [("vinyl","songs","song_key","album_sessions","session_count","listening_totals"),("spotify","spotify_songs","track_id","spotify_album_totals","play_count","spotify_listening_totals")] {
+                let marker=format!("annual_seed_{source}_v1");
+                let seeded=tx.query_row("SELECT 1 FROM meta WHERE key=?",[&marker],|r|r.get::<_,i64>(0)).optional()?.is_some();
+                if !seeded {
+                    tx.execute(&format!("INSERT INTO yearly_plays(source,year,song_key,artist,title,album,count) SELECT ?,2026,{key},artist,title,album,play_count FROM {table} WHERE play_count>0 ON CONFLICT DO NOTHING"),[source])?;
+                    tx.execute(&format!("INSERT INTO yearly_albums(source,year,album,count) SELECT ?,2026,album,{count} FROM {albums} WHERE {count}>0 ON CONFLICT DO NOTHING"),[source])?;
+                    tx.execute(&format!("INSERT INTO yearly_usage(source,year,kind,seconds) SELECT ?,2026,'listening',total_seconds FROM {usage} WHERE id=1 AND total_seconds>0 ON CONFLICT DO NOTHING"),[source])?;
+                    if source=="vinyl"{tx.execute_batch("INSERT INTO yearly_usage(source,year,kind,seconds) SELECT 'vinyl',2026,'pickup',total_seconds FROM pickup_usage_totals WHERE id=1 AND total_seconds>0 ON CONFLICT DO NOTHING")?;}
+                    tx.execute("INSERT INTO meta(key,value) VALUES(?,'2026')",[marker])?;
+                }
+            }
+            tx.commit()?;Ok(())
+        })?;
+        Ok(db)
+    }
+    pub fn with<T>(&self, f: impl FnOnce(&mut Connection) -> Result<T>) -> Result<T> {
+        let mut c = self
+            .0
+            .lock()
+            .map_err(|_| anyhow::anyhow!("Database mutex poisoned"))?;
+        f(&mut c)
+    }
+    pub async fn call<T: Send + 'static>(
+        &self,
+        f: impl FnOnce(&mut Connection) -> Result<T> + Send + 'static,
+    ) -> Result<T> {
+        let d = self.clone();
+        tokio::task::spawn_blocking(move || d.with(f)).await?
+    }
+    pub fn query(&self, sql: &str, args: impl rusqlite::Params) -> Result<Vec<Value>> {
+        self.with(|c| rows(c, sql, args))
+    }
+    pub fn cache(&self, key: &str) -> Result<Option<Value>> {
+        self.with(|c| {
+            let s: Option<String> = c
+                .query_row(
+                    "SELECT payload FROM rust_cache WHERE key=? AND expires>?",
+                    params![key, Utc::now().timestamp()],
+                    |r| r.get(0),
+                )
+                .optional()?;
+            s.map(|s| Ok(serde_json::from_str(&s)?)).transpose()
+        })
+    }
+    pub fn put_cache(&self, key: &str, v: &Value, ttl: i64) -> Result<()> {
+        self.with(|c| {
+            c.execute(
+                "INSERT OR REPLACE INTO rust_cache VALUES(?,?,?)",
+                params![key, v.to_string(), Utc::now().timestamp() + ttl],
+            )?;
+            Ok(())
+        })
+    }
+    pub fn log(&self, level: &str, message: &str) {
+        tracing::info!(level, message);
+        if let Err(e) = self.with(|c| {
+            c.execute(
+                "INSERT INTO runtime_logs(timestamp,level,logger,message) VALUES(?,?,?,?)",
+                params![
+                    Utc::now().timestamp_millis() as f64 / 1000.,
+                    level,
+                    "vinylpi64",
+                    message
+                ],
+            )?;
+            c.execute(
+                "DELETE FROM runtime_logs WHERE id < (SELECT MAX(id)-3000 FROM runtime_logs)",
+                [],
+            )?;
+            Ok(())
+        }) {
+            tracing::error!(error=%e,"Unable to persist diagnostic");
+        }
+    }
+    pub fn record_play(&self, mode: Mode, t: &Track, new_album: bool) -> Result<()> {
+        ensure!(mode != Mode::Off, "Cannot record playback for Off");
+        let year = Local::now().year();
+        let now = Utc::now().timestamp();
+        let key = t.key(mode);
+        let source = mode.as_str();
+        self.with(|c|{let tx=c.transaction()?;
+            if mode==Mode::Vinyl {
+                tx.execute("INSERT INTO songs(song_key,artist,title,album,cover_url,genre,shazam_track_id,shazam_artist_id,duration_ms,play_count) VALUES(?,?,?,?,?,?,?,?,?,1) ON CONFLICT(song_key) DO UPDATE SET play_count=play_count+1,album=COALESCE(excluded.album,songs.album),cover_url=COALESCE(excluded.cover_url,songs.cover_url),genre=COALESCE(excluded.genre,songs.genre),duration_ms=COALESCE(excluded.duration_ms,songs.duration_ms),updated_at=strftime('%s','now')",params![key,t.artist,t.title,t.album,t.cover_url,t.genre,t.track_id,t.artist_id,t.duration_ms])?;
+                tx.execute("INSERT INTO artist_totals(artist,play_count) VALUES(?,1) ON CONFLICT(artist) DO UPDATE SET play_count=play_count+1",[&t.artist])?;
+                if new_album && let Some(album)=&t.album {
+                    tx.execute("INSERT INTO album_sessions(album,session_count) VALUES(?,1) ON CONFLICT(album) DO UPDATE SET session_count=session_count+1",[album])?;
+                    tx.execute("INSERT INTO album_covers(album,artist,play_count,cover_url) VALUES(?,?,1,?) ON CONFLICT(album) DO UPDATE SET play_count=play_count+1,cover_url=COALESCE(excluded.cover_url,album_covers.cover_url)",params![album,t.artist,t.cover_url])?;
+                }
+            }else{
+                tx.execute("INSERT INTO spotify_songs(track_id,artist,title,artist_id,album,cover_url,genre,duration_ms,play_count) VALUES(?,?,?,?,?,?,?,?,1) ON CONFLICT(track_id) DO UPDATE SET play_count=play_count+1,cover_url=COALESCE(excluded.cover_url,spotify_songs.cover_url),genre=COALESCE(excluded.genre,spotify_songs.genre),updated_at=strftime('%s','now')",params![key,t.artist,t.title,t.artist_id,t.album,t.cover_url,t.genre,t.duration_ms])?;
+                tx.execute("INSERT INTO spotify_artist_totals(artist,play_count) VALUES(?,1) ON CONFLICT(artist) DO UPDATE SET play_count=play_count+1",[&t.artist])?;
+                if let Some(a)=&t.album{tx.execute("INSERT INTO spotify_album_totals(album,artist,cover_url,play_count) VALUES(?,?,?,1) ON CONFLICT(album) DO UPDATE SET play_count=play_count+1,cover_url=COALESCE(excluded.cover_url,spotify_album_totals.cover_url)",params![a,t.artist,t.cover_url])?;}
+            }
+            tx.execute("INSERT INTO yearly_plays(source,year,song_key,artist,title,album,count) VALUES(?,?,?,?,?,?,1) ON CONFLICT(source,year,song_key) DO UPDATE SET count=count+1",params![source,year,key,t.artist,t.title,t.album])?;
+            tx.execute("INSERT INTO playback_events(source,event_type,occurred_at,song_key,artist,title,album) VALUES(?,'play',?,?,?,?,?)",params![source,now,key,t.artist,t.title,t.album])?;
+            if (new_album || mode==Mode::Spotify) && let Some(a)=&t.album {
+                tx.execute("INSERT INTO yearly_albums(source,year,album,count) VALUES(?,?,?,1) ON CONFLICT(source,year,album) DO UPDATE SET count=count+1",params![source,year,a])?;
+                if mode==Mode::Vinyl{tx.execute("INSERT INTO playback_events(source,event_type,occurred_at,album) VALUES('vinyl','album_session',?,?)",params![now,a])?;}
+            }
+            tx.commit()?;Ok(())
+        })
+    }
+    pub fn seconds(&self, mode: Mode, key: Option<&str>, seconds: f64, pickup: bool) -> Result<()> {
+        ensure!(
+            seconds.is_finite() && (0.0..=1800.).contains(&seconds),
+            "Invalid listening increment"
+        );
+        let table = if pickup {
+            "pickup_usage_totals"
+        } else if mode == Mode::Spotify {
+            "spotify_listening_totals"
+        } else {
+            "listening_totals"
+        };
+        self.with(|c|{let tx=c.transaction()?;tx.execute(&format!("UPDATE {table} SET total_seconds=total_seconds+? WHERE id=1"),[seconds])?;
+            tx.execute("INSERT INTO yearly_usage(source,year,kind,seconds) VALUES(?,?,?,?) ON CONFLICT(source,year,kind) DO UPDATE SET seconds=seconds+excluded.seconds",params![mode.as_str(),Local::now().year(),if pickup{"pickup"}else{"listening"},seconds])?;
+            if let Some(key)=key{if mode==Mode::Spotify{tx.execute("UPDATE spotify_songs SET listened_seconds=listened_seconds+? WHERE track_id=?",params![seconds,key])?;}else{tx.execute("UPDATE songs SET measured_listen_seconds=COALESCE(measured_listen_seconds,0)+? WHERE song_key=?",params![seconds,key])?;}}
+            tx.commit()?;Ok(())})
+    }
+    pub fn save_status(&self, mode: Mode, v: &Value) -> Result<()> {
+        self.with(|c|{c.execute("INSERT INTO source_status(source,status_json) VALUES(?,?) ON CONFLICT(source) DO UPDATE SET status_json=excluded.status_json,updated_at=strftime('%s','now')",params![mode.as_str(),v.to_string()])?;Ok(())})
+    }
+    pub fn stats(&self, scope: &str, year: Option<i32>) -> Result<Value> {
+        ensure!(
+            ["vinyl", "spotify", "combined"].contains(&scope),
+            "Invalid scope"
+        );
+        self.with(|c|{
+            let filter="(?='combined' OR source=?) AND (? IS NULL OR year=?)";
+            let args=params![scope,scope,year,year];
+            let songs=rows(c,"WITH metadata AS(SELECT 'vinyl' source,song_key,cover_url,genre FROM songs UNION ALL SELECT 'spotify',track_id,cover_url,genre FROM spotify_songs) SELECT p.artist,p.title,MAX(p.album) album,MAX(m.cover_url) cover_url,MAX(m.genre) genre,SUM(p.count) count FROM yearly_plays p LEFT JOIN metadata m ON p.source=m.source AND p.song_key=m.song_key WHERE (?='combined' OR p.source=?) AND (? IS NULL OR year=?) GROUP BY lower(p.artist),lower(p.title) ORDER BY count DESC,p.title LIMIT 10",args)?;
+            let artists=rows(c,&format!("SELECT artist name,SUM(count) count FROM yearly_plays WHERE {filter} GROUP BY lower(artist) ORDER BY count DESC,name LIMIT 10"),args)?;
+            let albums=rows(c,&format!("WITH covers AS(SELECT album,artist,cover_url FROM album_covers UNION ALL SELECT album,artist,cover_url FROM spotify_album_totals), totals AS(SELECT album name,SUM(count) count FROM yearly_albums WHERE {filter} GROUP BY lower(album)) SELECT name,count,(SELECT cover_url FROM covers WHERE lower(album)=lower(name) AND cover_url IS NOT NULL LIMIT 1) cover_url,(SELECT artist FROM covers WHERE lower(album)=lower(name) LIMIT 1) artist FROM totals ORDER BY count DESC,name LIMIT 10"),args)?;
+            let genres=rows(c,"WITH m AS(SELECT 'vinyl' source,song_key,genre FROM songs UNION ALL SELECT 'spotify',track_id,genre FROM spotify_songs) SELECT m.genre name,SUM(p.count) count FROM yearly_plays p JOIN m ON p.source=m.source AND p.song_key=m.song_key WHERE (?='combined' OR p.source=?) AND (? IS NULL OR year=?) AND m.genre IS NOT NULL AND trim(m.genre)!='' GROUP BY lower(m.genre) ORDER BY count DESC LIMIT 10",args)?;
+            let usage=rows(c,&format!("SELECT kind,SUM(seconds) seconds FROM yearly_usage WHERE {filter} GROUP BY kind"),args)?;
+            let get=|kind:&str|usage.iter().find(|v|v["kind"]==kind).and_then(|v|v["seconds"].as_f64()).unwrap_or(0.);
+            let coverage=rows(c,"WITH m AS(SELECT 'vinyl' source,song_key,genre,shazam_track_id FROM songs UNION ALL SELECT 'spotify',track_id,genre,NULL FROM spotify_songs) SELECT COUNT(DISTINCT p.source||p.song_key) songs_total,COUNT(DISTINCT CASE WHEN m.genre IS NOT NULL AND trim(m.genre)!='' THEN p.source||p.song_key END) songs_with_genre,COUNT(DISTINCT CASE WHEN m.shazam_track_id IS NOT NULL THEN p.source||p.song_key END) songs_with_shazam_id FROM yearly_plays p LEFT JOIN m ON p.source=m.source AND p.song_key=m.song_key WHERE (?='combined' OR p.source=?) AND (? IS NULL OR year=?)",args)?;
+            Ok(json!({"scope":scope,"year":year,"top_songs":songs,"top_artists":artists,"top_albums":albums,"top_album_covers":albums,"top_genres":genres,"radar_genres":genres.iter().take(6).collect::<Vec<_>>(),"total_minutes_listened":(get("listening")/60.) as i64,"pickup_usage_seconds":get("pickup"),"album_count_unit":if scope=="vinyl"{"session"}else{"listen"},"metadata_coverage":coverage.first()}))
+        })
+    }
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn transactional_statistics_survive_restart() {
+        let d = tempfile::tempdir().unwrap();
+        let p = d.path().join("db");
+        let db = Db::open(&p).unwrap();
+        let t = Track {
+            artist: "Artist".into(),
+            title: "Song".into(),
+            album: Some("Album".into()),
+            ..Default::default()
+        };
+        db.record_play(Mode::Vinyl, &t, true).unwrap();
+        db.seconds(Mode::Vinyl, None, 180., false).unwrap();
+        drop(db);
+        let db = Db::open(&p).unwrap();
+        let v = db.stats("vinyl", None).unwrap();
+        assert_eq!(v["top_songs"][0]["count"], 1);
+        assert_eq!(v["total_minutes_listened"], 3);
+        assert_eq!(v["top_albums"][0]["count"], 1);
+    }
+    #[test]
+    fn seeds_legacy_totals_once_without_fabricated_events() {
+        let d = tempfile::tempdir().unwrap();
+        let p = d.path().join("db");
+        let c = Connection::open(&p).unwrap();
+        c.execute_batch(include_str!("../migrations/001_compatible.sql"))
+            .unwrap();
+        c.execute(
+            "INSERT INTO songs(song_key,artist,title,play_count) VALUES('a','a','a',8)",
+            [],
+        )
+        .unwrap();
+        drop(c);
+        for _ in 0..2 {
+            let db = Db::open(&p).unwrap();
+            assert_eq!(
+                db.stats("vinyl", Some(2026)).unwrap()["top_songs"][0]["count"],
+                8
+            );
+            assert!(
+                db.query("SELECT * FROM playback_events", [])
+                    .unwrap()
+                    .is_empty()
+            );
+        }
+    }
+}

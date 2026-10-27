@@ -2,7 +2,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
-const script = fs.readFileSync(require('node:path').join(__dirname, '../vinylpi/web/static/js/pages/logs.js'), 'utf8');
+const script = fs.readFileSync(require('node:path').join(__dirname, '../web/static/js/pages/logs.js'), 'utf8');
 const events = [
     { id: 1, timestamp: 1792750000, level: 'WARNING', source: 'Test', message: 'Old warning' },
     { id: 2, timestamp: 1792750100, level: 'DEBUG', source: 'Test', message: 'Old debug' },

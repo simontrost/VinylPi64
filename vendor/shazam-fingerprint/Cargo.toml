@@ -1,0 +1,10 @@
+[package]
+name="shazam-fingerprint"
+version="0.1.0"
+edition="2021"
+license="MIT"
+[dependencies]
+base64="0.22"
+byteorder="1"
+crc32fast="1"
+chfft="0.3"

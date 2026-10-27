@@ -1,0 +1,121 @@
+{
+  "audio": {
+    "device_name_contains": "",
+    "sample_seconds": 4,
+    "sample_rate": 44100,
+    "channels": 1,
+    "adaptive_sample": {
+      "enabled": false,
+      "failure_durations_seconds": [
+        6,
+        8
+      ]
+    },
+    "pickup_usage": {
+      "enabled": true,
+      "start_threshold_dbfs": -48.0,
+      "stop_threshold_dbfs": -61.0,
+      "start_confirm_seconds": 3.0,
+      "stop_confirm_seconds": 30.0
+    }
+  },
+  "image": {
+    "canvas_size": 64,
+    "show_cover": true,
+    "show_artist": true,
+    "show_title": true,
+    "show_album": false,
+    "top_margin": 1,
+    "cover_size": 46,
+    "margin_image_text": 3,
+    "line_spacing_margin": 3,
+    "font_path": "assets/fonts/vinylpixel.ttf",
+    "font_size": 5,
+    "use_dynamic_bg": true,
+    "manual_bg_color": [
+      0,
+      0,
+      0
+    ],
+    "use_dynamic_text_color": true,
+    "invert_dynamic_colors": false,
+    "text_color": [
+      255,
+      255,
+      255
+    ],
+    "uppercase": true,
+    "preview_scale": 8,
+    "marquee_speed": 20,
+    "sleep_seconds": 0.01
+  },
+  "divoom": {
+    "ip": "",
+    "device_name": "",
+    "device_id": 0,
+    "device_mac": "",
+    "timeout": 2.0,
+    "auto_reset_gif_id": false,
+    "animation_mode": "stream",
+    "discovery": {
+      "enabled": true,
+      "subnet_prefix": "192.168.2.",
+      "ip_range_start": 100,
+      "ip_range_end": 199
+    }
+  },
+  "shazam": {
+    "timeout_seconds": 15
+  },
+  "spotify": {
+    "poll_seconds": 2.0,
+    "auto_sleep_enabled": true,
+    "auto_sleep_iterations": 30
+  },
+  "discogs": {
+    "enabled": false,
+    "username": "",
+    "prefer_collection": true,
+    "cover_source": "shazam",
+    "sequence_matching": true,
+    "infer_unrecognized_next": true,
+    "vinyl_only": true,
+    "min_match_confidence": 0.72
+  },
+  "debug": {
+    "logs": true,
+    "pixoo_frame_path": "",
+    "preview_path": "",
+    "wav_path": ""
+  },
+  "fallback": {
+    "enabled": true,
+    "image_path": "assets/fallback/normal/Fallback.png",
+    "side_flip_enabled": true,
+    "side_flip_image_path": "assets/fallback/turn/turn_record.png",
+    "allowed_failures": 3
+  },
+  "behavior": {
+    "loop_delay_seconds": 1,
+    "vinyl_auto_wake_enabled": true,
+    "vinyl_auto_wake_threshold_dbfs": -48.0,
+    "vinyl_auto_wake_confirm_seconds": 2.0,
+    "vinyl_auto_sleep_enabled": true,
+    "vinyl_manual_shutdown_only": true,
+    "vinyl_auto_sleep_iterations": 30,
+    "vinyl_audio_sleep_enabled": true,
+    "vinyl_audio_sleep_threshold_dbfs": -61.0,
+    "vinyl_audio_sleep_confirm_seconds": 30.0,
+    "stats_min_consecutive": 3
+  },
+  "pixoo_automations": {
+    "turn_on_on_start": false,
+    "off_action": "none",
+    "stop_gif_file_id": ""
+  },
+  "homeassistant": {
+    "use_ha": true,
+    "base_url": "",
+    "webhook_id": "vinylpi_cover_color"
+  }
+}

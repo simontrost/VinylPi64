@@ -1,4 +1,9 @@
 __pycache__/
+target/
+.build-tools/
+dist/
+data/global/
+data/migration-backups/
 *.py[cod]
 
 frame.png
@@ -27,3 +32,12 @@ data/pixoo_liked_gifs.json
 
 # Generated on-device Pixoo animations
 data/pixoo_animations/
+
+# Rust branch: local tooling, temporary smoke tests and logs
+.venv/
+venv/
+.rust-smoke-data/
+rust-*.log
+.pytest_cache/
+# Runtime state and private credentials never belong in Git
+/data/

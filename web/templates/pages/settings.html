@@ -1,0 +1,814 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}VinylPi Settings{% endblock %}
+
+{% block page_styles %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/settings.css') }}?v=20261026-likes-on-demand">
+{% endblock %}
+
+{% block page_scripts %}
+    <script src="{{ url_for('static', filename='js/pages/settings.js') }}?v=20261026-likes-on-demand" defer></script>
+    <script src="{{ url_for('static', filename='js/pages/spotify_settings.js') }}?v=20261026-likes-on-demand" defer></script>
+{% endblock %}
+
+{% block content %}
+<main class="main">
+    <header class="main-header">
+        <div class="header-title pixel-title">Settings</div>
+    </header>
+
+
+    <form id="settings-form">
+        <section class="mobile-settings-menu" aria-label="Settings categories">
+            <div class="mobile-settings-categories">
+                <button type="button" class="mobile-settings-category" data-settings-target="section-audio">
+                    <span class="mobile-settings-category-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 9v6"></path><path d="M8 6v12"></path><path d="M12 3v18"></path><path d="M16 7v10"></path><path d="M20 10v4"></path></svg></span>
+                    <span><strong>Audio</strong><small>Input and recording</small></span><span class="mobile-settings-arrow" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"></path></svg></span>
+                </button>
+                <button type="button" class="mobile-settings-category" data-settings-target="section-display">
+                    <span class="mobile-settings-category-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="14" rx="2"></rect><path d="M8 21h8"></path><path d="M12 18v3"></path></svg></span>
+                    <span><strong>Display</strong><small>Canvas, cover and colors</small></span><span class="mobile-settings-arrow" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"></path></svg></span>
+                </button>
+                <button type="button" class="mobile-settings-category" data-settings-target="section-fallback">
+                    <span class="mobile-settings-category-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.3-5.7"></path><path d="M4 4v6h6"></path></svg></span>
+                    <span><strong>Fallback</strong><small>No-song and turn-record images</small></span><span class="mobile-settings-arrow" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"></path></svg></span>
+                </button>
+                <button type="button" class="mobile-settings-category" data-settings-target="section-pixoo">
+                    <span class="mobile-settings-category-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6" rx="1"></rect><rect x="14" y="4" width="6" height="6" rx="1"></rect><rect x="4" y="14" width="6" height="6" rx="1"></rect><rect x="14" y="14" width="6" height="6" rx="1"></rect></svg></span>
+                    <span><strong>Pixoo</strong><small>Device, discovery and automations</small></span><span class="mobile-settings-arrow" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"></path></svg></span>
+                </button>
+                <button type="button" class="mobile-settings-category" data-settings-target="section-discogs">
+                    <span class="mobile-settings-category-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"></circle><circle cx="12" cy="12" r="2"></circle><path d="M12 4v3"></path></svg></span>
+                    <span><strong>Discogs</strong><small>Collection matching</small></span><span class="mobile-settings-arrow" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"></path></svg></span>
+                </button>
+                <button type="button" class="mobile-settings-category" data-settings-target="section-spotify">
+                    <span class="mobile-settings-category-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="M7.5 9.5c3.7-1.1 7.7-.7 10.4.8"></path><path d="M8.2 12.5c3.1-.8 6.4-.5 8.8.7"></path><path d="M9 15.3c2.5-.6 5-.3 7 .6"></path></svg></span>
+                    <span><strong>Spotify</strong><small>Profile account connection</small></span><span class="mobile-settings-arrow" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"></path></svg></span>
+                </button>
+                <button type="button" class="mobile-settings-category" data-settings-target="section-behavior">
+                    <span class="mobile-settings-category-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 7h10"></path><path d="M18 7h2"></path><circle cx="16" cy="7" r="2"></circle><path d="M4 17h2"></path><path d="M10 17h10"></path><circle cx="8" cy="17" r="2"></circle></svg></span>
+                    <span><strong>Recognition</strong><small>Recognition timing</small></span><span class="mobile-settings-arrow" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"></path></svg></span>
+                </button>
+                <button type="button" class="mobile-settings-category" data-settings-target="section-standby">
+                    <span class="mobile-settings-category-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3v8"></path><path d="M7.1 5.9a8 8 0 1 0 9.8 0"></path></svg></span>
+                    <span><strong>Standby</strong><small>Auto wake and energy saving</small></span><span class="mobile-settings-arrow" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"></path></svg></span>
+                </button>
+                <button type="button" class="mobile-settings-category" data-settings-target="section-ha">
+                    <span class="mobile-settings-category-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5"></path><path d="M5.5 10.5V20h13v-9.5"></path><path d="M9 20v-6h6v6"></path></svg></span>
+                    <span><strong>Home Assistant</strong><small>Webhook integration</small></span><span class="mobile-settings-arrow" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"></path></svg></span>
+                </button>
+                <button type="button" class="mobile-settings-category" data-settings-target="section-debug">
+                    <span class="mobile-settings-category-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 9h8"></path><path d="M9 4h6l1 3H8l1-3z"></path><rect x="6" y="7" width="12" height="13" rx="5"></rect><path d="M3 12h3"></path><path d="M18 12h3"></path><path d="M4 17h3"></path><path d="M17 17h3"></path></svg></span>
+                    <span><strong>Debug</strong><small>Diagnostics</small></span><span class="mobile-settings-arrow" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"></path></svg></span>
+                </button>
+            </div>
+        </section>
+
+        <div class="mobile-settings-detail-header" hidden>
+            <button type="button" class="mobile-settings-back" aria-label="Back to settings categories">
+                <span aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m15 6-6 6 6 6"></path></svg></span> All settings
+            </button>
+            <span class="mobile-settings-current"></span>
+        </div>
+
+        <div class="settings-grid">
+            <div class="settings-panels">
+
+                <section class="card settings-card" id="section-audio">
+                    <button class="settings-card-header" type="button" aria-expanded="false">
+                        <span class="settings-card-title">
+                            <h2>Audio</h2>
+                            <span>Input device and sample capture</span>
+                        </span>
+                        <span class="chevron" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"></path></svg></span>
+                    </button>
+                    <div class="settings-card-content">
+                        <div class="form-group">
+                            <div class="group-title">Recording</div>
+                            <div class="form-row">
+                                <label for="audioDeviceName">Input device</label>
+                                <div class="audio-device-control">
+                                    <select id="audioDeviceName" class="pixoo-select">
+                                        <option value="">Automatic</option>
+                                    </select>
+                                    <button
+                                        type="button"
+                                        id="refreshAudioDevices"
+                                        class="audio-device-refresh"
+                                        aria-label="Refresh audio devices"
+                                        title="Refresh audio devices"
+                                    >
+                                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                                            <path d="M20 6v6h-6"></path>
+                                            <path d="M4 18v-6h6"></path>
+                                            <path d="M6.5 9a7 7 0 0 1 11.7-2.6L20 8"></path>
+                                            <path d="M17.5 15a7 7 0 0 1-11.7 2.6L4 16"></path>
+                                        </svg>
+                                    </button>
+                                </div>
+                                <div id="audioDeviceStatus" class="form-hint" role="status" aria-live="polite" hidden></div>
+                            </div>
+                            <div class="adaptive-sample-block">
+                                <div class="adaptive-sample-header">
+                                    <div>
+                                        <div class="adaptive-sample-title">Adaptive sample duration</div>
+                                        <div class="adaptive-sample-subtitle">Use longer samples after failed recognition attempts.</div>
+                                    </div>
+                                    <label class="adaptive-toggle-label" for="adaptiveSampleEnabled">
+                                        <span>Enabled</span>
+                                        <input type="checkbox" id="adaptiveSampleEnabled">
+                                    </label>
+                                </div>
+
+                                <div class="adaptive-stages" aria-label="Adaptive recording stages">
+                                    <div class="adaptive-stage adaptive-stage-primary">
+                                        <div class="adaptive-stage-index">1</div>
+                                        <div class="adaptive-stage-copy">
+                                            <label for="audioSampleSeconds">Initial attempt</label>
+                                            <span>Default sample length.</span>
+                                        </div>
+                                        <div class="adaptive-stage-input">
+                                            <input type="number" id="audioSampleSeconds" step="0.1" min="1">
+                                            <span>sec</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="adaptive-stage-connector" aria-hidden="true">No match</div>
+
+                                    <div data-setting-row="adaptive-sample-details" class="adaptive-stage-details">
+                                        <div class="adaptive-stage">
+                                            <div class="adaptive-stage-index">2</div>
+                                            <div class="adaptive-stage-copy">
+                                                <label for="adaptiveSampleFirstFailure">Second attempt</label>
+                                                <span>After the first failed attempt.</span>
+                                            </div>
+                                            <div class="adaptive-stage-input">
+                                                <input type="number" id="adaptiveSampleFirstFailure" step="0.5" min="0.5" max="30">
+                                                <span>sec</span>
+                                            </div>
+                                        </div>
+
+                                        <div class="adaptive-stage-connector" aria-hidden="true">No match</div>
+
+                                        <div class="adaptive-stage">
+                                            <div class="adaptive-stage-index">3</div>
+                                            <div class="adaptive-stage-copy">
+                                                <label for="adaptiveSampleLaterFailures">Further attempts</label>
+                                                <span>After repeated failed attempts.</span>
+                                            </div>
+                                            <div class="adaptive-stage-input">
+                                                <input type="number" id="adaptiveSampleLaterFailures" step="0.5" min="0.5" max="30">
+                                                <span>sec</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                            </div>
+                            <div class="form-row audio-sample-rate-row">
+                                <label for="audioSampleRate">Sample rate</label>
+                                <input type="number" id="audioSampleRate">
+                            </div>
+                            <div class="form-row">
+                                <label for="audioChannels">Channels</label>
+                                <input type="number" id="audioChannels" min="1" max="2">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <div class="setting-group-header">
+                                <div>
+                                    <div class="group-title">Pickup usage</div>
+                                    <div class="setting-group-copy">Estimate stylus usage from audio activity.</div>
+                                </div>
+                                <label class="setting-toggle-label" for="pickupUsageEnabled">
+                                    <span>Enabled</span>
+                                    <input type="checkbox" id="pickupUsageEnabled">
+                                </label>
+                            </div>
+                            <div data-setting-row="pickup-usage-details">
+                                <div class="form-row">
+                                    <label for="pickupStartThreshold">Start threshold (dBFS)</label>
+                                    <input type="number" id="pickupStartThreshold" min="-100" max="-1" step="0.5">
+                                </div>
+                                <div class="form-row">
+                                    <label for="pickupStopThreshold">Stop threshold (dBFS)</label>
+                                    <input type="number" id="pickupStopThreshold" min="-120" max="-1" step="0.5">
+                                </div>
+                                <div class="form-row">
+                                    <label for="pickupStartConfirmSeconds">Start confirmation (seconds)</label>
+                                    <input type="number" id="pickupStartConfirmSeconds" min="0.1" max="120" step="0.1">
+                                </div>
+                                <div class="form-row">
+                                    <label for="pickupStopConfirmSeconds">Stop grace period (seconds)</label>
+                                    <input type="number" id="pickupStopConfirmSeconds" min="0.1" max="600" step="0.1">
+                                </div>
+                                <div class="form-hint">Start threshold must be higher than stop threshold.</div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="card settings-card" id="section-display">
+                    <button class="settings-card-header" type="button" aria-expanded="false">
+                        <span class="settings-card-title">
+                            <h2>Display / Image</h2>
+                            <span>Pixel canvas, cover, text and colors</span>
+                        </span>
+                        <span class="chevron" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"></path></svg></span>
+                    </button>
+                    <div class="settings-card-content">
+                        <div class="display-designer">
+                            <div class="display-preview-panel">
+                                <div class="display-preview-heading">
+                                    <div>
+                                        <div class="group-title">Live layout preview</div>
+                                        <p>Every square is the fixed 64 × 64 Pixoo canvas.</p>
+                                    </div>
+                                    <span class="display-pixel-badge">64×64</span>
+                                </div>
+                                <div class="display-preview-stage">
+                                    <canvas id="displayPreview" width="64" height="64" aria-label="Pixoo layout preview"></canvas>
+                                </div>
+                                <div class="display-fit-card">
+                                    <div class="display-fit-copy">
+                                        <span id="displayFitStatus" class="display-fit-status">Fits display</span>
+                                        <strong id="displayFitUsage">63 / 64 px</strong>
+                                    </div>
+                                    <div class="display-fit-track" aria-hidden="true"><span id="displayFitBar"></span></div>
+                                    <p id="displayConstraintNote">The designer automatically keeps the vertical layout inside 64 pixels. Long text scrolls horizontally.</p>
+                                </div>
+                            </div>
+
+                            <div class="display-designer-controls">
+                                <div class="form-group display-presets-group">
+                                    <div class="group-title">Quick layouts</div>
+                                    <div class="display-preset-grid">
+                                        <button type="button" class="display-preset" data-display-preset="classic"><strong>Classic</strong><span>Large cover + artist + title</span></button>
+                                        <button type="button" class="display-preset" data-display-preset="large-text"><strong>Large text</strong><span>Smaller cover, larger typography</span></button>
+                                        <button type="button" class="display-preset" data-display-preset="album-info"><strong>Album info</strong><span>Cover + artist + title + album</span></button>
+                                        <button type="button" class="display-preset" data-display-preset="cover-only"><strong>Cover only</strong><span>Full 64 × 64 artwork</span></button>
+                                        <button type="button" class="display-preset" data-display-preset="text-only"><strong>Text only</strong><span>Artist + title + album</span></button>
+                                    </div>
+                                </div>
+
+                                <div class="form-group">
+                                    <div class="group-title">Visible elements</div>
+                                    <div class="display-element-grid">
+                                        <label class="display-element-toggle"><input type="checkbox" id="imageShowCover"><span>Cover</span></label>
+                                        <label class="display-element-toggle"><input type="checkbox" id="imageShowArtist"><span>Artist</span></label>
+                                        <label class="display-element-toggle"><input type="checkbox" id="imageShowTitle"><span>Title</span></label>
+                                        <label class="display-element-toggle"><input type="checkbox" id="imageShowAlbum"><span>Album</span></label>
+                                    </div>
+                                </div>
+
+                                <div class="form-group">
+                                    <div class="group-title">Layout</div>
+                                    <div class="display-range-row" data-display-control="cover">
+                                        <div class="display-range-label"><label for="imageCoverSize">Cover size</label><output id="imageCoverSizeValue" for="imageCoverSize">46 px</output></div>
+                                        <input type="range" id="imageCoverSize" min="12" max="64" step="1">
+                                    </div>
+                                    <div class="display-range-row" data-display-control="text">
+                                        <div class="display-range-label"><label for="imageFontSize">Text height</label><output id="imageFontSizeValue" for="imageFontSize">5 px</output></div>
+                                        <input type="range" id="imageFontSize" min="3" max="12" step="1">
+                                    </div>
+                                    <div class="display-range-row">
+                                        <div class="display-range-label"><label for="imageTopMargin">Top margin</label><output id="imageTopMarginValue" for="imageTopMargin">1 px</output></div>
+                                        <input type="range" id="imageTopMargin" min="0" max="16" step="1">
+                                    </div>
+                                    <div class="display-range-row" data-display-control="cover-gap">
+                                        <div class="display-range-label"><label for="imageMarginImageText">Cover / text gap</label><output id="imageMarginImageTextValue" for="imageMarginImageText">3 px</output></div>
+                                        <input type="range" id="imageMarginImageText" min="0" max="8" step="1">
+                                    </div>
+                                    <div class="display-range-row" data-display-control="line-gap">
+                                        <div class="display-range-label"><label for="imageLineSpacingMargin">Text line gap</label><output id="imageLineSpacingMarginValue" for="imageLineSpacingMargin">3 px</output></div>
+                                        <input type="range" id="imageLineSpacingMargin" min="0" max="8" step="1">
+                                    </div>
+                                    
+                                </div>
+
+                                <div class="form-group">
+                                    <div class="group-title">Typography</div>
+                                    <input type="hidden" id="imageFontPath">
+                                    <div class="form-row path-row">
+                                        <label>Selected font</label>
+                                        <code class="selected-image-path" id="imageFontPathLabel">No font selected</code>
+                                    </div>
+                                    <div class="form-row"><label for="fontUpload">Upload font</label><input type="file" id="fontUpload" accept=".ttf,.otf,font/ttf,font/otf"></div>
+                                    <div class="form-row"><label>Font gallery</label><button type="button" id="openFontGallery">Open font gallery</button></div>
+                                    <div id="fontGallery" class="font-gallery hidden"></div>
+                                    <div class="form-row"><label for="imageUppercase">Uppercase</label><input type="checkbox" id="imageUppercase"></div>
+                                </div>
+
+                                <div class="form-group">
+                                    <div class="group-title">Colors</div>
+                                    <div class="form-row color-mode-row">
+                                        <label for="useDynamicBg">Background color</label>
+                                        <div class="color-setting-control">
+                                            <div class="color-mode-switch" aria-label="Background color mode">
+                                                <span class="color-mode-label color-mode-label-manual">Manual</span>
+                                                <input type="checkbox" id="useDynamicBg" aria-label="Use automatic background color">
+                                                <span class="color-mode-label color-mode-label-auto">Automatic</span>
+                                            </div>
+                                            <input type="color" id="bgColor" aria-label="Manual background color">
+                                        </div>
+                                    </div>
+                                    <div class="form-row color-mode-row">
+                                        <label for="useDynamicText">Text color</label>
+                                        <div class="color-setting-control">
+                                            <div class="color-mode-switch" aria-label="Text color mode">
+                                                <span class="color-mode-label color-mode-label-manual">Manual</span>
+                                                <input type="checkbox" id="useDynamicText" aria-label="Use automatic text color">
+                                                <span class="color-mode-label color-mode-label-auto">Automatic</span>
+                                            </div>
+                                            <input type="color" id="textColor" aria-label="Manual text color">
+                                        </div>
+                                    </div>
+                                    <div class="form-row color-invert-row">
+                                        <label for="invertDynamicColors">Invert automatic colors</label>
+                                        <input type="checkbox" id="invertDynamicColors">
+                                    </div>
+                                </div>
+
+                                <div class="form-group">
+                                    <div class="group-title">Album artwork</div>
+                                    <div class="form-row cover-source-row">
+                                        <span id="discogsCoverSourceLabel" class="cover-source-label">Preferred album cover</span>
+                                        <div class="cover-source-segmented" role="radiogroup" aria-labelledby="discogsCoverSourceLabel">
+                                            <label><input type="radio" name="discogsCoverSource" value="shazam" checked><span>Shazam</span></label>
+                                            <label><input type="radio" name="discogsCoverSource" value="discogs"><span>Discogs</span></label>
+                                        </div>
+                                    </div>
+                                    <div class="form-hint">Discogs artwork is used when a matching record cover is available.</div>
+                                </div>
+
+                                <div class="form-group">
+                                    <div class="group-title">Scrolling text</div>
+                                    <div class="form-row"><label for="marqueeSpeed">Scroll speed (px/s)</label><input type="number" id="marqueeSpeed" min="1" max="200"></div>
+                                    <div class="form-row">
+                                        <span id="divoomAnimationModeLabel" class="cover-source-label">Playback mode</span>
+                                        <div class="cover-source-segmented" role="radiogroup" aria-labelledby="divoomAnimationModeLabel">
+                                            <label><input type="radio" name="divoomAnimationMode" value="stream" checked><span>Live frames</span></label>
+                                            <label><input type="radio" name="divoomAnimationMode" value="gif_url"><span>GIF on Pixoo</span></label>
+                                        </div>
+                                    </div>
+                                    <div class="form-hint" id="pixooAnimationHint" aria-live="polite"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="card settings-card" id="section-fallback">
+                    <button class="settings-card-header" type="button" aria-expanded="false">
+                        <span class="settings-card-title"><h2>Fallback</h2><span>Separate displays for silence and record-side changes</span></span>
+                        <span class="chevron" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"></path></svg></span>
+                    </button>
+                    <div class="settings-card-content">
+                        <div class="fallback-option-grid">
+                            <div class="form-group fallback-option">
+                                <div class="setting-group-header">
+                                    <div>
+                                        <div class="group-title">No song fallback</div>
+                                        <div class="setting-group-copy">Shown after repeated recognition failures when no side change is expected.</div>
+                                    </div>
+                                    <label class="setting-toggle-label" for="fallbackEnabled">
+                                        <span>Enabled</span>
+                                        <input type="checkbox" id="fallbackEnabled">
+                                    </label>
+                                </div>
+                                <div data-setting-row="fallback-normal-details">
+                                    <input type="hidden" id="fallbackImage">
+                                    <div class="form-row path-row">
+                                        <label>Selected image</label>
+                                        <code class="selected-image-path" id="fallbackImagePath">No image selected</code>
+                                    </div>
+                                    <div class="form-row"><label for="fallbackUpload">Upload image</label><input type="file" id="fallbackUpload" accept="image/png,image/jpeg"></div>
+                                    <div class="form-row"><label>Gallery</label><button type="button" id="openFallbackGallery">Open gallery</button></div>
+                                    <div id="fallbackGallery" class="gallery hidden"></div>
+                                </div>
+                            </div>
+
+                            <div class="form-group fallback-option">
+                                <div class="setting-group-header">
+                                    <div>
+                                        <div class="group-title">Turn-record fallback</div>
+                                        <div class="setting-group-copy">Shown for paired side changes such as A → B, C → D or E → F.</div>
+                                    </div>
+                                    <label class="setting-toggle-label" for="sideFlipEnabled">
+                                        <span>Enabled</span>
+                                        <input type="checkbox" id="sideFlipEnabled">
+                                    </label>
+                                </div>
+                                <div data-setting-row="fallback-turn-details">
+                                    <input type="hidden" id="sideFlipImage">
+                                    <div class="form-row path-row">
+                                        <label>Selected image</label>
+                                        <code class="selected-image-path" id="sideFlipImagePath">No image selected</code>
+                                    </div>
+                                    <div class="form-row"><label for="sideFlipUpload">Upload image</label><input type="file" id="sideFlipUpload" accept="image/png,image/jpeg"></div>
+                                    <div class="form-row"><label>Gallery</label><button type="button" id="openSideFlipGallery">Open gallery</button></div>
+                                    <div id="sideFlipGallery" class="gallery hidden"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group" data-setting-row="fallback-shared-details">
+                            <div class="group-title">Activation</div>
+                            <div class="form-row"><label for="fallbackAllowedFailures">Show after failed recognitions</label><input type="number" id="fallbackAllowedFailures" min="1"></div>
+                            
+                        </div>
+                    </div>
+                </section>
+
+                <section class="card settings-card" id="section-pixoo">
+                    <button class="settings-card-header" type="button" aria-expanded="false">
+                        <span class="settings-card-title"><h2>Pixoo & Network</h2><span>Device, discovery and automations</span></span>
+                        <span class="chevron" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"></path></svg></span>
+                    </button>
+                    <div class="settings-card-content">
+                        <div class="form-group">
+                            <div class="group-title">Device</div>
+                            <div class="form-row">
+                                <label for="divoomIp">Pixoo device</label>
+                                <div class="audio-device-control">
+                                    <select id="divoomIp" class="pixoo-select">
+                                        <option value="">Automatic discovery</option>
+                                    </select>
+                                    <button type="button" id="scanPixooDevices" class="audio-device-refresh"
+                                            aria-label="Search for Pixoo devices" title="Search local network for Pixoo devices">
+                                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                                            <circle cx="10.8" cy="10.8" r="6.3"></circle>
+                                            <path d="m15.5 15.5 5.2 5.2"></path>
+                                        </svg>
+                                    </button>
+                                </div>
+                                <div id="pixooDeviceStatus" class="form-hint" role="status" aria-live="polite" hidden></div>
+                                <div class="form-hint pixoo-device-hint">Tip: Reserve a fixed IP for your Pixoo in your router.</div>
+                            </div>
+                            <div class="form-row"><label for="divoomDeviceName">Device name</label><input type="text" id="divoomDeviceName" placeholder="Pixoo64"></div>
+                            <div class="form-row"><label for="divoomDeviceID">Device ID</label><input type="text" id="divoomDeviceID" placeholder="0"></div>
+                            <div class="form-row"><label for="divoomDeviceMAC">Device MAC</label><input type="text" id="divoomDeviceMAC" placeholder=""></div>
+                            <div class="form-row"><label for="divoomTimeout">Timeout</label><input type="number" id="divoomTimeout" step="0.1"></div>
+                            <div class="form-row"><label for="divoomAutoResetGif">Auto Reset GIF ID</label><input type="checkbox" id="divoomAutoResetGif"></div>
+
+                        </div>
+
+                        <div class="form-group">
+                            <div class="group-title">Automatic discovery (fallback)</div>
+                            <div class="form-hint pixoo-device-hint">VinylPi searches automatically if no device is selected or your Pixoo becomes unreachable.</div>
+                            <div class="form-row"><label for="discoveryEnabled">Auto discovery enabled</label><input type="checkbox" id="discoveryEnabled"></div>
+                            <div data-setting-row="discovery-details">
+                                <div class="form-row"><label for="subnetPrefix">Subnet prefix</label><input type="text" id="subnetPrefix" placeholder="192.168.1."></div>
+                                <div class="form-row"><label for="ipRangeStart">IP range start</label><input type="number" id="ipRangeStart" min="1" max="254"></div>
+                                <div class="form-row"><label for="ipRangeEnd">IP range end</label><input type="number" id="ipRangeEnd" min="1" max="254"></div>
+                            </div>
+                        </div>
+                        <div class="form-group pixoo-automations-group">
+                            <div class="group-title">Automations</div>
+                            <div class="pixoo-automation-option">
+                                <div class="setting-group-header">
+                                    <div>
+                                        <div class="group-title">Turn on automation</div>
+                                        <div class="setting-group-copy">Set Pixoo brightness to 100% when Vinyl or Spotify starts.</div>
+                                    </div>
+                                    <label class="setting-toggle-label" for="pixooOnVinylStart"><span>Enabled</span><input type="checkbox" id="pixooOnVinylStart"></label>
+                                </div>
+                            </div>
+                            <div class="pixoo-automation-option">
+                                <div class="setting-group-header">
+                                    <div>
+                                        <div class="group-title">Turn off automation</div>
+                                        <div class="setting-group-copy">Choose what Pixoo displays when playback stops, including auto sleep.</div>
+                                    </div>
+                                    <label class="setting-toggle-label" for="pixooOffEnabled"><span>Enabled</span><input type="checkbox" id="pixooOffEnabled"></label>
+                                </div>
+                                <div data-setting-row="pixoo-off-action-details" hidden>
+                                    <div class="form-row">
+                                        <span class="cover-source-label" id="pixooOffActionLabel">Action</span>
+                                        <div class="cover-source-segmented" role="radiogroup" aria-labelledby="pixooOffActionLabel">
+                                            <label><input type="radio" name="pixooOffAction" value="community_gif" checked><span>Community GIF</span></label>
+                                            <label><input type="radio" name="pixooOffAction" value="brightness_off"><span>Turn off display</span></label>
+                                        </div>
+                                    </div>
+                                    <div data-setting-row="pixoo-off-gif-details" hidden>
+                                        <div class="form-row pixoo-automation-gif-row">
+                                            <label for="pixooStopGifSelect">Community GIF</label>
+                                            <div class="pixoo-automation-gif-picker">
+                                                <select id="pixooStopGifSelect"><option value="">No GIF selected</option></select>
+                                                <button type="button" id="pixooRefreshLikes" title="Refresh liked GIFs from Divoom">Refresh</button>
+                                            </div>
+                                        </div>
+                                        <div class="form-hint" id="pixooStopGifStatus" role="status" aria-live="polite"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="card settings-card" id="section-discogs">
+                    <button class="settings-card-header" type="button" aria-expanded="false">
+                        <span class="settings-card-title"><h2>Discogs Collection</h2><span>Use your own records and their fixed track order to improve recognition</span></span>
+                        <span class="chevron" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"></path></svg></span>
+                    </button>
+                    <div class="settings-card-content">
+                        <div class="discogs-status-card" id="discogsStatusCard">
+                            <div class="discogs-status-main">
+                                <span class="discogs-status-dot" id="discogsStatusDot"></span>
+                                <div>
+                                    <div class="discogs-status-title" id="discogsStatusTitle">Not connected</div>
+                                    <div class="discogs-status-copy" id="discogsStatusCopy">Connect your Discogs account to import your collection.</div>
+                                </div>
+                            </div>
+                            <div class="discogs-counts">
+                                <div><strong id="discogsReleaseCount">0</strong><span>releases</span></div>
+                                <div><strong id="discogsTrackCount">0</strong><span>tracks</span></div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <div class="group-title">Account</div>
+                            <div class="discogs-actions">
+                                <button type="button" class="btn-primary" id="discogsConnect">Check connection</button>
+                                <button type="button" id="discogsSync" disabled>Sync collection</button>
+                            </div>
+                            <div class="discogs-progress hidden" id="discogsProgress" aria-live="polite">
+                                <div class="discogs-progress-track"><span id="discogsProgressBar"></span></div>
+                                <div class="discogs-progress-copy" id="discogsProgressCopy">Preparing sync…</div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <div class="group-title">Credentials</div>
+                            <div class="credentials-card">
+                                <div class="credentials-copy">
+                                    <strong>Discogs API token</strong>
+                                    <span>Stored in <strong>vinylpi.env</strong></span>
+                                </div>
+                                <span class="credentials-state" id="discogsTokenStatus" role="status">Checking…</span>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <div class="group-title">Recognition assistance</div>
+                            <div class="form-row"><label for="discogsEnabled">Use Discogs matching</label><input type="checkbox" id="discogsEnabled"></div>
+                            <div data-setting-row="discogs-details">
+                                <div class="form-row"><label for="discogsPreferCollection">Prefer collection matches</label><input type="checkbox" id="discogsPreferCollection"></div>
+                                
+                                <div class="form-row"><label for="discogsSequenceMatching">Use record sequence</label><input type="checkbox" id="discogsSequenceMatching"></div>
+                                
+                                <div class="form-row"><label for="discogsInferNext">Estimate an unrecognized next track</label><input type="checkbox" id="discogsInferNext"></div>
+                                
+                                <div class="form-row"><label for="discogsVinylOnly">Import vinyl releases only</label><input type="checkbox" id="discogsVinylOnly"></div>
+                                <div class="form-row"><label for="discogsMinConfidence">Minimum confidence</label><input type="number" id="discogsMinConfidence" min="0.5" max="0.95" step="0.01"></div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="card settings-card" id="section-spotify">
+                    <button class="settings-card-header" type="button" aria-expanded="false">
+                        <span class="settings-card-title"><h2>Spotify</h2><span>Connect your Spotify account</span></span>
+                        <span class="chevron" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"></path></svg></span>
+                    </button>
+                    <div class="settings-card-content">
+                        <div class="spotify-settings-status-card">
+                            <div class="spotify-settings-status-main">
+                                <span class="spotify-settings-status-dot" id="spotifySettingsStatusDot"></span>
+                                <div>
+                                    <div class="spotify-settings-status-title" id="spotifySettingsStatusTitle">Loading Spotify status…</div>
+                                    <div class="spotify-settings-status-copy" id="spotifySettingsStatusCopy">One Spotify account is shared by this device.</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <div class="group-title">Account</div>
+                            <div class="spotify-settings-actions">
+                                <button type="button" class="btn-primary" id="spotifySettingsConnect">Connect Spotify</button>
+                                <button type="button" id="spotifySettingsDisconnect" disabled>Disconnect</button>
+                            </div>
+                            <div id="spotifySettingsFeedback" class="form-hint" role="status" aria-live="polite"></div>
+                        </div>
+
+                        <div class="form-group">
+                            <div class="group-title">Playback polling</div>
+                            <div class="form-row"><label for="spotifyPollSeconds">Poll interval (seconds)</label><input type="number" id="spotifyPollSeconds" min="1" max="60" step="0.5"></div>
+                        </div>
+
+                        <div class="form-group">
+                            <div class="group-title">Credentials</div>
+                            <div class="credentials-card">
+                                <div class="credentials-copy">
+                                    <strong>Spotify app credentials</strong>
+                                    <span>Stored in <strong>vinylpi.env</strong></span>
+                                </div>
+                                <span class="credentials-state" id="spotifySettingsAppStatus" role="status">Checking…</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="card settings-card" id="section-behavior">
+                    <button class="settings-card-header" type="button" aria-expanded="false">
+                        <span class="settings-card-title"><h2>Recognition</h2><span>Vinyl recognition timing</span></span>
+                        <span class="chevron" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"></path></svg></span>
+                    </button>
+                    <div class="settings-card-content">
+                        <div class="form-group">
+                            <div class="group-title">Recognition timing</div>
+                            <div class="form-row"><label for="behaviorLoopDelay">Vinyl loop delay (seconds)</label><input type="number" id="behaviorLoopDelay" min="0.1" step="0.1"></div>
+                            <div class="form-row"><label for="shazamTimeout">Shazam timeout</label><input type="number" id="shazamTimeout" min="5" max="60" step="1"></div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="card settings-card" id="section-standby">
+                    <button class="settings-card-header" type="button" aria-expanded="false">
+                        <span class="settings-card-title"><h2>Standby</h2><span>Automatic wake and sleep controls</span></span>
+                        <span class="chevron" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"></path></svg></span>
+                    </button>
+                    <div class="settings-card-content">
+                        <div class="form-group">
+                            <div class="group-title">Startup</div>
+                            <div class="setting-group-header">
+                                <div>
+                                    <div class="group-title">Auto wake</div>
+                                    <div class="setting-group-copy">Start Vinyl automatically when audio is detected while playback is Off.</div>
+                                </div>
+                                <label class="setting-toggle-label" for="vinylAutoWakeEnabled">
+                                    <span>Enabled</span>
+                                    <input type="checkbox" id="vinylAutoWakeEnabled">
+                                </label>
+                            </div>
+                            <div data-setting-row="vinyl-auto-wake-details">
+                                <div class="form-row"><label for="vinylAutoWakeThreshold">Wake threshold (dBFS)</label><input type="number" id="vinylAutoWakeThreshold" min="-100" max="-1" step="0.5"></div>
+                                <div class="form-row"><label for="vinylAutoWakeConfirmSeconds">Confirmation (seconds)</label><input type="number" id="vinylAutoWakeConfirmSeconds" min="0.1" max="30" step="0.1"></div>
+                                
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <div class="setting-group-header">
+                                <div>
+                                    <div class="group-title">Manual startup requires manual shutdown</div>
+                                    <div class="setting-group-copy">Disable both Vinyl auto-sleep mechanisms when Vinyl was started manually. Auto-wake sessions still sleep normally.</div>
+                                </div>
+                                <label class="setting-toggle-label" for="vinylManualShutdownOnly">
+                                    <span>Enabled</span>
+                                    <input type="checkbox" id="vinylManualShutdownOnly">
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <div class="group-title">Automatic sleep</div>
+                            <div class="setting-group-header">
+                                <div>
+                                    <div class="group-title">Vinyl · silence</div>
+                                    <div class="setting-group-copy">Stop Vinyl after the input stays below the threshold.</div>
+                                </div>
+                                <label class="setting-toggle-label" for="vinylAudioSleepEnabled">
+                                    <span>Enabled</span>
+                                    <input type="checkbox" id="vinylAudioSleepEnabled">
+                                </label>
+                            </div>
+                            <div data-setting-row="vinyl-audio-sleep-details">
+                                <div class="form-row"><label for="vinylAudioSleepThreshold">Sleep threshold (dBFS)</label><input type="number" id="vinylAudioSleepThreshold" min="-120" max="-1" step="0.5"></div>
+                                <div class="form-row"><label for="vinylAudioSleepConfirmSeconds">Grace period (seconds)</label><input type="number" id="vinylAudioSleepConfirmSeconds" min="0.1" max="600" step="0.1"></div>
+                                
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <div class="setting-group-header">
+                                <div>
+                                    <div class="group-title">Vinyl · recognition</div>
+                                    <div class="setting-group-copy">Stop Vinyl after repeated unsuccessful recognition attempts.</div>
+                                </div>
+                                <label class="setting-toggle-label" for="vinylAutoSleepEnabled">
+                                    <span>Enabled</span>
+                                    <input type="checkbox" id="vinylAutoSleepEnabled">
+                                </label>
+                            </div>
+                            <div data-setting-row="vinyl-auto-sleep-details">
+                                <div class="form-row"><label for="vinylAutoSleepIterations">Failed recognitions</label><input type="number" id="vinylAutoSleepIterations" min="1" step="1"></div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <div class="setting-group-header">
+                                <div>
+                                    <div class="group-title">Spotify</div>
+                                    <div class="setting-group-copy">Stop Spotify after repeated checks without an active track.</div>
+                                </div>
+                                <label class="setting-toggle-label" for="spotifyAutoSleepEnabled">
+                                    <span>Enabled</span>
+                                    <input type="checkbox" id="spotifyAutoSleepEnabled">
+                                </label>
+                            </div>
+                            <div data-setting-row="spotify-auto-sleep-details">
+                                <div class="form-row"><label for="spotifyAutoSleepIterations">Idle checks</label><input type="number" id="spotifyAutoSleepIterations" min="1" step="1"></div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="card settings-card" id="section-ha">
+                    <button class="settings-card-header" type="button" aria-expanded="false">
+                        <span class="settings-card-title"><h2>Home Assistant</h2><span>Optional light color synchronization</span></span>
+                        <span class="chevron" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"></path></svg></span>
+                    </button>
+                    <div class="settings-card-content">
+                        <div class="form-group">
+                            <div class="group-title">Connection</div>
+                            <div class="form-row"><label for="useHA">Use HA Integration</label><input type="checkbox" id="useHA"></div>
+                            <div data-setting-row="ha-details">
+                                <div class="form-row"><label for="baseURL">Base URL</label><input type="text" id="baseURL" placeholder="http://homeassistant:8123"></div>
+                                <div class="form-row"><label for="webHookID">Webhook ID · Color sync</label><input type="text" id="webHookID" placeholder="vinylpi_cover_color"></div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="card settings-card" id="section-debug">
+                    <button class="settings-card-header" type="button" aria-expanded="false">
+                        <span class="settings-card-title"><h2>Debug</h2><span>Optional diagnostics</span></span>
+                        <span class="chevron" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"></path></svg></span>
+                    </button>
+                    <div class="settings-card-content">
+                        <div class="form-group">
+                            <div class="group-title">Diagnostics</div>
+                            <div class="form-row"><label for="debugLogs">Debug logs</label><input type="checkbox" id="debugLogs"></div>
+                            <div class="form-row"><label for="debugPixooFrameEnabled">Save Pixoo frame</label><input type="checkbox" id="debugPixooFrameEnabled"></div>
+                            <div class="form-row"><label for="debugPreviewEnabled">Save preview</label><input type="checkbox" id="debugPreviewEnabled"></div>
+                            <div class="form-row"><label for="debugWavEnabled">Save recorded WAV</label><input type="checkbox" id="debugWavEnabled"></div>
+                        </div>
+                    </div>
+                </section>
+
+                <div class="settings-actions">
+                    <button class="btn-primary" type="submit">Save settings</button>
+                    <button class="btn-danger" type="button" id="reset-defaults">Reset to defaults</button>
+                </div>
+            </div>
+
+            <aside class="settings-side-panel" aria-label="Settings overview">
+                <div class="settings-mini-card">
+                    <h3>Quick navigation</h3>
+                    <nav class="settings-toc">
+                        <a href="#section-audio">Audio</a>
+                        <a href="#section-display">Display</a>
+                        <a href="#section-fallback">Fallback</a>
+                        <a href="#section-pixoo">Pixoo</a>
+                        <a href="#section-discogs">Discogs</a>
+                        <a href="#section-spotify">Spotify</a>
+                        <a href="#section-behavior">Recognition</a>
+                        <a href="#section-standby">Standby</a>
+                        <a href="#section-ha">Home Assistant</a>
+                        <a href="#section-debug">Debug</a>
+                    </nav>
+                </div>
+            </aside>
+        </div>
+
+        <button
+            type="button"
+            id="mobileDisplayPreviewButton"
+            class="mobile-display-preview-trigger"
+            aria-controls="mobileDisplayPreviewModal"
+            aria-expanded="false"
+            hidden
+        >
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"></rect><path d="M8 9h8M8 12h8M8 15h5"></path></svg>
+            <span>Preview</span>
+        </button>
+    </form>
+
+    <div id="mobileDisplayPreviewModal" class="mobile-display-preview-modal hidden" aria-hidden="true">
+        <button class="mobile-display-preview-backdrop" type="button" data-display-preview-close aria-label="Close display preview"></button>
+        <section class="mobile-display-preview-sheet" role="dialog" aria-modal="true" aria-labelledby="mobileDisplayPreviewTitle">
+            <div class="mobile-display-preview-header">
+                <div>
+                    <span class="mobile-preview-eyebrow">Pixoo 64</span>
+                    <h2 id="mobileDisplayPreviewTitle">Live preview</h2>
+                </div>
+                <button class="mobile-display-preview-close" type="button" data-display-preview-close aria-label="Close display preview">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"></path></svg>
+                </button>
+            </div>
+            <div class="mobile-display-preview-stage">
+                <canvas id="displayPreviewMobile" width="64" height="64" aria-label="Pixoo mobile layout preview"></canvas>
+            </div>
+            <div class="mobile-display-preview-fit">
+                <span id="mobileDisplayFitStatus">Fits display</span>
+                <strong id="mobileDisplayFitUsage">63 / 64 px</strong>
+            </div>
+            <p>Changes are mirrored here immediately. Close the preview to continue editing.</p>
+        </section>
+    </div>
+
+    <div id="settingsToast" class="settings-toast" role="status" aria-live="polite"></div>
+</main>
+{% endblock %}
