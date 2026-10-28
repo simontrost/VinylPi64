@@ -13,4 +13,5 @@ pub mod model;
 pub mod net;
 pub mod pickup;
 pub mod spotify;
+pub mod share;
 pub mod uploads;

@@ -684,7 +684,7 @@ async fn api(
         }
         ("stats/share-card", true, _, _) => {
             let (scope, year) = filter(&q)?;
-            binary(share_card(&app, &scope, year)?, "image/png")
+            binary(crate::share::render(&app, &scope, year).await?, "image/png")
         }
         ("fallback-images", true, _, _) => ok(uploads::images(
             &app.root,
@@ -826,73 +826,4 @@ fn ensure_api(condition: bool, message: &str) -> std::result::Result<(), ApiErro
     } else {
         Err(ApiError(StatusCode::BAD_REQUEST, message.into()))
     }
-}
-fn share_card(app: &App, scope: &str, year: Option<i32>) -> Result<Vec<u8>> {
-    let stats = app.db.stats(scope, year)?;
-    let font = crate::display::font(&app.root, "assets/fonts/vinylpixel.ttf")?;
-    let bg = [21, 21, 25];
-    let mut img = image::RgbImage::from_pixel(1080, 1080, image::Rgb(bg));
-    let mut line = |text: &str, y: i64, height: f32, color: [u8; 3]| {
-        let sprite = crate::display::text_sprite(&font, text, height, color, bg);
-        image::imageops::overlay(&mut img, &sprite, 48, y);
-    };
-    line("VINYLPI64 · SPIN REPORT", 50, 28., [240, 200, 90]);
-    line(
-        &format!(
-            "{} / {}",
-            scope.to_uppercase(),
-            year.map(|y| y.to_string()).unwrap_or("ALL TIME".into())
-        ),
-        110,
-        18.,
-        [255, 255, 255],
-    );
-    line(
-        &format!("{} MINUTES LISTENED", stats["total_minutes_listened"]),
-        175,
-        22.,
-        [220, 220, 230],
-    );
-    line("TOP SONGS", 250, 24., [240, 200, 90]);
-    for (i, s) in stats["top_songs"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .take(5)
-        .enumerate()
-    {
-        line(
-            &format!(
-                "{}. {} - {} ({})",
-                i + 1,
-                s["artist"].as_str().unwrap_or(""),
-                s["title"].as_str().unwrap_or(""),
-                s["count"]
-            ),
-            310 + i as i64 * 75,
-            16.,
-            [255, 255, 255],
-        );
-    }
-    line("TOP ARTISTS", 740, 24., [240, 200, 90]);
-    for (i, a) in stats["top_artists"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .take(3)
-        .enumerate()
-    {
-        line(
-            &format!(
-                "{}. {} ({})",
-                i + 1,
-                a["name"].as_str().unwrap_or(""),
-                a["count"]
-            ),
-            800 + i as i64 * 65,
-            18.,
-            [255, 255, 255],
-        );
-    }
-    crate::display::png(img)
 }

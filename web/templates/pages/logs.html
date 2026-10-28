@@ -10,6 +10,7 @@
 <main class="main">
     <header class="main-header">
         <div class="header-title pixel-title">Logs</div>
+            <a href="/about.html" class="header-logo-link" aria-label="About VinylPi64" title="About VinylPi64"><img src="/static/images/logo.webp" alt="VinylPi64 logo" class="header-logo"></a>
     </header>
     <section class="logs-shell" aria-label="System diagnostics">
         <div class="logs-overview card">
@@ -25,7 +26,7 @@
                     <span>Show</span>
                     <select id="logsLevel" aria-label="Filter log level">
                         <option value="issues">Warnings &amp; errors</option>
-                        <option value="all">All messages</option>
+                        <option value="all" selected>All messages</option>
                         <option value="errors">Errors only</option>
                         <option value="warnings">Warnings only</option>
                         <option value="info">Info only</option>

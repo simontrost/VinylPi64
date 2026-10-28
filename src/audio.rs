@@ -62,7 +62,7 @@ pub fn devices() -> Result<Vec<Value>> {
         };
         if let Some(name) = hint.name {
             let desc = hint.desc.unwrap_or_else(|| name.clone()).replace('\n', " ");
-            out.push(json!({"index":out.len(),"name":name,"label":desc,"max_input_channels":2,"default_samplerate":44100,"hostapi":"ALSA","is_default":name=="default"}));
+            out.push(json!({"index":out.len(),"name":name,"label":desc,"display_name":desc,"max_input_channels":2,"default_samplerate":44100,"hostapi":"ALSA","is_default":name=="default"}));
         }
     }
     Ok(out)
@@ -74,34 +74,52 @@ pub fn devices() -> Result<Vec<Value>> {
     )
 }
 
+/// ALSA exposes both plugin names and human-readable hardware descriptions.
+/// A legacy substring ("USB AUDIO") must match the description too, while a
+/// value selected in Settings ("plughw:CARD=…") should be matched exactly.
+fn select_input(configured: &str, list: &[Value]) -> Result<String> {
+    let entries = list.iter().filter_map(|d| {
+        Some((d["name"].as_str()?, d["label"].as_str().unwrap_or("")))
+    }).collect::<Vec<_>>();
+    let normalize = |v: &str| v.chars().filter(|c| c.is_alphanumeric()).flat_map(char::to_lowercase).collect::<String>();
+    let needle = normalize(configured);
+    let matches = entries.iter().filter(|(name, label)| {
+        needle.is_empty()
+            || normalize(name).contains(&needle)
+            || normalize(label).contains(&needle)
+    });
+    let rank = |(name, label): &(&str, &str)| -> i32 {
+        let n = name.to_ascii_lowercase();
+        let l = label.to_ascii_lowercase();
+        let mut score = 0;
+        if !configured.is_empty() && n.eq_ignore_ascii_case(configured) {
+            score += 2000;
+        }
+        if n.starts_with("plughw:") {
+            score += 500;
+        } else if n.starts_with("sysdefault:") {
+            score += 300;
+        } else if n.starts_with("hw:") {
+            score += 150;
+        }
+        if l.contains("usb") { score += 100; }
+        if n == "default" { score -= 200; }
+        score
+    };
+    if let Some((name, _)) = matches.max_by_key(|entry| rank(entry)) {
+        return Ok((*name).to_owned());
+    }
+    let available = entries.iter().take(12).map(|(name, label)| format!("{name} ({label})")).collect::<Vec<_>>().join(", ");
+    anyhow::bail!("Configured USB input not found: '{configured}'. ALSA inputs: [{}]. Select an available device in Settings > Audio or disable auto-wake when no turntable is attached.", available)
+}
+
 #[cfg(target_os = "linux")]
-pub fn capture(cfg: &Audio, seconds: f64, cancel: &CancellationToken) -> Result<Vec<i16>> {
+pub fn capture(cfg: &Audio, seconds: f64, cancel: &CancellationToken, wav_path: &str) -> Result<Vec<i16>> {
     use alsa::{
         Direction, ValueOr,
         pcm::{Access, Format, HwParams, PCM},
     };
-    let name = if cfg.device_name_contains.is_empty() {
-        "default".to_owned()
-    } else {
-        let want = cfg.device_name_contains.to_lowercase();
-        devices()?
-            .iter()
-            .find(|d| {
-                d["name"]
-                    .as_str()
-                    .unwrap_or("")
-                    .to_lowercase()
-                    .contains(&want)
-                    || d["label"]
-                        .as_str()
-                        .unwrap_or("")
-                        .to_lowercase()
-                        .contains(&want)
-            })
-            .and_then(|d| d["name"].as_str())
-            .map(str::to_owned)
-            .ok_or_else(|| anyhow::anyhow!("Configured USB input not found"))?
-    };
+    let name = select_input(&cfg.device_name_contains, &devices()?)?;
     let pcm = PCM::new(&name, Direction::Capture, true)?;
     {
         let hw = HwParams::any(&pcm)?;
@@ -139,11 +157,32 @@ pub fn capture(cfg: &Audio, seconds: f64, cancel: &CancellationToken) -> Result<
             }
         }
     }
+    if !wav_path.is_empty() {
+        if let Err(error) = write_debug_wav(wav_path, &data, rate, channels as u16) {
+            tracing::warn!(%error, "Unable to write debug WAV");
+        }
+    }
     Ok(mono_16k(&data, rate, channels))
 }
 #[cfg(not(target_os = "linux"))]
-pub fn capture(_cfg: &Audio, _seconds: f64, _cancel: &CancellationToken) -> Result<Vec<i16>> {
+pub fn capture(_cfg: &Audio, _seconds: f64, _cancel: &CancellationToken, _wav_path: &str) -> Result<Vec<i16>> {
     bail!("Audio capture is supported on Linux/ALSA only")
+}
+
+fn write_debug_wav(path: &str, samples: &[i16], rate: u32, channels: u16) -> Result<()> {
+    let path = std::path::Path::new(path);
+    if let Some(parent) = path.parent() && !parent.as_os_str().is_empty() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let mut writer = hound::WavWriter::create(path, hound::WavSpec {
+        channels,
+        sample_rate: rate,
+        bits_per_sample: 16,
+        sample_format: hound::SampleFormat::Int,
+    })?;
+    for &sample in samples { writer.write_sample(sample)?; }
+    writer.finalize()?;
+    Ok(())
 }
 
 #[cfg(test)]
@@ -153,6 +192,16 @@ mod tests {
     fn silence_and_full_scale() {
         assert_eq!(dbfs(&[0; 50]), -120.);
         assert!(dbfs(&[32767; 50]) > -0.01);
+    }
+    #[test]
+    fn alsa_device_names_and_legacy_filter() {
+        let list = vec![
+            serde_json::json!({"name":"default","label":"Default PCM"}),
+            serde_json::json!({"name":"plughw:CARD=CODEC,DEV=0","label":"USB Audio CODEC, USB Audio"}),
+        ];
+        assert_eq!(select_input("USB AUDIO", &list).unwrap(), "plughw:CARD=CODEC,DEV=0");
+        assert_eq!(select_input("", &list).unwrap(), "plughw:CARD=CODEC,DEV=0");
+        assert!(select_input("not-a-device", &list).unwrap_err().to_string().contains("ALSA inputs"));
     }
     #[test]
     fn resampler_duration_and_antialias() {

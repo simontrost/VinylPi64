@@ -48,6 +48,8 @@ struct Confirmation {
     consecutive: usize,
     counted: String,
     album: String,
+    album_tracks: std::collections::HashSet<String>,
+    album_recorded: bool,
 }
 impl Confirmation {
     fn observe(&mut self, t: &Track, min: usize) -> (bool, bool) {
@@ -60,11 +62,22 @@ impl Confirmation {
         };
         let count = self.consecutive >= min && self.counted != id;
         let album = t.album.as_deref().map(normalize).unwrap_or_default();
-        let new_album = count && !album.is_empty() && self.album != album;
+        let mut new_album = false;
         if count {
-            self.counted = id;
-            if new_album {
-                self.album = album
+            self.counted = id.clone();
+            if !album.is_empty() {
+                if self.album != album {
+                    self.album = album;
+                    self.album_tracks.clear();
+                    self.album_recorded = false;
+                }
+                self.album_tracks.insert(id);
+                // Preserve the Python definition of an album session:
+                // at least two DISTINCT, confirmed songs on the same album.
+                if self.album_tracks.len() >= 2 && !self.album_recorded {
+                    self.album_recorded = true;
+                    new_album = true;
+                }
             }
         };
         (count, new_album)
@@ -143,8 +156,20 @@ impl Engine {
             .context("Recognition engine stopped")?;
         rx.await.context("Recognition engine stopped")?
     }
-    fn waiting(&self, mode: Mode) {
-        self.status.send_replace(json!({"source":mode,"artist":"","title":match mode{Mode::Off=>"Recognition off",Mode::Vinyl=>"Waiting for vinyl…",Mode::Spotify=>"Waiting for Spotify…"},"updated_at":chrono::Utc::now().timestamp_millis(),"bg_color":[0,0,0]}));
+    fn waiting(&self, mode: Mode, last: Option<Value>) {
+        if let Some(mut status) = last.filter(|s| s["artist"].as_str().is_some_and(|v| !v.is_empty()) && s["title"].as_str().is_some_and(|v| !v.is_empty())) {
+            status["source"] = json!(mode);
+            status["is_playing"] = json!(false);
+            status["restored"] = json!(true);
+            if let Some(v) = status.as_object_mut() {
+                for key in ["error", "side_flip_prompt_active", "side_flip_from_side", "side_flip_to_side", "side_flip_next_title", "side_flip_next_position"] {
+                    v.remove(key);
+                }
+            }
+            self.status.send_replace(status);
+        } else {
+            self.status.send_replace(json!({"source":mode,"artist":"","title":match mode{Mode::Off=>"Recognition off",Mode::Vinyl=>"Waiting for vinyl…",Mode::Spotify=>"Waiting for Spotify…"},"is_playing":false,"updated_at":chrono::Utc::now().timestamp_millis(),"bg_color":[0,0,0]}));
+        }
     }
     async fn change(&self, mode: Mode, s: &Services) -> Result<()> {
         if mode == self.get_mode() {
@@ -162,9 +187,18 @@ impl Engine {
         }
         let cfg = s.config.get();
         let old = self.get_mode();
+        let remembered = s.db.last_status(mode)?;
         self.mode.send_replace(mode);
-        self.waiting(mode);
-        s.display.show(Content::Fallback(false));
+        self.waiting(mode, remembered.clone());
+        // Keep the previously displayed track in the dashboard; the Pixoo only
+        // switches to a fresh track once recognition resumes.
+        if mode == Mode::Off {
+            s.display.show(Content::Fallback(false));
+        } else if let Some(track) = remembered.and_then(|v| serde_json::from_value::<Track>(v).ok()) {
+            s.display.show(Content::Track(Box::new(track)));
+        } else {
+            s.display.show(Content::Fallback(false));
+        }
         if mode == Mode::Off && old != Mode::Off {
             match cfg.pixoo_automations.off_action.as_str() {
                 "brightness_off" => {
@@ -248,9 +282,13 @@ impl Engine {
                     cancel.cancelled().await;
                     return Ok((None, None));
                 }
+                if mode == Mode::Vinyl && cfg.debug.logs {
+                    s.db.log("DEBUG", &format!("Recording vinyl audio sample ({seconds:.1}s)…"));
+                }
                 let audio_cfg = cfg.audio.clone();
+                let wav_path = cfg.debug.wav_path.clone();
                 let samples = tokio::task::spawn_blocking(move || {
-                    audio::capture(&audio_cfg, seconds, &operation_cancel)
+                    audio::capture(&audio_cfg, seconds, &operation_cancel, &wav_path)
                 })
                 .await??;
                 let level = audio::dbfs(&samples);
@@ -263,6 +301,7 @@ impl Engine {
                 {
                     return Ok((None, Some((level, observed))));
                 };
+                if cfg.debug.logs { s.db.log("DEBUG", "Audio sample recorded; starting Shazam recognition…"); }
                 let mut track =
                     net::recognize(&s.client, samples, cfg.shazam.timeout_seconds).await?;
                 if let Some(t) = &mut track {
@@ -293,6 +332,7 @@ impl Engine {
                         pickup.reset();
                         display_fallback = true;
                         spotify_previous = None;
+                        unavailable = 0;
                         wake = Wake::default();
                         next = tokio::time::Instant::now() + Duration::from_millis(50);
                     }
@@ -314,17 +354,23 @@ impl Engine {
                             unavailable = (unavailable + 1).min(6);
                             let delay = (5u64 << unavailable.saturating_sub(1)).min(300);
                             next = tokio::time::Instant::now() + Duration::from_secs(delay);
-                            s.db.log(
-                                "WARNING",
-                                &format!(
-                                    "{} input unavailable; retry in {delay}s: {e}",
-                                    mode.as_str()
-                                ),
-                            );
-                            let mut status = self.status.borrow().clone();
-                            status["error"] = json!(e.to_string());
-                            status["updated_at"] = json!(chrono::Utc::now().timestamp_millis());
-                            self.status.send_replace(status);
+                            // Auto-wake probes USB in Off mode too. Do not turn a
+                            // missing turntable into a permanent stream of warnings.
+                            if mode != Mode::Off || unavailable == 1 {
+                                s.db.log(
+                                    if mode == Mode::Off { "INFO" } else { "WARNING" },
+                                    &format!(
+                                        "{} audio input unavailable; retry in {delay}s: {e}{}",
+                                        mode.as_str(),
+                                        if mode == Mode::Off { " (auto-wake is enabled; disable Vinyl auto wake in Settings to stop probing)" } else { "" },
+                                    ),
+                                );
+                            }
+                            if mode != Mode::Off {
+                                let mut status = self.status.borrow().clone();
+                                status["error"] = json!(e.to_string());
+                                self.status.send_replace(status);
+                            }
                             confirmation.failure();
                             spotify_previous = None;
                         }
@@ -361,6 +407,9 @@ impl Engine {
                                 }
                             }
                             if let Some(t) = track {
+                                if cfg.debug.logs && (last.as_ref().is_none_or(|old| old.identity() != t.identity())) {
+                                    s.db.log("INFO", &format!("{} recognized: {} – {}{}",mode.as_str(),t.artist,t.title,t.album.as_ref().map(|a|format!(" ({a})")).unwrap_or_default()));
+                                }
                                 failures = 0;
                                 let id = t.identity();
                                 let changed = last.as_ref().is_none_or(|old| old.identity() != id);
@@ -400,7 +449,11 @@ impl Engine {
                                         cfg.behavior.stats_min_consecutive as usize
                                     },
                                 );
+                                if cfg.debug.logs && !count && mode == Mode::Vinyl && changed {
+                                    s.db.log("DEBUG", &format!("Recognition candidate: {} – {} (confirmation {}/{})", t.artist, t.title, confirmation.consecutive, cfg.behavior.stats_min_consecutive as usize));
+                                }
                                 if count {
+                                    s.db.log("INFO", &format!("Play confirmed: {} – {} [{}]{}", t.artist, t.title, mode.as_str(), if new_album { "; album session recorded" } else { "" }));
                                     if let Err(e) = s.db.record_play(mode, &t, new_album) {
                                         s.db.log("ERROR", &format!("Statistics write failed: {e}"));
                                         confirmation.counted.clear();
@@ -436,6 +489,9 @@ impl Engine {
                                 last = Some(t);
                             } else {
                                 failures += 1;
+                                if cfg.debug.logs {
+                                    s.db.log("DEBUG", &format!("{}: no song recognized ({} consecutive unsuccessful samples)",mode.as_str(), failures));
+                                }
                                 confirmation.failure();
                                 spotify_previous = None;
                                 let flip = if mode == Mode::Vinyl
@@ -447,6 +503,7 @@ impl Engine {
                                     None
                                 };
                                 if failures == cfg.fallback.allowed_failures as usize {
+                                    s.db.log("INFO", if flip.is_some() { "Recognition failed repeatedly; displaying record side-flip prompt" } else if cfg.fallback.enabled { "Recognition failed repeatedly; displaying fallback image" } else { "Recognition failed repeatedly; fallback disabled" });
                                     if let Some(side) = &flip {
                                         s.display.show(Content::SideFlip(side.clone()));
                                         display_fallback = true;
@@ -469,6 +526,7 @@ impl Engine {
                                                         as usize))
                                 };
                                 if sleep {
+                                    s.db.log("INFO", &format!("{} auto sleep: recognition/silence threshold reached",mode.as_str()));
                                     let _ = self.change(Mode::Off, &s).await;
                                     wake = Wake::default();
                                     confirmation = Confirmation::default();
@@ -540,12 +598,12 @@ mod tests {
     fn counts_confirmed_transitions_and_retains_guard_across_failures() {
         let mut c = Confirmation::default();
         assert!(!c.observe(&track("one"), 2).0);
-        assert_eq!(c.observe(&track("one"), 2), (true, true));
+        assert_eq!(c.observe(&track("one"), 2), (true, false));
         c.failure();
         c.observe(&track("one"), 2);
         assert!(!c.observe(&track("one"), 2).0);
         c.observe(&track("two"), 2);
-        assert_eq!(c.observe(&track("two"), 2), (true, false));
+        assert_eq!(c.observe(&track("two"), 2), (true, true));
         c.observe(&track("one"), 2);
         assert!(c.observe(&track("one"), 2).0);
     }

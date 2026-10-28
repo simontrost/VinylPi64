@@ -44,7 +44,7 @@ const ids = ['logsStream', 'logsLevel', 'logsSearch', 'logsToggleLive', 'logsLiv
     'logsNew', 'logsVerbose', 'logsVerboseHelp'];
 function buildBrowser() {
     const elements = Object.fromEntries(ids.map(id => [id, new Element(id)]));
-    elements.logsLevel.value = 'issues';
+    elements.logsLevel.value = 'all';
     const document = {
         hidden: false,
         getElementById: id => elements[id],
@@ -91,7 +91,7 @@ const visibleEntries = els => els.logsStream.children.filter(e => e.className ==
 (async () => {
     let els = buildBrowser();
     await settle();
-    assert.equal(visibleEntries(els), 1, 'initial issues filter');
+    assert.equal(visibleEntries(els), 2, 'default all-messages filter');
     els.logsLevel.value = 'all';
     await els.logsLevel.fire('change');
     await settle();

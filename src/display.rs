@@ -395,6 +395,24 @@ pub struct DisplayRuntime {
     pub status: watch::Sender<Value>,
     pub cancel: tokio_util::sync::CancellationToken,
 }
+fn save_debug_images(root: &std::path::Path, cfg: &Config, frame: &RgbImage) -> anyhow::Result<()> {
+    for (name, scale) in [
+        (cfg.debug.pixoo_frame_path.as_str(), 1u32),
+        (cfg.debug.preview_path.as_str(), cfg.image.preview_scale as u32),
+    ] {
+        if name.is_empty() { continue; }
+        anyhow::ensure!(crate::config::safe_relative(name) && name.starts_with("data/"),
+            "Debug PNG must be a relative data/ path");
+        let path = root.join(name);
+        if let Some(parent) = path.parent() { std::fs::create_dir_all(parent)?; }
+        let preview = if scale <= 1 { frame.clone() } else {
+            image::imageops::resize(frame, 64*scale, 64*scale, image::imageops::FilterType::Nearest)
+        };
+        preview.save(path)?;
+    }
+    Ok(())
+}
+
 pub struct Display {
     pub pixoo: Arc<Pixoo>,
     tx: watch::Sender<(u64, Content)>,
@@ -549,6 +567,15 @@ impl Display {
                         );
                     }
                 }
+                // Preserve the legacy debug export options. One diagnostic PNG
+                // per content revision, never one file per scrolling frame.
+                if !cfg.debug.pixoo_frame_path.is_empty() || !cfg.debug.preview_path.is_empty() {
+                    let diagnostic = composition.as_ref().map(|c| c.frame(0)).or_else(|| still.clone());
+                    if let Some(frame) = diagnostic
+                        && let Err(e) = save_debug_images(&root, &cfg, &frame) {
+                            db.log("WARNING", &format!("Debug image export failed: {e}"));
+                        }
+                }
                 if cfg.divoom.animation_mode == "gif_url"
                     && let Some(c) = &composition
                     && c.animated()
@@ -658,6 +685,7 @@ impl Display {
                     if !animated {
                         break;
                     };
+                    tokio::time::sleep(Duration::from_secs_f64(cfg.image.sleep_seconds)).await;
                 }
                 Ok(())
             };

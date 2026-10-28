@@ -143,7 +143,12 @@ impl Db {
         })
     }
     pub fn log(&self, level: &str, message: &str) {
-        tracing::info!(level, message);
+        match level {
+            "ERROR" => tracing::error!("{message}"),
+            "WARNING" => tracing::warn!("{message}"),
+            "DEBUG" => tracing::debug!("{message}"),
+            _ => tracing::info!("{message}"),
+        }
         if let Err(e) = self.with(|c| {
             c.execute(
                 "INSERT INTO runtime_logs(timestamp,level,logger,message) VALUES(?,?,?,?)",
@@ -208,6 +213,18 @@ impl Db {
             if let Some(key)=key{if mode==Mode::Spotify{tx.execute("UPDATE spotify_songs SET listened_seconds=listened_seconds+? WHERE track_id=?",params![seconds,key])?;}else{tx.execute("UPDATE songs SET measured_listen_seconds=COALESCE(measured_listen_seconds,0)+? WHERE song_key=?",params![seconds,key])?;}}
             tx.commit()?;Ok(())})
     }
+    /// Return the last successfully recognized track for this source, not the
+    /// currently visible fallback/waiting state.
+    pub fn last_status(&self, mode: Mode) -> Result<Option<Value>> {
+        if mode == Mode::Off { return Ok(None); }
+        self.with(|c| {
+            let json: Option<String> = c.query_row(
+                "SELECT status_json FROM source_status WHERE source=?",
+                [mode.as_str()], |r| r.get(0),
+            ).optional()?;
+            json.map(|s| serde_json::from_str(&s).map_err(Into::into)).transpose()
+        })
+    }
     pub fn save_status(&self, mode: Mode, v: &Value) -> Result<()> {
         self.with(|c|{c.execute("INSERT INTO source_status(source,status_json) VALUES(?,?) ON CONFLICT(source) DO UPDATE SET status_json=excluded.status_json,updated_at=strftime('%s','now')",params![mode.as_str(),v.to_string()])?;Ok(())})
     }
@@ -252,6 +269,18 @@ mod tests {
         assert_eq!(v["top_songs"][0]["count"], 1);
         assert_eq!(v["total_minutes_listened"], 3);
         assert_eq!(v["top_albums"][0]["count"], 1);
+    }
+    #[test]
+    fn remembers_tracks_separately_for_vinyl_and_spotify() {
+        let d = tempfile::tempdir().unwrap();
+        let db = Db::open(&d.path().join("db")).unwrap();
+        db.save_status(Mode::Vinyl, &json!({"artist":"Vinyl artist","title":"A"})).unwrap();
+        db.save_status(Mode::Spotify, &json!({"artist":"Spotify artist","title":"B"})).unwrap();
+        drop(db);
+        let db = Db::open(&d.path().join("db")).unwrap();
+        assert_eq!(db.last_status(Mode::Vinyl).unwrap().unwrap()["title"], "A");
+        assert_eq!(db.last_status(Mode::Spotify).unwrap().unwrap()["title"], "B");
+        assert!(db.last_status(Mode::Off).unwrap().is_none());
     }
     #[test]
     fn seeds_legacy_totals_once_without_fabricated_events() {

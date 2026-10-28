@@ -526,7 +526,12 @@ function renderStatus(status) {
     }
 
     const songCard = document.querySelector(".song-card");
-    if (songCard) songCard.style.setProperty("--song-bg", status.bg_color || "#2b2b34");
+    if (songCard) {
+        const color = Array.isArray(status.bg_color) && status.bg_color.length === 3
+            ? `rgb(${status.bg_color.map(v => Math.max(0, Math.min(255, Number(v) || 0))).join(", ")})`
+            : (typeof status.bg_color === "string" ? status.bg_color : "#2b2b34");
+        songCard.style.setProperty("--song-bg", color);
+    }
 }
 
 async function loadStatus() {
@@ -535,7 +540,7 @@ async function loadStatus() {
         if (!response.ok) throw new Error(`Status request failed: ${response.status}`);
 
         const status = await response.json();
-        if (!status || status.status === null || status.error) {
+        if (!status || status.status === null) {
             renderEmptyStatus();
             return;
         }
@@ -879,7 +884,7 @@ function connectStatusEvents() {
     statusEventSource.addEventListener("status", (event) => {
         try {
             const status = JSON.parse(event.data);
-            if (!status || status.status === null || status.error) {
+            if (!status || status.status === null) {
                 renderEmptyStatus();
                 return;
             }

@@ -81,7 +81,7 @@ function renderSpotifyConnection(spotify = {}) {
 
     const configured = Boolean(spotify.configured);
     const connected = Boolean(spotify.connected);
-    const shouldShow = !vinylPiSourceBusyForViewer
+    const shouldShow = true
         && vinylPiSourceMode === "spotify"
         && (!configured || !connected);
     row.classList.toggle("hidden", !shouldShow);
@@ -157,8 +157,6 @@ async function setSourceMode(mode) {
             body: JSON.stringify({ mode }),
         });
         const data = await response.json();
-        updateSourceUI(data);
-
         if (!response.ok || !data.ok) {
             if (data.needs_auth) {
                 setSpotifyFeedback("Connect Spotify first.", "error");
@@ -169,9 +167,10 @@ async function setSourceMode(mode) {
             }
             return;
         }
+        updateSourceUI(data);
     } catch (error) {
         console.error(error);
-        setSpotifyFeedback("Could not change the music source.", "error");
+        setSpotifyFeedback(error?.message || "Could not change the music source.", "error");
     } finally {
         vinylPiSourceChanging = false;
         document.querySelectorAll("[data-source-mode]").forEach((button) => {

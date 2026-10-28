@@ -39,6 +39,21 @@ impl Config {
                 .or_insert(json!(n.max(1)));
             b.remove("auto_sleep");
         }
+        // Maintain semantics of earlier Python Home Assistant / Pixoo settings.
+        if let Some(automations) = value.get_mut("pixoo_automations").and_then(Value::as_object_mut) {
+            if !automations.contains_key("turn_on_on_start")
+                && let Some(old) = automations.get("turn_on_on_vinyl_start").and_then(Value::as_bool)
+            {
+                automations.insert("turn_on_on_start".to_owned(), json!(old));
+            }
+            if !automations.contains_key("off_action")
+                && automations.get("play_gif_on_stop").and_then(Value::as_bool) == Some(true)
+            {
+                automations.insert("off_action".to_owned(), json!("community_gif"));
+            }
+            automations.remove("turn_on_on_vinyl_start");
+            automations.remove("play_gif_on_stop");
+        }
         if let Some(d) = value.get_mut("discogs").and_then(Value::as_object_mut) {
             d.remove("token");
             d.remove("token_configured");
@@ -289,6 +304,18 @@ mod tests {
                 .unwrap();
         assert!(!c.behavior.vinyl_auto_sleep_enabled);
         assert!(!c.public().to_string().contains("secret"));
+    }
+    #[test]
+    fn upgrades_legacy_pixoo_automation_flags() {
+        let c = Config::from_value(json!({"pixoo_automations": {
+            "turn_on_on_vinyl_start": true,
+            "play_gif_on_stop": true,
+            "stop_gif_file_id": "12345"
+        }})).unwrap();
+        assert!(c.pixoo_automations.turn_on_on_start);
+        assert_eq!(c.pixoo_automations.off_action, "community_gif");
+        assert_eq!(c.pixoo_automations.stop_gif_file_id, "12345");
+        assert!(!c.public().to_string().contains("play_gif_on_stop"));
     }
     #[test]
     fn preserves_partial_concurrent_updates() {

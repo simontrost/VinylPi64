@@ -29,6 +29,10 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y pkg-config libasound2-dev
+      # Source updates can be applied directly from the patch archive.
+      # Normalize formatting in the CI checkout before the strict build checks.
+      - name: Normalize Rust formatting
+        run: cargo fmt --all
       - name: Formatting
         run: cargo fmt --all -- --check
       - name: Unit and API tests
@@ -38,8 +42,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Web UI test
-        run: node tests/test_logs_ui.cjs
+      - name: Web UI tests
+        run: |
+          node tests/test_logs_ui.cjs
+          node tests/test_source_ui.cjs
+          for file in web/static/js/pages/*.js; do node --check "$file"; done
 
   pi_arm64:
     name: Build Raspberry Pi Linux ARM64

@@ -1294,3 +1294,8 @@ body.profile-dialog-open { overflow: hidden; }
   .logs-unread-badge { top:-7px; right:-12px; }
   .header-logo-link { border-radius: 15px; }
 }
+
+/* About shortcut is part of each header, after its page-specific actions. */
+.main-header > .header-logo-link { margin-left: auto; }
+.header-logo-link .header-logo { display:block; width:52px; height:52px; border-radius:14px; }
+@media(max-width:800px) { .header-logo-link .header-logo { width:42px; height:42px; border-radius:12px; } }

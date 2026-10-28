@@ -1,6 +1,7 @@
 use crate::{
     config::{Config, atomic_write},
     db::{Db, snapshot},
+    model::Mode,
 };
 use anyhow::{Context, Result, ensure};
 use std::{
@@ -91,6 +92,17 @@ pub fn migrate(root: &Path, selection: &str, destination: &Path) -> Result<PathB
     )?;
     {
         let db = Db::open(&stage.path().join("vinylpi.db"))?;
+        // The Python dashboard stored its last recognized vinyl song in
+        // status.json. Import it once into the per-source status cache.
+        if backup.join("status.json").is_file() && db.last_status(Mode::Vinyl)?.is_none() {
+            let mut status: serde_json::Value = serde_json::from_slice(&fs::read(backup.join("status.json"))?)?;
+            if status["artist"].as_str().is_some_and(|s| !s.is_empty())
+                && status["title"].as_str().is_some_and(|s| !s.is_empty()) {
+                    status["source"] = serde_json::json!("vinyl");
+                    status["is_playing"] = serde_json::json!(false);
+                    db.save_status(Mode::Vinyl, &status)?;
+                }
+        }
         db.with(|c| {
             c.execute_batch("PRAGMA wal_checkpoint(TRUNCATE)")?;
             Ok(())
