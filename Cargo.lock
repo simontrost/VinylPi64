@@ -2436,6 +2436,7 @@ dependencies = [
  "clap",
  "dotenvy",
  "fontdue",
+ "gif",
  "fs2",
  "futures-util",
  "hound",

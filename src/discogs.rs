@@ -29,6 +29,57 @@ pub fn normalized(s: &str) -> String {
         .collect::<Vec<_>>()
         .join(" ")
 }
+/// Normalize aliases used by Shazam and Discogs for multi-part vinyl tracks.
+/// Do not discard part numbers: parts 1-5 must not match parts 6-9.
+fn track_match_key(title: &str) -> String {
+    let normalized = normalized(title);
+    let mut in_parts = false;
+    normalized
+        .split_whitespace()
+        .map(|token| match token {
+            "pt" | "pts" | "part" | "parts" => {
+                in_parts = true;
+                "part"
+            }
+            "i" if in_parts => "1",
+            "ii" if in_parts => "2",
+            "iii" if in_parts => "3",
+            "iv" if in_parts => "4",
+            "v" if in_parts => "5",
+            "vi" if in_parts => "6",
+            "vii" if in_parts => "7",
+            "viii" if in_parts => "8",
+            "ix" if in_parts => "9",
+            _ => token,
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// Shazam sometimes appends an anniversary number to an otherwise identical
+/// album (e.g. "Wish You Were Here 50"). That is not a different LP title.
+fn album_match_key(album: &str) -> String {
+    let normalized = normalized(album);
+    let mut words = normalized.split_whitespace().collect::<Vec<_>>();
+    while words.last().is_some_and(|w| matches!(*w, "edition" | "anniversary")) {
+        words.pop();
+    }
+    if words.len() >= 3 && words.last().is_some_and(|w| matches!(*w, "50" | "50th" | "40th" | "40" | "30th" | "30" | "25th" | "25")) {
+        words.pop();
+    }
+    words.join(" ")
+}
+
+/// First few words only select SQL candidates; a complete normalized title
+/// comparison below is required to avoid false-positive release matches.
+fn track_search_prefix(title: &str) -> String {
+    normalized(title)
+        .split_whitespace()
+        .take(5)
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
 fn artists(v: &Value) -> String {
     v.as_array()
         .into_iter()
@@ -289,7 +340,15 @@ impl Discogs {
         if !cfg.discogs.enabled {
             return Ok(());
         };
-        let matches=self.db.query("SELECT t.*,r.title release_title,r.artist release_artist,r.cover_url,r.year,r.label,r.catalog_number FROM discogs_tracks t JOIN discogs_releases r USING(release_id) WHERE normalized_title=? OR replace(normalized_title,' ','')=replace(?,' ','') LIMIT 200",params![normalized(&t.title),normalized(&t.title)])?;
+        // Discogs uses labels such as "Parts I-V" while Shazam returns
+        // "Pts. 1-5". Strict SQL equality silently missed these releases.
+        let title = normalized(&t.title);
+        let prefix = track_search_prefix(&t.title);
+        let matches = self.db.query(
+            "SELECT t.*,r.title release_title,r.artist release_artist,r.cover_url,r.year,r.label,r.catalog_number FROM discogs_tracks t JOIN discogs_releases r USING(release_id) WHERE normalized_title=? OR replace(normalized_title,' ','')=replace(?,' ','') OR normalized_title LIKE ? LIMIT 500",
+            params![title, title, format!("{prefix}%")],
+        )?;
+        let wanted_title = track_match_key(&t.title);
         let wanted = normalized(&t.artist);
         let old_id = previous
             .and_then(|t| t.extra.get("discogs_release_id"))
@@ -300,6 +359,9 @@ impl Discogs {
         let best = matches
             .iter()
             .filter_map(|v| {
+                if track_match_key(v["title"].as_str().unwrap_or("")) != wanted_title {
+                    return None;
+                }
                 let a = normalized(v["artist"].as_str().unwrap_or(""));
                 let artist_match = a == wanted
                     || (!a.is_empty()
@@ -314,7 +376,7 @@ impl Discogs {
                 let score = if sequence {
                     1.0
                 } else if t.album.as_deref().is_some_and(|a| {
-                    normalized(a) == normalized(v["release_title"].as_str().unwrap_or(""))
+                    album_match_key(a) == album_match_key(v["release_title"].as_str().unwrap_or(""))
                 }) {
                     0.96
                 } else {
@@ -415,5 +477,43 @@ mod side_flip_tests {
         let mut no_release = matched("A", "B");
         no_release.extra.remove("discogs_release_id");
         assert!(side_flip_target(&no_release).is_none());
+    }
+}
+
+#[cfg(test)]
+mod vinyl_matching_tests {
+    use super::*;
+    #[test]
+    fn shazam_anniversary_and_parts_match_without_conflating_sides() {
+        assert_eq!(album_match_key("Wish You Were Here 50"), album_match_key("Wish You Were Here"));
+        assert_eq!(album_match_key("Wish You Were Here 50th Anniversary"), "wish you were here");
+        assert_eq!(track_match_key("Shine On You Crazy Diamond (Pts. 1-5)"),
+                   track_match_key("Shine On You Crazy Diamond (Parts I-V)"));
+        assert_ne!(track_match_key("Shine On You Crazy Diamond (Pts. 1-5)"),
+                   track_match_key("Shine On You Crazy Diamond (Parts VI-IX)"));
+    }
+    #[test]
+    fn lookup_uses_own_collection_and_matches_reissue_aliases() {
+        let dir = tempfile::tempdir().unwrap();
+        let db = Db::open(&dir.path().join("discogs.db")).unwrap();
+        let name = "Shine On You Crazy Diamond (Parts I-V)";
+        db.with(|c| {
+            c.execute("INSERT INTO discogs_releases(release_id,title,artist,cover_url) VALUES(123,'Wish You Were Here','Pink Floyd','https://example.com/original.jpg')", [])?;
+            c.execute("INSERT INTO discogs_tracks(release_id,track_index,position,side,title,artist,normalized_title,normalized_artist) VALUES(123,1,'A1','A',?,'Pink Floyd',?,'pink floyd')",params![name,normalized(name)])?;
+            Ok(())
+        }).unwrap();
+        let discogs = Discogs::new(reqwest::Client::new(), db);
+        let mut cfg = Config::default();
+        cfg.discogs.enabled = true;
+        let mut track = Track {
+            artist: "Pink Floyd".to_owned(),
+            title: "Shine On You Crazy Diamond (Pts. 1-5)".to_owned(),
+            album: Some("Wish You Were Here 50".to_owned()),
+            ..Default::default()
+        };
+        discogs.enrich(&mut track, &cfg, None).unwrap();
+        assert_eq!(track.extra["discogs_release_id"].as_i64(), Some(123));
+        assert!((track.extra["discogs_confidence"].as_f64().unwrap() - 0.96).abs() < 1e-9);
+        assert_eq!(track.album.as_deref(), Some("Wish You Were Here"));
     }
 }

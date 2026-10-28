@@ -235,7 +235,23 @@
     margin: 0;
     padding: 0;
     list-style: none;
+    overflow-y: auto;
+    min-height: 0;
+    scrollbar-width: thin;
 }
+
+/* More entries scroll inside the card, not across the radar chart below. */
+.stats-list-card {
+    height: 475px;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.stats-list .stats-item[hidden] {
+    display: none;
+}
+
 
 .stats-item {
     display: grid;

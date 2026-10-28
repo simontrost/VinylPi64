@@ -9,6 +9,7 @@ use base64::Engine;
 use image::{DynamicImage, Rgb, RgbImage};
 use serde_json::{Value, json};
 use std::{
+    collections::{BTreeMap, HashMap},
     path::{Path, PathBuf},
     sync::{
         Arc,
@@ -199,8 +200,13 @@ impl Composition {
             background: bg,
         })
     }
+    fn scroll_cycle(&self) -> u32 {
+        self.lines.iter().filter(|(s, _)| s.width() > 64)
+            .map(|(s, _)| s.width() + 20).max().unwrap_or(64)
+    }
     pub fn frame(&self, offset: u32) -> RgbImage {
         let mut frame = self.base.clone();
+        let cycle = self.scroll_cycle();
         for (sprite, y) in &self.lines {
             if sprite.width() <= 64 {
                 image::imageops::overlay(
@@ -210,7 +216,8 @@ impl Composition {
                     *y as i64,
                 )
             } else {
-                let cycle = sprite.width() + 20;
+                // Every overflowing line shares the same period. A shorter
+                // artist waits for the longer title instead of drifting.
                 let x = -((offset % cycle) as i64);
                 image::imageops::overlay(&mut frame, sprite, x, *y as i64);
                 image::imageops::overlay(&mut frame, sprite, x + cycle as i64, *y as i64);
@@ -222,6 +229,54 @@ impl Composition {
         self.lines.iter().any(|(s, _)| s.width() > 64)
     }
 }
+/// Build one adaptive palette for the *entire* Pixoo GIF. The generic GIF
+/// encoder derives a new palette for each frame: even unchanged artwork then
+/// acquires slightly different colors, causing visible flicker.
+fn shared_gif_palette(composition: &Composition) -> Vec<u8> {
+    let mut histogram = BTreeMap::<[u8; 3], (u64, [u64; 3])>::new();
+    for (img, weight) in std::iter::once((&composition.base, 4_u64))
+        .chain(composition.lines.iter().map(|(sprite, _)| (sprite, 1_u64)))
+    {
+        for pixel in img.pixels() {
+            let rgb = pixel.0;
+            let bucket = [rgb[0] >> 3, rgb[1] >> 3, rgb[2] >> 3];
+            let entry = histogram.entry(bucket).or_default();
+            entry.0 += weight;
+            for (sum, value) in entry.1.iter_mut().zip(rgb) {
+                *sum += u64::from(value) * weight;
+            }
+        }
+    }
+    let mut groups = histogram.into_iter().collect::<Vec<_>>();
+    groups.sort_by(|a, b| b.1.0.cmp(&a.1.0).then_with(|| a.0.cmp(&b.0)));
+    let mut palette = vec![composition.background];
+    for (_, (count, sums)) in groups {
+        if palette.len() == 256 { break; }
+        let color = sums.map(|sum| (sum / count) as u8);
+        if !palette.contains(&color) { palette.push(color); }
+    }
+    // A 256-color global table eliminates palette changes between frames.
+    let mut bytes = palette.into_iter().flatten().collect::<Vec<_>>();
+    bytes.resize(256 * 3, 0);
+    bytes
+}
+
+fn gif_indices(frame: &RgbImage, palette: &[u8], cache: &mut HashMap<[u8; 3], u8>) -> Vec<u8> {
+    frame.pixels().map(|p| {
+        let rgb = p.0;
+        *cache.entry(rgb).or_insert_with(|| {
+            (0..256usize)
+                .min_by_key(|i| {
+                    let idx = *i * 3;
+                    (0..3).map(|channel| {
+                        let distance = i32::from(rgb[channel]) - i32::from(palette[idx + channel]);
+                        distance * distance
+                    }).sum::<i32>()
+                }).unwrap_or(0) as u8
+        })
+    }).collect()
+}
+
 /// Fill the single-letter badge of the configurable side-flip graphic.
 /// The bundled image has the word SIDE and a blank badge for the target side.
 fn side_flip_frame(root: &Path, mut image: RgbImage, next_side: &str) -> Result<RgbImage> {
@@ -584,27 +639,32 @@ impl Display {
                     let dir = data.join("animations");
                     std::fs::create_dir_all(&dir)?;
                     let file = std::fs::File::create(dir.join(format!("{token}.gif")))?;
-                    let mut encoder = image::codecs::gif::GifEncoder::new(file);
-                    encoder.set_repeat(image::codecs::gif::Repeat::Infinite)?;
-                    for offset in (0..c
-                        .lines
-                        .iter()
-                        .map(|(s, _)| s.width() + 20)
-                        .max()
-                        .unwrap_or(64)
-                        .min(512))
-                        .step_by(2)
-                    {
-                        let rgba = DynamicImage::ImageRgb8(c.frame(offset)).into_rgba8();
-                        encoder.encode_frame(image::Frame::from_parts(
-                            rgba,
-                            0,
-                            0,
-                            image::Delay::from_numer_denom_ms(
-                                (2000. / cfg.image.marquee_speed) as u32,
-                                1,
-                            ),
-                        ))?;
+                    let palette = shared_gif_palette(c);
+                    let mut encoder = gif::Encoder::new(file, 64, 64, &palette)?;
+                    encoder.set_repeat(gif::Repeat::Infinite)?;
+                    let cycle = c.scroll_cycle();
+                    // Render the full shared cycle (never cut it off at 512px).
+                    // Bound the frame count instead, so long titles remain
+                    // seamless without exhausting the Pi Zero's memory.
+                    let step = cycle.div_ceil(512).max(1) as usize;
+                    let mut colors = HashMap::new();
+                    for offset in (0..cycle).step_by(step) {
+                        let rgb = c.frame(offset);
+                        // GIF delay is in 1/100 sec; clamp ultra-fast settings.
+                        let frame = gif::Frame {
+                            width: 64,
+                            height: 64,
+                            delay: ((step as f64 * 100. / cfg.image.marquee_speed)
+                                .round() as u16)
+                                .max(2),
+                            buffer: std::borrow::Cow::Owned(gif_indices(
+                                &rgb,
+                                &palette,
+                                &mut colors,
+                            )),
+                            ..Default::default()
+                        };
+                        encoder.write_frame(&frame)?;
                     }
                     drop(encoder);
                     // Keep disk use bounded; a previously served GIF may remain cached by Pixoo.
@@ -746,6 +806,38 @@ mod tests {
         assert_eq!(marquee_offset(elapsed, 200.0), 25);
         // Sending a frame must not increment the offset by a fixed one pixel.
         assert_eq!(marquee_offset(Duration::from_millis(260), 40.0), 10);
+    }
+
+    #[test]
+    fn both_long_lines_share_a_cycle_and_restart_in_sync() {
+        let short = RgbImage::from_pixel(90, 8, Rgb([255, 0, 0]));
+        let long = RgbImage::from_pixel(150, 8, Rgb([0, 255, 0]));
+        let c = Composition {
+            base: RgbImage::from_pixel(64, 64, Rgb([0, 0, 0])),
+            lines: vec![(short, 2), (long, 24)],
+            background: [0, 0, 0],
+        };
+        assert_eq!(c.scroll_cycle(), 170);
+        assert_eq!(c.frame(0), c.frame(170));
+        assert_eq!(c.frame(30), c.frame(200));
+        // The short line stays blank after leaving the left edge,
+        // instead of restarting before the longer title finishes.
+        assert_eq!(c.frame(115).get_pixel(3, 3).0, [0, 0, 0]);
+    }
+
+    #[test]
+    fn global_gif_palette_keeps_stationary_cover_pixels_identical() {
+        let mut base = RgbImage::from_pixel(64, 64, Rgb([12, 34, 56]));
+        base.put_pixel(12, 12, Rgb([211, 48, 122]));
+        let c = Composition { base, lines: vec![
+            (RgbImage::from_pixel(90, 6, Rgb([255, 255, 255])), 50)
+        ], background: [12, 34, 56] };
+        let palette = shared_gif_palette(&c);
+        let mut cache = HashMap::new();
+        let a = gif_indices(&c.frame(0), &palette, &mut cache);
+        let b = gif_indices(&c.frame(10), &palette, &mut cache);
+        assert_eq!(palette.len(), 768);
+        assert_eq!(a[12 * 64 + 12], b[12 * 64 + 12]);
     }
 
     #[test]

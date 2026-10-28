@@ -19,6 +19,7 @@ serde_json = "1"
 rusqlite = { version = "0.37", features = ["bundled", "backup"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+gif = "=0.14.2"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp"] }
 fontdue = "0.9"
 minijinja = { version = "2", features = ["loader"] }

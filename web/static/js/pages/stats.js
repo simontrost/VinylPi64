@@ -57,40 +57,45 @@ function createRankedItem(rank, title, subtitle, countText, metaText = "") {
 }
 
 function setupExpandableList(listElement, items, renderItem, emptyMessage) {
-    let expanded = false;
+    listElement.replaceChildren();
+    listElement.classList.remove("is-expanded");
 
-    const render = () => {
-        listElement.replaceChildren();
+    if (!items.length) {
+        listElement.appendChild(createEmptyItem(emptyMessage));
+        return;
+    }
 
-        if (!items.length) {
-            listElement.appendChild(createEmptyItem(emptyMessage));
-            return;
+    const extraRows = [];
+    items.forEach((item, index) => {
+        const element = renderItem(item, index);
+        if (index >= MAX_VISIBLE) {
+            element.hidden = true;
+            extraRows.push(element);
         }
+        listElement.appendChild(element);
+    });
 
-        const visibleItems = expanded ? items : items.slice(0, MAX_VISIBLE);
-        visibleItems.forEach((item, index) => {
-            listElement.appendChild(renderItem(item, index));
+    if (extraRows.length) {
+        const wrapper = document.createElement("li");
+        wrapper.className = "stats-toggle-wrapper";
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "stats-toggle";
+        button.setAttribute("aria-expanded", "false");
+        button.textContent = `Show all ${items.length}`;
+        button.addEventListener("click", () => {
+            const expanded = button.getAttribute("aria-expanded") !== "true";
+            extraRows.forEach(row => { row.hidden = !expanded; });
+            listElement.classList.toggle("is-expanded", expanded);
+            button.setAttribute("aria-expanded", String(expanded));
+            button.textContent = expanded ? "Show less" : `Show all ${items.length}`;
+            // Reveal rows 6-10 immediately inside the fixed-height list.
+            listElement.scrollTop = expanded ? listElement.scrollHeight : 0;
+            // No list reconstruction, no stats re-fetch, no Chart.js redraw.
         });
-
-        if (items.length > MAX_VISIBLE) {
-            const wrapper = document.createElement("li");
-            wrapper.className = "stats-toggle-wrapper";
-
-            const button = document.createElement("button");
-            button.type = "button";
-            button.className = "stats-toggle";
-            button.textContent = expanded ? "Show less" : "Show more";
-            button.addEventListener("click", () => {
-                expanded = !expanded;
-                render();
-            });
-
-            wrapper.appendChild(button);
-            listElement.appendChild(wrapper);
-        }
-    };
-
-    render();
+        wrapper.appendChild(button);
+        listElement.appendChild(wrapper);
+    }
 }
 
 function setFeedback(targetId, message, type = "") {
