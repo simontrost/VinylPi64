@@ -48,9 +48,7 @@ fn artists(v: &Value) -> String {
 /// already matched Discogs release (A->B, C->D, E->F, ...).
 /// Other transitions, unmatched tracks, and missing metadata are ignored.
 pub fn side_flip_target(track: &Track) -> Option<String> {
-    if track.extra.get("discogs_release_id")?.as_i64().is_none() {
-        return None;
-    }
+    track.extra.get("discogs_release_id")?.as_i64()?;
     let from = track
         .extra
         .get("discogs_side")?
@@ -71,7 +69,7 @@ pub fn side_flip_target(track: &Track) -> Option<String> {
     if !a.is_ascii_uppercase() || !b.is_ascii_uppercase() {
         return None;
     }
-    if (a - b'A') % 2 == 0 && b == a + 1 {
+    if (a - b'A').is_multiple_of(2) && b == a + 1 {
         Some(to)
     } else {
         None

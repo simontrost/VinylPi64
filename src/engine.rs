@@ -22,7 +22,7 @@ type Observation = (Option<Track>, Option<(f64, f64)>);
 enum EngineEvent {
     Stop,
     Command(Option<ModeCommand>),
-    Observation(Result<Observation>),
+    Observation(Box<Result<Observation>>),
 }
 pub struct ModeCommand {
     mode: Mode,
@@ -277,7 +277,7 @@ impl Engine {
                 }
                 Ok((track, Some((level, observed))))
             };
-            let event = tokio::select! {biased; _=cancel.cancelled()=>EngineEvent::Stop,command=commands.recv()=>EngineEvent::Command(command),result=operation=>EngineEvent::Observation(result)};
+            let event = tokio::select! {biased; _=cancel.cancelled()=>EngineEvent::Stop,command=commands.recv()=>EngineEvent::Command(command),result=operation=>EngineEvent::Observation(Box::new(result))};
             match event {
                 EngineEvent::Stop => break,
                 EngineEvent::Command(command) => {
@@ -299,6 +299,7 @@ impl Engine {
                     let _ = command.reply.send(result);
                 }
                 EngineEvent::Observation(result) => {
+                    let result = *result;
                     next = tokio::time::Instant::now()
                         + Duration::from_secs_f64(if mode == Mode::Spotify {
                             cfg.spotify.poll_seconds
