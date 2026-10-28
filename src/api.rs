@@ -130,9 +130,11 @@ impl App {
     }
     pub fn source(&self) -> Result<Value> {
         let mode = self.engine.get_mode();
-        Ok(
-            json!({"ok":true,"mode":mode,"vinyl_running":mode==Mode::Vinyl,"spotify_running":mode==Mode::Spotify,"spotify":self.spotify.status()?}),
-        )
+        let spotify = self.spotify.status().unwrap_or_else(|error| {
+            tracing::warn!(%error, "Unable to read Spotify connection status");
+            json!({"ok":false,"configured":false,"connected":false})
+        });
+        Ok(json!({"ok":true,"mode":mode,"vinyl_running":mode==Mode::Vinyl,"spotify_running":mode==Mode::Spotify,"spotify":spotify}))
     }
 }
 pub struct ApiError(StatusCode, String);

@@ -180,7 +180,9 @@ impl Engine {
                 s.spotify.status()?["connected"] == true,
                 "Connect Spotify in Settings first"
             );
-            s.spotify.current().await?;
+            // A paused player, expired access token or temporary Spotify API
+            // outage must not prevent choosing the source or showing its last
+            // cached song. The polling loop handles network failures/retries.
         }
         if mode == Mode::Vinyl {
             audio::devices()?;
@@ -194,10 +196,10 @@ impl Engine {
         // switches to a fresh track once recognition resumes.
         if mode == Mode::Off {
             s.display.show(Content::Fallback(false));
-        } else if let Some(track) = remembered.and_then(|v| serde_json::from_value::<Track>(v).ok()) {
-            s.display.show(Content::Track(Box::new(track)));
         } else {
-            s.display.show(Content::Fallback(false));
+            // A restored song belongs to the dashboard only. Never replay its
+            // album art on Pixoo until a *new* recognition is received.
+            s.display.show(Content::Hold);
         }
         if mode == Mode::Off && old != Mode::Off {
             match cfg.pixoo_automations.off_action.as_str() {

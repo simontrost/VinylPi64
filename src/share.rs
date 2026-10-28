@@ -86,9 +86,11 @@ impl Poster {
         let mut at=x as f32;
         for ch in text.chars() {
             let (metrics,bitmap)=self.font(variant).rasterize(ch,size);
-            // Fontdue raster bitmap starts at its glyph top; position against a
-            // stable text line rather than relying on a platform-specific baseline.
-            let top=y+(size as i32-metrics.height as i32)/2;
+            // Fontdue ymin is the glyph's bottom bearing relative to the
+            // baseline. Height-only centering made descenders, capitals and
+            // lowercase letters jump independently (the 'wobbly' text).
+            let baseline = y + size.round() as i32;
+            let top = baseline - metrics.height as i32 - metrics.ymin;
             for by in 0..metrics.height {
                 let dy=top+by as i32;
                 if !(0..H as i32).contains(&dy){continue;}
@@ -136,19 +138,28 @@ fn duration(seconds:f64)->String {
     let mins=(seconds.max(0.)/60.).round() as u64;
     if mins>=60 {format!("{} h {:02} min",mins/60,mins%60)}else{format!("{mins} min")}
 }
-async fn cover(client:&reqwest::Client, url:&str)->Option<RgbImage> {
-    let parsed=url::Url::parse(url).ok()?;
-    if parsed.scheme()!="https" {return None;}
-    let host=parsed.host_str()?.to_ascii_lowercase();
-    // The URL originates in metadata and may be controlled by remote APIs.
-    // Never fetch private addresses or untrusted hosts in a backend endpoint.
-    if !["mzstatic.com","scdn.co","discogs.com","discogsusercontent.com","coverartarchive.org","musicbrainz.org"].iter().any(|domain|host==*domain||host.ends_with(&format!(".{domain}"))){return None;}
-    let response=client.get(parsed).timeout(std::time::Duration::from_secs(4)).send().await.ok()?;
-    if !response.status().is_success() || response.content_length().is_some_and(|l|l>3_000_000){return None;}
-    let bytes=response.bytes().await.ok()?;
-    if bytes.len()>3_000_000{return None;}
-    let img=image::load_from_memory(&bytes).ok()?;
-    Some(img.resize_to_fill(160,160,FilterType::Lanczos3).to_rgb8())
+fn allowed_cover_url(url: &url::Url) -> bool {
+    if url.scheme() != "https" || url.port_or_known_default() != Some(443) {
+        return false;
+    }
+    let Some(host) = url.host_str() else { return false; };
+    let host = host.to_ascii_lowercase();
+    // Validated again after every redirect; no HTTP or LAN URLs.
+    ["mzstatic.com", "scdn.co", "discogs.com", "discogsusercontent.com",
+     "coverartarchive.org", "musicbrainz.org", "archive.org", "lastfm.freetls.fastly.net",
+     "images.genius.com", "last.fm"].iter()
+        .any(|domain| host == *domain || host.ends_with(&format!(".{domain}")))
+}
+async fn cover(client: &reqwest::Client, url: &str) -> Option<RgbImage> {
+    let parsed = url::Url::parse(url).ok()?;
+    if !allowed_cover_url(&parsed) { return None; }
+    let response = client.get(parsed).timeout(std::time::Duration::from_secs(5)).send().await.ok()?;
+    if !response.status().is_success()
+        || response.content_length().is_some_and(|l| l > 3_000_000) { return None; }
+    let bytes = response.bytes().await.ok()?;
+    if bytes.len() > 3_000_000 { return None; }
+    let img = image::load_from_memory(&bytes).ok()?;
+    Some(img.resize_to_fill(160, 160, FilterType::Lanczos3).to_rgb8())
 }
 
 pub async fn render(app:&App, scope:&str, year:Option<i32>)->Result<Vec<u8>> {
@@ -156,8 +167,14 @@ pub async fn render(app:&App, scope:&str, year:Option<i32>)->Result<Vec<u8>> {
     let accent=accent(scope);
     let mut p=Poster::new(&app.root,accent)?;
     let cover_client=reqwest::Client::builder()
-        .redirect(reqwest::redirect::Policy::none())
-        .timeout(std::time::Duration::from_secs(4)).build()?;
+        .redirect(reqwest::redirect::Policy::custom(|attempt| {
+            if attempt.previous().len() < 4 && allowed_cover_url(attempt.url()) {
+                attempt.follow()
+            } else {
+                attempt.stop()
+            }
+        }))
+        .timeout(std::time::Duration::from_secs(5)).build()?;
     // The subtle record engraving in the top right mirrors the legacy image.
     for radius in (130..550).step_by(10) {
         p.circle(912,235,radius,if radius%40==0 {[40,43,54]}else{[30,32,42]},true);
@@ -197,14 +214,23 @@ pub async fn render(app:&App, scope:&str, year:Option<i32>)->Result<Vec<u8>> {
     p.text(100,738,"IN ROTATION",23.,1,WHITE);
     p.right(979,743,"TOP ALBUM ART",17.,2,accent);
     let albums=stats["top_album_covers"].as_array().cloned().unwrap_or_default();
+    let mut artwork = Vec::new();
+    // An old URL may be stale even if the DB has a non-empty cover_url. Try
+    // the next albums in the ranked list rather than drawing a broken image.
+    for entry in albums.iter().take(10) {
+        if artwork.len() == 3 { break; }
+        if let Some(url) = entry["cover_url"].as_str()
+            && let Some(img) = cover(&cover_client, url).await {
+                artwork.push((entry["name"].as_str().unwrap_or("—").to_owned(), img));
+            }
+    }
     for (i,x) in [94,398,702].iter().enumerate() {
         p.rounded(*x,787,284,215,17,SURFACE,Some([44,48,61]));
         p.placeholder_cover(*x+62,796);
-        if let Some(url)=albums.get(i).and_then(|v|v["cover_url"].as_str())
-            && let Some(img)=cover(&cover_client,url).await {
-                image::imageops::overlay(&mut p.img,&img,(*x+62) as i64,796);
-            }
-        let name=albums.get(i).and_then(|v|v["name"].as_str()).unwrap_or("—");
+        let name = if let Some((name,img)) = artwork.get(i) {
+            image::imageops::overlay(&mut p.img,img,(*x+62) as i64,796);
+            name.as_str()
+        } else { "—" };
         let title=p.fit(name,18.,1,245);
         let tx=*x+(284-p.width(&title,18.,1))/2;
         p.text(tx,962,&title,18.,1,WHITE);

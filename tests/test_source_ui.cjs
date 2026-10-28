@@ -12,6 +12,8 @@ const buttons = ['off', 'vinyl', 'spotify'].map(mode => ({
     addEventListener() {},
 }));
 let source = 'off';
+let brokenPostResponse = false;
+const expectedErrors = [];
 const feedback = { textContent: '', classList: { toggle() {}, remove() {}, add() {} } };
 const context = {
     document: {
@@ -26,6 +28,10 @@ const context = {
     fetch: async (url, options) => {
         if (url === '/api/source' && options?.method === 'POST') {
             source = JSON.parse(options.body).mode;
+            if (brokenPostResponse) {
+                // The backend applied the mode change, but the HTTP body was lost.
+                return { ok: true, json: async () => { throw new Error('Response lost'); } };
+            }
         }
         assert.equal(url, '/api/source');
         return { ok: true, json: async () => ({ ok: true, mode: source, spotify: { connected: true, configured: true } }) };
@@ -33,7 +39,7 @@ const context = {
     renderDiscogsContext() {}, showTrackInfo() {},
     setText() {}, loadStatus: async () => {},
     currentTrackKey: null, CURRENT_TRACK: {},
-    console,
+    console: { log: console.log, error: (...messages) => expectedErrors.push(messages) },
 };
 vm.createContext(context);
 vm.runInContext(code, context);
@@ -44,5 +50,10 @@ vm.runInContext(code, context);
         assert.equal(feedback.textContent, '', `unexpected UI error after switching to ${mode}`);
         assert.ok(buttons.every(b => !b.disabled));
     }
-    console.log('Source UI: successful Vinyl/Spotify/Off changes preserve the selector and show no error');
+    brokenPostResponse = true;
+    await vm.runInContext("setSourceMode('vinyl')", context);
+    assert.equal(source, 'vinyl');
+    assert.equal(feedback.textContent, '', 'confirmed source mode must not show a phantom HTTP error');
+    assert.equal(expectedErrors.length, 1, 'lost HTTP response should still be logged');
+    console.log('Source UI: successful source changes and lost POST responses do not show phantom errors');
 })().catch(error => { console.error(error); process.exitCode = 1; });

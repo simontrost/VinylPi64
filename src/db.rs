@@ -222,7 +222,41 @@ impl Db {
                 "SELECT status_json FROM source_status WHERE source=?",
                 [mode.as_str()], |r| r.get(0),
             ).optional()?;
-            json.map(|s| serde_json::from_str(&s).map_err(Into::into)).transpose()
+            let cached: Option<Value> = json.as_deref().map(serde_json::from_str::<Value>).transpose()?;
+            if let Some(mut remembered) = cached.filter(|s| {
+                s["artist"].as_str().is_some_and(|a| !a.is_empty())
+                    && s["title"].as_str().is_some_and(|t| !t.is_empty())
+            }) {
+                if remembered["cover_url"].as_str().is_none_or(|url| url.is_empty()) {
+                    let table = if mode == Mode::Spotify { "spotify_songs" } else { "songs" };
+                    let query = format!("SELECT cover_url,album FROM {table} WHERE artist=? AND title=? ORDER BY updated_at DESC LIMIT 1");
+                    let album = rows(c, &query, params![remembered["artist"].as_str(), remembered["title"].as_str()])?
+                        .into_iter().next();
+                    if let Some(entry) = album {
+                        if entry["cover_url"].as_str().is_some_and(|url| !url.is_empty()) {
+                            remembered["cover_url"] = entry["cover_url"].clone();
+                        }
+                        if remembered["album"].as_str().is_none_or(|name| name.is_empty()) {
+                            remembered["album"] = entry["album"].clone();
+                        }
+                    }
+                }
+                return Ok(Some(remembered));
+            }
+            // Existing Python databases have song history but no source_status.
+            // Recover the last known song for the dashboard only, without
+            // marking it playing or incrementing any statistics.
+            let query = if mode == Mode::Spotify {
+                "SELECT s.artist,s.title,s.album,s.cover_url,s.genre,s.track_id,s.artist_id,s.duration_ms FROM spotify_songs s LEFT JOIN (SELECT song_key, MAX(occurred_at) last_at FROM playback_events WHERE source='spotify' AND event_type='play' GROUP BY song_key) p ON p.song_key=s.track_id ORDER BY COALESCE(p.last_at,s.updated_at) DESC,s.updated_at DESC LIMIT 1"
+            } else {
+                "SELECT s.artist,s.title,s.album,s.cover_url,s.genre,s.shazam_track_id AS track_id,s.shazam_artist_id AS artist_id,s.duration_ms FROM songs s LEFT JOIN (SELECT song_key, MAX(occurred_at) last_at FROM playback_events WHERE source='vinyl' AND event_type='play' GROUP BY song_key) p ON p.song_key=s.song_key ORDER BY COALESCE(p.last_at,s.updated_at) DESC,s.updated_at DESC LIMIT 1"
+            };
+            let candidate = rows(c, query, [])?.into_iter().next();
+            Ok(candidate.map(|mut track| {
+                track["source"] = json!(mode.as_str());
+                track["is_playing"] = json!(false);
+                track
+            }))
         })
     }
     pub fn save_status(&self, mode: Mode, v: &Value) -> Result<()> {
@@ -238,18 +272,38 @@ impl Db {
             let args=params![scope,scope,year,year];
             let songs=rows(c,"WITH metadata AS(SELECT 'vinyl' source,song_key,cover_url,genre FROM songs UNION ALL SELECT 'spotify',track_id,cover_url,genre FROM spotify_songs) SELECT p.artist,p.title,MAX(p.album) album,MAX(m.cover_url) cover_url,MAX(m.genre) genre,SUM(p.count) count FROM yearly_plays p LEFT JOIN metadata m ON p.source=m.source AND p.song_key=m.song_key WHERE (?='combined' OR p.source=?) AND (? IS NULL OR year=?) GROUP BY lower(p.artist),lower(p.title) ORDER BY count DESC,p.title LIMIT 10",args)?;
             let artists=rows(c,&format!("SELECT artist name,SUM(count) count FROM yearly_plays WHERE {filter} GROUP BY lower(artist) ORDER BY count DESC,name LIMIT 10"),args)?;
-            let albums=rows(c,&format!("WITH covers AS(SELECT album,artist,cover_url FROM album_covers UNION ALL SELECT album,artist,cover_url FROM spotify_album_totals), totals AS(SELECT album name,SUM(count) count FROM yearly_albums WHERE {filter} GROUP BY lower(album)) SELECT name,count,(SELECT cover_url FROM covers WHERE lower(album)=lower(name) AND cover_url IS NOT NULL LIMIT 1) cover_url,(SELECT artist FROM covers WHERE lower(album)=lower(name) LIMIT 1) artist FROM totals ORDER BY count DESC,name LIMIT 10"),args)?;
+            let albums=rows(c,&format!("WITH covers AS(SELECT album,artist,cover_url FROM album_covers UNION ALL SELECT album,artist,cover_url FROM spotify_album_totals), totals AS(SELECT album name,SUM(count) count FROM yearly_albums WHERE {filter} GROUP BY lower(album)) SELECT name,count,COALESCE((SELECT cover_url FROM covers WHERE lower(album)=lower(name) AND trim(COALESCE(cover_url,''))!='' LIMIT 1),(SELECT cover_url FROM songs WHERE lower(album)=lower(name) AND trim(COALESCE(cover_url,''))!='' ORDER BY play_count DESC LIMIT 1),(SELECT cover_url FROM spotify_songs WHERE lower(album)=lower(name) AND trim(COALESCE(cover_url,''))!='' ORDER BY play_count DESC LIMIT 1)) cover_url,(SELECT artist FROM covers WHERE lower(album)=lower(name) LIMIT 1) artist FROM totals ORDER BY count DESC,name LIMIT 10"),args)?;
+            // The ranked album list may contain legacy sessions without cover art.
+            // The image gallery only shows albums for which artwork is known.
+            let album_covers = albums.iter().filter(|album| album["cover_url"].as_str().is_some_and(|url| !url.is_empty())).cloned().collect::<Vec<_>>();
             let genres=rows(c,"WITH m AS(SELECT 'vinyl' source,song_key,genre FROM songs UNION ALL SELECT 'spotify',track_id,genre FROM spotify_songs) SELECT m.genre name,SUM(p.count) count FROM yearly_plays p JOIN m ON p.source=m.source AND p.song_key=m.song_key WHERE (?='combined' OR p.source=?) AND (? IS NULL OR year=?) AND m.genre IS NOT NULL AND trim(m.genre)!='' GROUP BY lower(m.genre) ORDER BY count DESC LIMIT 10",args)?;
             let usage=rows(c,&format!("SELECT kind,SUM(seconds) seconds FROM yearly_usage WHERE {filter} GROUP BY kind"),args)?;
             let get=|kind:&str|usage.iter().find(|v|v["kind"]==kind).and_then(|v|v["seconds"].as_f64()).unwrap_or(0.);
             let coverage=rows(c,"WITH m AS(SELECT 'vinyl' source,song_key,genre,shazam_track_id FROM songs UNION ALL SELECT 'spotify',track_id,genre,NULL FROM spotify_songs) SELECT COUNT(DISTINCT p.source||p.song_key) songs_total,COUNT(DISTINCT CASE WHEN m.genre IS NOT NULL AND trim(m.genre)!='' THEN p.source||p.song_key END) songs_with_genre,COUNT(DISTINCT CASE WHEN m.shazam_track_id IS NOT NULL THEN p.source||p.song_key END) songs_with_shazam_id FROM yearly_plays p LEFT JOIN m ON p.source=m.source AND p.song_key=m.song_key WHERE (?='combined' OR p.source=?) AND (? IS NULL OR year=?)",args)?;
-            Ok(json!({"scope":scope,"year":year,"top_songs":songs,"top_artists":artists,"top_albums":albums,"top_album_covers":albums,"top_genres":genres,"radar_genres":genres.iter().take(6).collect::<Vec<_>>(),"total_minutes_listened":(get("listening")/60.) as i64,"pickup_usage_seconds":get("pickup"),"album_count_unit":if scope=="vinyl"{"session"}else{"listen"},"metadata_coverage":coverage.first()}))
+            Ok(json!({"scope":scope,"year":year,"top_songs":songs,"top_artists":artists,"top_albums":albums,"top_album_covers":album_covers,"top_genres":genres,"radar_genres":genres.iter().take(6).collect::<Vec<_>>(),"total_minutes_listened":(get("listening")/60.) as i64,"pickup_usage_seconds":get("pickup"),"album_count_unit":if scope=="vinyl"{"session"}else{"listen"},"metadata_coverage":coverage.first()}))
         })
     }
 }
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn legacy_song_history_restores_dashboard_status_without_a_pixoo_command() {
+        let dir = tempfile::tempdir().unwrap();
+        let db = Db::open(&dir.path().join("songs.db")).unwrap();
+        db.with(|c| {
+            c.execute("INSERT INTO songs(song_key,artist,title,album,cover_url) VALUES('v','Vinyl Artist','Vinyl Song','Vinyl Album','https://example.com/v.jpg')", [])?;
+            c.execute("INSERT INTO spotify_songs(track_id,artist,title,album,cover_url) VALUES('s','Spotify Artist','Spotify Song','Spotify Album','https://example.com/s.jpg')", [])?;
+            Ok(())
+        }).unwrap();
+        let vinyl = db.last_status(Mode::Vinyl).unwrap().unwrap();
+        assert_eq!(vinyl["album"], "Vinyl Album");
+        assert_eq!(vinyl["cover_url"], "https://example.com/v.jpg");
+        assert_eq!(vinyl["is_playing"], false);
+        let spotify = db.last_status(Mode::Spotify).unwrap().unwrap();
+        assert_eq!(spotify["title"], "Spotify Song");
+        assert_eq!(spotify["is_playing"], false);
+    }
     #[test]
     fn transactional_statistics_survive_restart() {
         let d = tempfile::tempdir().unwrap();

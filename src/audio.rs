@@ -61,6 +61,8 @@ pub fn devices() -> Result<Vec<Value>> {
             continue;
         };
         if let Some(name) = hint.name {
+            // "null" is a sink/source of zeroes, never an actual turntable input.
+            if name.eq_ignore_ascii_case("null") { continue; }
             let desc = hint.desc.unwrap_or_else(|| name.clone()).replace('\n', " ");
             out.push(json!({"index":out.len(),"name":name,"label":desc,"display_name":desc,"max_input_channels":2,"default_samplerate":44100,"hostapi":"ALSA","is_default":name=="default"}));
         }
@@ -82,11 +84,16 @@ fn select_input(configured: &str, list: &[Value]) -> Result<String> {
         Some((d["name"].as_str()?, d["label"].as_str().unwrap_or("")))
     }).collect::<Vec<_>>();
     let normalize = |v: &str| v.chars().filter(|c| c.is_alphanumeric()).flat_map(char::to_lowercase).collect::<String>();
-    let needle = normalize(configured);
+    // Python/PortAudio used labels such as "USB AUDIO  CODEC: Audio (hw:0,0)".
+    // ALSA exposes the same input under a PCM name like plughw:CARD=CODEC,DEV=0.
+    let legacy_name = configured.split(": Audio (hw:").next().unwrap_or(configured);
+    let needle = normalize(legacy_name);
     let matches = entries.iter().filter(|(name, label)| {
-        needle.is_empty()
-            || normalize(name).contains(&needle)
-            || normalize(label).contains(&needle)
+        // "null" captures silence and must never win automatic discovery.
+        !name.eq_ignore_ascii_case("null")
+            && (needle.is_empty()
+                || normalize(name).contains(&needle)
+                || normalize(label).contains(&needle))
     });
     let rank = |(name, label): &(&str, &str)| -> i32 {
         let n = name.to_ascii_lowercase();
@@ -200,6 +207,7 @@ mod tests {
             serde_json::json!({"name":"plughw:CARD=CODEC,DEV=0","label":"USB Audio CODEC, USB Audio"}),
         ];
         assert_eq!(select_input("USB AUDIO", &list).unwrap(), "plughw:CARD=CODEC,DEV=0");
+        assert_eq!(select_input("USB AUDIO  CODEC: Audio (hw:0,0)", &list).unwrap(), "plughw:CARD=CODEC,DEV=0");
         assert_eq!(select_input("", &list).unwrap(), "plughw:CARD=CODEC,DEV=0");
         assert!(select_input("not-a-device", &list).unwrap_err().to_string().contains("ALSA inputs"));
     }

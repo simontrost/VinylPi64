@@ -61,10 +61,16 @@ function populateAudioDeviceSelect(devices, configuredName = "") {
 
     let selectedDevice = null;
     if (configured) {
+        // The Python backend stored PortAudio names like
+        // "USB AUDIO  CODEC: Audio (hw:0,0)" instead of ALSA PCM identifiers.
+        const legacyName = configured.split(": Audio (hw:")[0].replace(/[^a-z0-9]/gi, "").toLocaleLowerCase();
         selectedDevice = devices.find(
             (device) => String(device.name || "").toLocaleLowerCase() === normalized,
         ) || devices.find(
             (device) => String(device.name || "").toLocaleLowerCase().includes(normalized),
+        ) || devices.find(
+            (device) => String(device.name || "").startsWith("plughw:") &&
+                String(device.display_name || "").replace(/[^a-z0-9]/gi, "").toLocaleLowerCase().includes(legacyName),
         );
     }
 

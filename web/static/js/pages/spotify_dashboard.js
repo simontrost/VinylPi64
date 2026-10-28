@@ -101,7 +101,11 @@ function renderSpotifyConnection(spotify = {}) {
 function updateSourceUI(data = {}) {
     vinylPiLastSourceData = data;
     vinylPiSourceMode = ["off", "vinyl", "spotify"].includes(data.mode) ? data.mode : "off";
-    document.dispatchEvent(new CustomEvent("vinylpi:source-change", { detail: { mode: vinylPiSourceMode } }));
+    try {
+        document.dispatchEvent(new CustomEvent("vinylpi:source-change", { detail: { mode: vinylPiSourceMode } }));
+    } catch (error) {
+        console.error("Source-change UI listener failed:", error);
+    }
 
     document.querySelectorAll("[data-source-mode]").forEach((button) => {
         const active = button.dataset.sourceMode === vinylPiSourceMode;
@@ -137,6 +141,7 @@ async function loadSourceStatus() {
         if (!response.ok || !data.ok) throw new Error(data.error || `Source request failed: ${response.status}`);
         if (requestId !== vinylPiSourceRequestId || vinylPiSourceChanging) return;
         updateSourceUI(data);
+        // Don't erase real authorization or configuration errors on each poll.
     } catch (error) {
         console.error(error);
     }
@@ -158,19 +163,30 @@ async function setSourceMode(mode) {
         });
         const data = await response.json();
         if (!response.ok || !data.ok) {
-            if (data.needs_auth) {
-                setSpotifyFeedback("Connect Spotify first.", "error");
-            } else if (data.needs_config) {
-                setSpotifyFeedback("Add the Spotify app credentials to vinylpi.env first.", "error");
-            } else {
-                setSpotifyFeedback(data.error || "Could not change source.", "error");
-            }
-            return;
+            const reason = data.needs_auth ? "Connect Spotify first."
+                : data.needs_config ? "Add Spotify app credentials to vinylpi.env first."
+                : data.error || "Source switch rejected. Check Logs.";
+            throw new Error(reason);
         }
         updateSourceUI(data);
+        setSpotifyFeedback("");
     } catch (error) {
-        console.error(error);
-        setSpotifyFeedback(error?.message || "Could not change the music source.", "error");
+        console.error("Source switch request failed:", error);
+        // A successful backend switch can outlive a failed response. Confirm
+        // actual mode before presenting an error; never show a phantom failure.
+        try {
+            const current = await fetch("/api/source", { cache: "no-store" });
+            const currentData = await current.json();
+            if (current.ok && currentData.ok && currentData.mode === mode) {
+                updateSourceUI(currentData);
+                setSpotifyFeedback("");
+            } else {
+                setSpotifyFeedback(error?.message || "Source switch failed. Check Logs.", "error");
+            }
+        } catch (readError) {
+            console.error("Could not confirm current source:", readError);
+            setSpotifyFeedback("Source status unavailable. Check Logs.", "error");
+        }
     } finally {
         vinylPiSourceChanging = false;
         document.querySelectorAll("[data-source-mode]").forEach((button) => {
