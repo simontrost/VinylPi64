@@ -85,6 +85,35 @@ cargo build --release --locked
 
 A Pi Zero 2 W only has 512 MB RAM; compiling this application directly on that device may exceed its memory and disk capacity. Prefer a cross build or build on a stronger ARM Linux computer with the same target architecture. See `scripts/cross-build.sh` and `Dockerfile.cross` (cross-build path must be validated on your build host).
 
+### Developer updates via GitHub Actions (no local Docker)
+
+On the `refactor/rust` branch, each push triggers Rust tests and an **ARM64 native build** on GitHub Actions (`ubuntu-22.04-arm`). Only if all tests and the ARM64 build succeed does CI publish the binary to the rolling, **experimental** [`rust-dev` release](https://github.com/simontrost/VinylPi64/releases/tag/rust-dev). The release archive includes the full commit SHA and a SHA-256 checksum. This is **not** an official v1.0 release.
+
+On the Pi, after you have checked out `refactor/rust` and installed the experimental ARM64 binary at least once:
+
+```bash
+# One-time: fetch the deployment scripts after merging them into the branch
+cd ~/VinylPi64-rust
+git pull --ff-only
+
+# For each later update (wait until GitHub Actions is green):
+bash scripts/update.sh
+```
+
+The update script fetches the latest `refactor/rust` commit, downloads the matching verified GitHub release asset, checks its commit SHA, fast-forwards Git, backs up the current executable and experimental data, and replaces the binary. If the separate `vinylpi64-rust.service` is running, it is stopped and restarted with an HTTP health check. A failed restart restores the previous binary and source checkout; any pre-update data backup is preserved for manual recovery. **Data migrations themselves are not automatically rolled back.** Old backups accumulate in `data/rust-update-backups`; remove obsolete ones manually after checking the new version.
+
+A manually started server must be stopped with Ctrl+C before running the updater. If no service has been installed, `update.sh` updates the binary but does not start it automatically. To configure automatic startup **once**, after confirming the Python recognizer is not controlling the hardware:
+
+```bash
+cd ~/VinylPi64-rust
+bash scripts/install-rust-service.sh
+sudo systemctl status vinylpi64-rust.service
+```
+
+The optional service deliberately uses port **8081** and the separate `.rust-smoke-data` directory. It does not disable or remove the old Python service. Both applications must not actively control the same USB input and Pixoo simultaneously. The installer refuses to replace an existing systemd service file. This setup currently targets **64-bit Raspberry Pi OS (`aarch64`) only**.
+
+The Pi needs `git`, `curl`, `tar` and `sha256sum`. Releases are fetched from this **public** GitHub repository; no personal GitHub token is stored on the Pi. If CI has not yet published the binary for the newest commit, the updater stops without replacing the installed binary. To check the build, open [GitHub Actions](https://github.com/simontrost/VinylPi64/actions).
+
 ### Safe first run (separate from the existing Python installation)
 
 Clone this branch into a separate directory. Never point the experimental Rust process at the old Python data directory:
@@ -223,10 +252,14 @@ Check the service logs or run the recognizer manually:
 ### Service fails after an update
 
 ```bash
-git pull
-cargo build --release --locked
-# Restart only the Rust service after validating the binary and backing up data.
+sudo journalctl -u vinylpi64-rust.service -n 100 --no-pager
+sudo systemctl status vinylpi64-rust.service
+# If installed through scripts/install-rust-service.sh, re-run the updater
+# after fixing the GitHub Actions build or configuration:
+bash scripts/update.sh
 ```
+
+The updater retains the previous executable and a pre-update data archive in `data/rust-update-backups`. If a database schema changed, restore a backup only after inspecting its contents and stopping the Rust service.
 
 ## License
 

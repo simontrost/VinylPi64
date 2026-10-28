@@ -1,4 +1,4 @@
-name: Rust CI
+name: Rust CI and Pi ARM64
 
 on:
   push:
@@ -10,28 +10,87 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: vinylpi64-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
-    name: Rust and web UI (Linux)
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
+    name: Rust and web UI tests
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
-      - name: Install ALSA build dependencies
+      - uses: Swatinem/rust-cache@v2
+      - name: Install ALSA development headers
         run: |
           sudo apt-get update
-          sudo apt-get install -y libasound2-dev pkg-config
-      - name: Rust formatting
+          sudo apt-get install -y pkg-config libasound2-dev
+      - name: Formatting
         run: cargo fmt --all -- --check
-      - name: Rust tests
+      - name: Unit and API tests
         run: cargo test --locked --workspace
-      - name: Rust Clippy
+      - name: Clippy
         run: cargo clippy --locked --workspace --all-targets -- -D warnings
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Browser-independent logs UI test
+      - name: Web UI test
         run: node tests/test_logs_ui.cjs
+
+  pi_arm64:
+    name: Build Raspberry Pi Linux ARM64
+    needs: test
+    # Never publish unreviewed PRs, master builds, or failed test runs.
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/refactor/rust'
+    runs-on: ubuntu-22.04-arm
+    timeout-minutes: 50
+    permissions:
+      contents: write  # Required only to publish the experimental GitHub release.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-unknown-linux-gnu
+      - uses: Swatinem/rust-cache@v2
+      - name: Install ALSA development headers
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libasound2-dev
+      - name: Compile natively on Linux ARM64
+        run: cargo build --release --locked --target aarch64-unknown-linux-gnu
+      - name: Package binary with commit identity and checksum
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          install -m 0755 target/aarch64-unknown-linux-gnu/release/vinylpi64 dist/vinylpi64
+          printf '%s\n' "$GITHUB_SHA" > dist/commit.txt
+          (cd dist && sha256sum vinylpi64 > sha256.txt)
+          tar -C dist -czf vinylpi64-aarch64.tar.gz vinylpi64 commit.txt sha256.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vinylpi64-aarch64-${{ github.sha }}
+          path: vinylpi64-aarch64.tar.gz
+          if-no-files-found: error
+          retention-days: 14
+      - name: Publish rolling experimental release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! gh release view rust-dev >/dev/null 2>&1; then
+            gh release create rust-dev --prerelease \
+              --target "$GITHUB_SHA" \
+              --title 'Rust development build (ARM64)' \
+              --notes 'Experimental Rust branch build. For Pi Zero 2 W 64-bit Raspberry Pi OS. Not a stable release.'
+          fi
+          # The archive contains the full SHA; update.sh refuses a stale build.
+          gh release upload rust-dev vinylpi64-aarch64.tar.gz --clobber
+          gh release edit rust-dev --prerelease \
+            --title 'Rust development build (ARM64)' \
+            --notes "Latest tested branch commit: ${GITHUB_SHA}. Experimental; use scripts/update.sh on Pi."
