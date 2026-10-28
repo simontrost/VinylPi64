@@ -115,18 +115,27 @@ impl Discogs {
             .into_iter()
             .next()
             .unwrap_or(json!({}));
+        let token_configured = !std::env::var("DISCOGS_API_TOKEN")
+            .unwrap_or_default()
+            .trim()
+            .is_empty();
+        let releases_count = self
+            .db
+            .query("SELECT count(*) n FROM discogs_releases", [])?;
+        let tracks_count = self.db.query("SELECT count(*) n FROM discogs_tracks", [])?;
+        let sync_status = v.get("status").cloned().unwrap_or(Value::Null);
         v["ok"] = json!(true);
         v["enabled"] = json!(cfg.discogs.enabled);
-        v["token_configured"] = json!(
-            !std::env::var("DISCOGS_API_TOKEN")
-                .unwrap_or_default()
-                .is_empty()
-        );
+        v["token_configured"] = json!(token_configured);
+        // The settings UI reads `connected`; the old endpoint omitted this field.
+        v["connected"] = json!(token_configured);
+        v["username"] = json!(&cfg.discogs.username);
         v["syncing"] = json!(self.sync.try_lock().is_err());
-        v["collection_releases"] = json!(
-            self.db
-                .query("SELECT count(*) n FROM discogs_releases", [])?[0]["n"]
-        );
+        v["sync_status"] = sync_status;
+        // Use the actual database counts, including imported Python collections.
+        v["collection_releases"] = releases_count[0]["n"].clone();
+        v["releases_count"] = releases_count[0]["n"].clone();
+        v["tracks_count"] = tracks_count[0]["n"].clone();
         Ok(v)
     }
     pub async fn folders(&self, username: &str) -> Result<Value> {
