@@ -157,10 +157,10 @@ pub fn capture(cfg: &Audio, seconds: f64, cancel: &CancellationToken, wav_path: 
             }
         }
     }
-    if !wav_path.is_empty() {
-        if let Err(error) = write_debug_wav(wav_path, &data, rate, channels as u16) {
-            tracing::warn!(%error, "Unable to write debug WAV");
-        }
+    if !wav_path.is_empty()
+        && let Err(error) = write_debug_wav(wav_path, &data, rate, channels as u16)
+    {
+        tracing::warn!(%error, "Unable to write debug WAV");
     }
     Ok(mono_16k(&data, rate, channels))
 }
