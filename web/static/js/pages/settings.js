@@ -25,99 +25,143 @@ function setAudioDeviceStatus(message = "") {
     status.hidden = !text;
 }
 
-function audioDeviceLabel(device, disambiguate = false) {
-    const label = String(device?.display_name || device?.name || "Audio input");
-    if (!disambiguate) return label;
-    const hostApi = String(device?.hostapi || "").trim();
-    return hostApi ? `${label} · ${hostApi}` : `${label} · device ${device?.index ?? "?"}`;
+// ALSA lists several PCM paths for each physical device. The ordinary picker
+// only shows one stable, conversion-capable path per real input. All raw paths
+// remain available behind an explicit advanced option.
+let availableAudioDevices = [];
+
+function audioPathInfo(device) {
+    const name = String(device?.name || "").trim();
+    const rawLabel = String(device?.display_name || device?.label || name).replace(/\s+/g, " ").trim();
+    const card = name.match(/(?:^|:)CARD=([^,\s]+)/i)?.[1] || "";
+    const deviceNumber = name.match(/(?:^|,)DEV=(\d+)/i)?.[1] || "0";
+    const generic = name === "default" || name === "sysdefault";
+    const baseLabel = (card ? rawLabel.split(",")[0] : rawLabel.split(" · ")[0]).trim();
+    const friendly = generic ? "System default" :
+        /^USB\s+Audio\s+CODEC$/i.test(baseLabel) ? "USB Audio CODEC" :
+        baseLabel || name;
+    const kind = name.startsWith("plughw:") ? "compatible" :
+        name.startsWith("hw:") ? "direct" :
+        name.startsWith("dsnoop:") ? "shared" :
+        name.startsWith("sysdefault:") || name.startsWith("default:") || generic ? "standard" : "other";
+    const kindLabel = {
+        compatible: "Compatible (recommended)",
+        direct: "Direct hardware",
+        shared: "Shared capture",
+        standard: "ALSA default",
+        other: "Custom ALSA path",
+    }[kind];
+    return {
+        name, friendly, kind, kindLabel, card,
+        family: card ? `${card.toLowerCase()}:${deviceNumber}` : "",
+        usb: /usb/i.test(rawLabel) || /usb/i.test(name),
+    };
+}
+
+function preferredAudioPaths(devices) {
+    const groups = new Map();
+    for (const device of devices) {
+        const entry = audioPathInfo(device);
+        if (!entry.family) continue;
+        const priority = { compatible: 4, standard: 3, direct: 2, shared: 1, other: 0 }[entry.kind];
+        const previous = groups.get(entry.family);
+        if (!previous || priority > previous.priority) groups.set(entry.family, { ...entry, priority });
+    }
+    const preferred = [...groups.values()];
+    // If ALSA exposes no physical hardware, keep the system default usable.
+    if (!preferred.length) {
+        const fallback = devices.find((device) => ["default", "sysdefault"].includes(device.name));
+        if (fallback) preferred.push(audioPathInfo(fallback));
+    }
+    return preferred.sort((a, b) => Number(b.usb) - Number(a.usb) || a.friendly.localeCompare(b.friendly));
+}
+
+function audioDeviceOptions(devices, configuredName = "", showAdvanced = false) {
+    const valid = devices.filter((device) => device?.name && device.name.toLowerCase() !== "null");
+    const preferred = preferredAudioPaths(valid);
+    const options = [{ value: "", label: "Automatic (detect USB input)", mode: "auto" }];
+    for (const entry of preferred) {
+        const duplicateName = preferred.filter((other) => other.friendly === entry.friendly).length > 1;
+        const suffix = duplicateName ? ` · ${entry.card} (${entry.family.split(":")[1]})` : "";
+        options.push({ value: entry.name, label: `${entry.friendly}${suffix} · ${entry.kind === "compatible" ? "Recommended" : entry.kindLabel}`, mode: "primary" });
+    }
+
+    const configured = String(configuredName || "").trim();
+    const normalized = configured.toLowerCase();
+    const exact = valid.find((device) => device.name.toLowerCase() === normalized);
+    const legacy = configured.split(": Audio (hw:")[0].replace(/[^a-z0-9]/gi, "").toLowerCase();
+    const legacyMatch = !exact && legacy.length > 3 && preferred.find((entry) =>
+        entry.kind === "compatible" && entry.friendly.replace(/[^a-z0-9]/gi, "").toLowerCase().includes(legacy));
+    let selected = exact?.name || legacyMatch?.name || configured;
+
+    if (showAdvanced) {
+        for (const device of valid) {
+            if (options.some((option) => option.value === device.name)) continue;
+            const entry = audioPathInfo(device);
+            // The technical name is essential for distinguishing ALSA paths here.
+            options.push({ value: entry.name, label: `${entry.friendly} · ${entry.kindLabel} (${entry.name})`, mode: "advanced" });
+        }
+    } else if (exact && !options.some((option) => option.value === exact.name)) {
+        const entry = audioPathInfo(exact);
+        options.push({ value: exact.name, label: `${entry.friendly} · Current (${entry.kindLabel})`, mode: "current" });
+    }
+    if (selected && !options.some((option) => option.value === selected)) {
+        options.push({ value: selected, label: `${selected} · Not available`, mode: "unavailable" });
+    }
+    return { options, selected, preferred, legacyMigrated: Boolean(legacyMatch) };
+}
+
+function updateAudioDeviceDetails() {
+    const select = document.getElementById("audioDeviceName");
+    const description = document.getElementById("audioDeviceDetails");
+    if (!select || !description) return;
+    const selected = availableAudioDevices.find((device) => device.name === select.value);
+    if (!select.value) {
+        description.textContent = "Automatic prioritizes USB inputs. For a fixed turntable, select USB Audio CODEC to avoid switching devices.";
+    } else if (selected) {
+        const entry = audioPathInfo(selected);
+        description.textContent = entry.kind === "compatible"
+            ? `Recommended USB input · ALSA: ${entry.name}. Format conversion is handled automatically.`
+            : `${entry.kindLabel} · ALSA: ${entry.name}. For a USB turntable, the compatible input is usually preferable.`;
+    } else {
+        description.textContent = "The saved audio input is unavailable. Select USB Audio CODEC or Automatic and save your settings.";
+    }
 }
 
 function populateAudioDeviceSelect(devices, configuredName = "") {
     const select = document.getElementById("audioDeviceName");
     if (!select) return;
-
-    const configured = String(configuredName || "").trim();
-    const normalized = configured.toLocaleLowerCase();
+    availableAudioDevices = devices;
+    const advanced = document.getElementById("audioDeviceAdvanced")?.checked || false;
+    const { options, selected, legacyMigrated } = audioDeviceOptions(devices, configuredName, advanced);
     select.replaceChildren();
-
-    const automatic = document.createElement("option");
-    automatic.value = "";
-    automatic.textContent = "Automatic";
-    select.appendChild(automatic);
-
-    const nameCounts = new Map();
-    devices.forEach((device) => {
-        const key = String(device?.display_name || device?.name || "").toLocaleLowerCase();
-        nameCounts.set(key, (nameCounts.get(key) || 0) + 1);
-    });
-
-    devices.forEach((device) => {
+    for (const item of options) {
         const option = document.createElement("option");
-        option.value = String(device.name || "");
-        const key = String(device?.display_name || device?.name || "").toLocaleLowerCase();
-        option.textContent = audioDeviceLabel(device, (nameCounts.get(key) || 0) > 1);
+        option.value = item.value;
+        option.textContent = item.label;
+        option.dataset.mode = item.mode;
         select.appendChild(option);
-    });
-
-    let selectedDevice = null;
-    if (configured) {
-        // The Python backend stored PortAudio names like
-        // "USB AUDIO  CODEC: Audio (hw:0,0)" instead of ALSA PCM identifiers.
-        const legacyName = configured.split(": Audio (hw:")[0].replace(/[^a-z0-9]/gi, "").toLocaleLowerCase();
-        selectedDevice = devices.find(
-            (device) => String(device.name || "").toLocaleLowerCase() === normalized,
-        ) || devices.find(
-            (device) => String(device.name || "").toLocaleLowerCase().includes(normalized),
-        ) || devices.find(
-            (device) => String(device.name || "").startsWith("plughw:") &&
-                String(device.display_name || "").replace(/[^a-z0-9]/gi, "").toLocaleLowerCase().includes(legacyName),
-        );
     }
-
-    if (selectedDevice) {
-        select.value = String(selectedDevice.name || "");
-        return;
-    }
-
-    if (configured) {
-        const unavailable = document.createElement("option");
-        unavailable.value = configured;
-        unavailable.textContent = `${configured} · unavailable`;
-        unavailable.dataset.unavailable = "true";
-        select.appendChild(unavailable);
-        select.value = configured;
-        return;
-    }
-
-    if (devices.length === 1) {
-        select.value = String(devices[0].name || "");
-    } else {
-        select.value = "";
-    }
+    select.value = selected;
+    const status = devices.length ? "" : "No audio inputs detected. Check the USB cable and refresh.";
+    setAudioDeviceStatus(legacyMigrated ? "Previous Python audio input matched. Save settings to use the recommended ALSA path." : status);
+    updateAudioDeviceDetails();
 }
 
 async function loadAudioDevices(configuredName = null, { announce = false } = {}) {
     const select = document.getElementById("audioDeviceName");
     const refresh = document.getElementById("refreshAudioDevices");
     if (!select) return;
-
-    const preferred = configuredName === null
-        ? String(select.value || "")
-        : String(configuredName || "");
-
+    const preferred = configuredName === null ? String(select.value || "") : String(configuredName || "");
     if (refresh) refresh.disabled = true;
     try {
         const response = await fetch("/api/audio-devices", { cache: "no-store" });
         const data = await response.json().catch(() => ({}));
-        if (!response.ok || !data.ok) {
-            throw new Error(data.error || "Audio device scan failed");
-        }
-
+        if (!response.ok || !data.ok) throw new Error(data.error || "Audio device scan failed");
         const devices = Array.isArray(data.devices) ? data.devices : [];
         populateAudioDeviceSelect(devices, preferred);
-        setAudioDeviceStatus(devices.length ? "" : "No audio inputs detected.");
         if (announce) {
-            showToast(`${devices.length} audio input${devices.length === 1 ? "" : "s"} found.`);
+            showToast(`${preferredAudioPaths(devices).length} input device${preferredAudioPaths(devices).length === 1 ? "" : "s"} found.`);
         }
     } catch (error) {
         console.error(error);
@@ -1132,6 +1176,10 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById(id)?.addEventListener("change", syncDependentSettingStates);
   });
 
+  document.getElementById("audioDeviceName")?.addEventListener("change", updateAudioDeviceDetails);
+  document.getElementById("audioDeviceAdvanced")?.addEventListener("change", () => {
+    populateAudioDeviceSelect(availableAudioDevices, document.getElementById("audioDeviceName")?.value || "");
+  });
   document.getElementById("refreshAudioDevices")?.addEventListener("click", () => {
     loadAudioDevices(null, { announce: true });
   });

@@ -46,6 +46,7 @@ jobs:
         run: |
           node tests/test_logs_ui.cjs
           node tests/test_source_ui.cjs
+          node tests/test_audio_devices_ui.cjs
           for file in web/static/js/pages/*.js; do node --check "$file"; done
 
   pi_arm64:

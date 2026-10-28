@@ -4,10 +4,11 @@
 
 {% block page_styles %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/settings.css') }}?v=20261026-likes-on-demand">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/audio_devices.css') }}?v=20261028-audio-simple">
 {% endblock %}
 
 {% block page_scripts %}
-    <script src="{{ url_for('static', filename='js/pages/settings.js') }}?v=20261028-alsa3" defer></script>
+    <script src="{{ url_for('static', filename='js/pages/settings.js') }}?v=20261028-audio-simple" defer></script>
     <script src="{{ url_for('static', filename='js/pages/spotify_settings.js') }}?v=20261028-alsa3" defer></script>
 {% endblock %}
 
@@ -90,7 +91,7 @@
                                 <label for="audioDeviceName">Input device</label>
                                 <div class="audio-device-control">
                                     <select id="audioDeviceName" class="pixoo-select">
-                                        <option value="">Automatic</option>
+                                        <option value="">Automatic (detect USB input)</option>
                                     </select>
                                     <button
                                         type="button"
@@ -107,6 +108,11 @@
                                         </svg>
                                     </button>
                                 </div>
+                                <div id="audioDeviceDetails" class="audio-device-description" role="status" aria-live="polite"></div>
+                                <label class="audio-device-expert" for="audioDeviceAdvanced">
+                                    <input id="audioDeviceAdvanced" type="checkbox">
+                                    <span>Show advanced ALSA paths</span>
+                                </label>
                                 <div id="audioDeviceStatus" class="form-hint" role="status" aria-live="polite" hidden></div>
                             </div>
                             <div class="adaptive-sample-block">

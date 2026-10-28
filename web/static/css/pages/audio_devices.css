@@ -1,0 +1,33 @@
+/* The simple audio picker groups ALSA PCM aliases by physical USB input. */
+.audio-device-description {
+    grid-column: 2;
+    color: var(--muted-2);
+    font-size: 12px;
+    line-height: 1.55;
+    overflow-wrap: anywhere;
+    margin-top: 2px;
+}
+.audio-device-expert {
+    grid-column: 2;
+    width: max-content;
+    max-width: 100%;
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 550;
+    cursor: pointer;
+    margin-top: 3px;
+}
+.audio-device-expert input {
+    width: 15px;
+    height: 15px;
+    margin: 0;
+    accent-color: var(--pink, #db298e);
+}
+.audio-device-expert:hover span { color: var(--text); }
+.audio-device-expert input:focus-visible { outline: 2px solid var(--yellow); outline-offset: 3px; }
+@media (max-width: 700px) {
+    .audio-device-description, .audio-device-expert { grid-column: 1 / -1; }
+}
