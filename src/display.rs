@@ -116,8 +116,8 @@ fn marquee_offset(elapsed: Duration, pixels_per_second: f64) -> u32 {
 /// throughput available from the Pixoo's HTTP endpoint.
 fn time_to_next_pixel(elapsed: Duration, pixels_per_second: f64) -> Duration {
     let current = marquee_offset(elapsed, pixels_per_second);
-    let seconds = ((current as f64 + 1.0) / pixels_per_second - elapsed.as_secs_f64())
-        .clamp(0.001, 0.250);
+    let seconds =
+        ((current as f64 + 1.0) / pixels_per_second - elapsed.as_secs_f64()).clamp(0.001, 0.250);
     Duration::from_secs_f64(seconds)
 }
 
@@ -465,7 +465,9 @@ impl Display {
                         );
                     }
                     Content::SideFlip(next_side) => {
-                        let path = root.join(&cfg.fallback.side_flip_image_path).canonicalize()?;
+                        let path = root
+                            .join(&cfg.fallback.side_flip_image_path)
+                            .canonicalize()?;
                         ensure!(
                             path.starts_with(root.join("assets").canonicalize()?),
                             "Side-flip prompt outside assets"
@@ -481,7 +483,10 @@ impl Display {
                         let cover = if let Some(url) = &t.cover_url {
                             let downloaded = async {
                                 let u = url::Url::parse(url)?;
-                                ensure!(["https", "http"].contains(&u.scheme()), "Invalid cover URL");
+                                ensure!(
+                                    ["https", "http"].contains(&u.scheme()),
+                                    "Invalid cover URL"
+                                );
                                 let bytes = net::bytes(
                                     self.pixoo.client.get(u).send().await?,
                                     8 * 1024 * 1024,
@@ -493,7 +498,12 @@ impl Display {
                             match downloaded {
                                 Ok(image) => image,
                                 Err(e) => {
-                                    db.log("WARNING", &format!("Album artwork unavailable; using blank cover: {e}"));
+                                    db.log(
+                                        "WARNING",
+                                        &format!(
+                                            "Album artwork unavailable; using blank cover: {e}"
+                                        ),
+                                    );
                                     DynamicImage::new_rgb8(64, 64)
                                 }
                             }
@@ -635,8 +645,8 @@ impl Display {
                         if perf_started.elapsed() >= Duration::from_secs(10) {
                             tracing::info!(
                                 fps = perf_frames as f64 / perf_started.elapsed().as_secs_f64(),
-                                avg_send_ms = perf_send_duration.as_secs_f64() * 1000.0
-                                    / perf_frames as f64,
+                                avg_send_ms =
+                                    perf_send_duration.as_secs_f64() * 1000.0 / perf_frames as f64,
                                 requested_px_s = cfg.image.marquee_speed,
                                 "Pixoo live-frame performance"
                             );

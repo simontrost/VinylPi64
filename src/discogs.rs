@@ -51,8 +51,18 @@ pub fn side_flip_target(track: &Track) -> Option<String> {
     if track.extra.get("discogs_release_id")?.as_i64().is_none() {
         return None;
     }
-    let from = track.extra.get("discogs_side")?.as_str()?.trim().to_ascii_uppercase();
-    let to = track.extra.get("discogs_expected_next_side")?.as_str()?.trim().to_ascii_uppercase();
+    let from = track
+        .extra
+        .get("discogs_side")?
+        .as_str()?
+        .trim()
+        .to_ascii_uppercase();
+    let to = track
+        .extra
+        .get("discogs_expected_next_side")?
+        .as_str()?
+        .trim()
+        .to_ascii_uppercase();
     if from.len() != 1 || to.len() != 1 {
         return None;
     }
@@ -379,7 +389,9 @@ mod side_flip_tests {
         let mut track = Track::default();
         track.extra.insert("discogs_release_id".into(), json!(10));
         track.extra.insert("discogs_side".into(), json!(from));
-        track.extra.insert("discogs_expected_next_side".into(), json!(to));
+        track
+            .extra
+            .insert("discogs_expected_next_side".into(), json!(to));
         track
     }
 
@@ -388,7 +400,10 @@ mod side_flip_tests {
         assert_eq!(side_flip_target(&matched("a", "b")), Some("B".to_owned()));
         assert_eq!(side_flip_target(&matched("C", "D")), Some("D".to_owned()));
         for (from, to) in [("B", "C"), ("A", "C"), ("D", "A"), ("A", "A"), ("A1", "B")] {
-            assert!(side_flip_target(&matched(from, to)).is_none(), "{from} -> {to}");
+            assert!(
+                side_flip_target(&matched(from, to)).is_none(),
+                "{from} -> {to}"
+            );
         }
         let mut no_release = matched("A", "B");
         no_release.extra.remove("discogs_release_id");

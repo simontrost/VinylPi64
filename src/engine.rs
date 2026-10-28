@@ -475,28 +475,42 @@ impl Engine {
                                 } else {
                                     let mut v = self.status.borrow().clone();
                                     v["is_playing"] = json!(false);
-                                    let active_flip = failures >= cfg.fallback.allowed_failures as usize
+                                    let active_flip = failures
+                                        >= cfg.fallback.allowed_failures as usize
                                         && flip.is_some();
                                     v["side_flip_prompt_active"] = json!(active_flip);
                                     if active_flip {
                                         let side = flip.as_deref().unwrap_or_default();
-                                        v["side_flip_from_side"] = last.as_ref()
+                                        v["side_flip_from_side"] = last
+                                            .as_ref()
                                             .and_then(|t| t.extra.get("discogs_side"))
-                                            .cloned().unwrap_or(Value::Null);
+                                            .cloned()
+                                            .unwrap_or(Value::Null);
                                         v["side_flip_to_side"] = json!(side);
-                                        v["side_flip_next_title"] = last.as_ref()
-                                            .and_then(|t| t.extra.get("discogs_expected_next_title"))
-                                            .cloned().unwrap_or(Value::Null);
-                                        v["side_flip_next_position"] = last.as_ref()
-                                            .and_then(|t| t.extra.get("discogs_expected_next_position"))
-                                            .cloned().unwrap_or(Value::Null);
+                                        v["side_flip_next_title"] = last
+                                            .as_ref()
+                                            .and_then(|t| {
+                                                t.extra.get("discogs_expected_next_title")
+                                            })
+                                            .cloned()
+                                            .unwrap_or(Value::Null);
+                                        v["side_flip_next_position"] = last
+                                            .as_ref()
+                                            .and_then(|t| {
+                                                t.extra.get("discogs_expected_next_position")
+                                            })
+                                            .cloned()
+                                            .unwrap_or(Value::Null);
                                     }
                                     v["updated_at"] = json!(chrono::Utc::now().timestamp_millis());
                                     if failures == cfg.fallback.allowed_failures as usize
                                         && mode == Mode::Vinyl
                                         && let Err(e) = s.db.save_status(mode, &v)
                                     {
-                                        s.db.log("WARNING", &format!("Saving fallback status failed: {e}"));
+                                        s.db.log(
+                                            "WARNING",
+                                            &format!("Saving fallback status failed: {e}"),
+                                        );
                                     }
                                     self.status.send_replace(v);
                                 }
