@@ -116,7 +116,7 @@ impl Poster {
             let yy=y+88+i*83;
             self.rounded(x+18,yy,421,73,14,SURFACE,None);
             self.text(x+29,yy+22,&format!("{:02}",i+1),19.,1,self.accent);
-            let item=items.get(i);
+            let item=items.get(i as usize);
             let name=item.and_then(|v|v["name"].as_str()).unwrap_or("—");
             let count=item.and_then(|v|v["count"].as_i64()).map(|v|v.to_string()).unwrap_or_else(||"—".to_owned());
             let label=self.fit(name,20.,1,285);
