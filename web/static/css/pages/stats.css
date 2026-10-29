@@ -235,15 +235,15 @@
     margin: 0;
     padding: 0;
     list-style: none;
-    overflow-y: auto;
+    /* Rows 6–10 expand the card instead of being clipped in a scroll area. */
+    overflow: visible;
     min-height: 0;
-    scrollbar-width: thin;
+    flex: 1 0 auto;
 }
 
-/* More entries scroll inside the card, not across the radar chart below. */
 .stats-list-card {
-    height: 475px;
-    min-height: 0;
+    min-height: 475px;
+    height: auto;
     display: flex;
     flex-direction: column;
 }

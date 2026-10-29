@@ -57,8 +57,10 @@ function createRankedItem(rank, title, subtitle, countText, metaText = "") {
 }
 
 function setupExpandableList(listElement, items, renderItem, emptyMessage) {
+    // A background stats refresh must not collapse a list that the user opened.
+    const wasExpanded = listElement.classList.contains("is-expanded");
     listElement.replaceChildren();
-    listElement.classList.remove("is-expanded");
+    listElement.classList.toggle("is-expanded", wasExpanded && items.length > MAX_VISIBLE);
 
     if (!items.length) {
         listElement.appendChild(createEmptyItem(emptyMessage));
@@ -69,7 +71,7 @@ function setupExpandableList(listElement, items, renderItem, emptyMessage) {
     items.forEach((item, index) => {
         const element = renderItem(item, index);
         if (index >= MAX_VISIBLE) {
-            element.hidden = true;
+            element.hidden = !wasExpanded;
             extraRows.push(element);
         }
         listElement.appendChild(element);
@@ -81,17 +83,16 @@ function setupExpandableList(listElement, items, renderItem, emptyMessage) {
         const button = document.createElement("button");
         button.type = "button";
         button.className = "stats-toggle";
-        button.setAttribute("aria-expanded", "false");
-        button.textContent = `Show all ${items.length}`;
+        button.setAttribute("aria-expanded", String(wasExpanded));
+        button.textContent = wasExpanded ? "Show less" : `Show all ${items.length}`;
         button.addEventListener("click", () => {
             const expanded = button.getAttribute("aria-expanded") !== "true";
             extraRows.forEach(row => { row.hidden = !expanded; });
             listElement.classList.toggle("is-expanded", expanded);
             button.setAttribute("aria-expanded", String(expanded));
             button.textContent = expanded ? "Show less" : `Show all ${items.length}`;
-            // Reveal rows 6-10 immediately inside the fixed-height list.
-            listElement.scrollTop = expanded ? listElement.scrollHeight : 0;
-            // No list reconstruction, no stats re-fetch, no Chart.js redraw.
+            // Let the card grow naturally. All ranks remain visible without an
+            // inner scrollbar, and the genre chart is not rebuilt or re-fetched.
         });
         wrapper.appendChild(button);
         listElement.appendChild(wrapper);
