@@ -10,7 +10,6 @@ SERVICE=vinylpi64-rust.service
 BIN="$ROOT/target/release/vinylpi64"
 DATA_DIR="${VINYLPI_UPDATE_DATA_DIR:-$ROOT/.rust-smoke-data}"
 BACKUP_ROOT="$ROOT/data/rust-update-backups"
-URL='https://github.com/simontrost/VinylPi64/releases/download/rust-dev/vinylpi64-aarch64.tar.gz'
 PORT="${VINYLPI_UPDATE_PORT:-8081}"
 
 fail() { echo "ERROR: $*" >&2; exit 1; }
@@ -26,6 +25,9 @@ git fetch origin "$BRANCH"
 wanted="$(git rev-parse FETCH_HEAD)"
 git merge-base --is-ancestor "$before" "$wanted" || fail 'Remote is not a fast-forward; refusing to update'
 echo "Requested commit: $wanted"
+# Every commit uses its own immutable release filename. The rolling asset URL
+# previously served stale archives from GitHub/CDN caches after --clobber.
+URL="https://github.com/simontrost/VinylPi64/releases/download/rust-dev/vinylpi64-aarch64-${wanted}.tar.gz"
 
 stage="$(mktemp -d)"
 updating=false
@@ -57,7 +59,7 @@ trap cleanup EXIT
 curl --fail --location --silent --show-error --retry 3 --retry-delay 2 \
   --connect-timeout 10 --max-time 120 \
   --output "$stage/build.tar.gz" "$URL" \
-  || fail 'ARM64 release is not available yet; verify the GitHub Actions run and retry'
+  || fail 'ARM64 release for this commit is not available; check the latest GitHub Actions run'
 
 # Prevent an archive with unexpected entries or paths from being installed.
 contents="$(tar -tzf "$stage/build.tar.gz")" || fail 'Invalid release archive'
@@ -65,7 +67,7 @@ expected="$(printf 'vinylpi64\ncommit.txt\nsha256.txt')"
 [[ "$contents" == "$expected" ]] || fail 'Unexpected contents in release archive'
 tar -xzf "$stage/build.tar.gz" -C "$stage" \
   vinylpi64 commit.txt sha256.txt
-[[ "$(cat "$stage/commit.txt")" == "$wanted" ]] || fail 'Release binary is not built from the latest branch commit. Wait for Actions.'
+[[ "$(cat "$stage/commit.txt")" == "$wanted" ]] || fail "Release archive commit does not match $wanted; refusing to install"
 [[ "$(cat "$stage/sha256.txt")" =~ ^[a-f0-9]{64}[[:space:]][[:space:]]vinylpi64$ ]] || fail 'Unexpected checksum manifest'
 (cd "$stage" && sha256sum --check --status sha256.txt) || fail 'Release checksum verification failed'
 chmod 755 "$stage/vinylpi64"

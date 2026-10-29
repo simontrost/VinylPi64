@@ -94,8 +94,11 @@ jobs:
               --title 'Rust development build (ARM64)' \
               --notes 'Experimental Rust branch build. For Pi Zero 2 W 64-bit Raspberry Pi OS. Not a stable release.'
           fi
-          # The archive contains the full SHA; update.sh refuses a stale build.
-          gh release upload rust-dev vinylpi64-aarch64.tar.gz --clobber
+          # Commit-specific filenames avoid stale CDN caches for the previous
+          # rolling filename. Re-runs of the same SHA may replace their asset.
+          archive="vinylpi64-aarch64-${GITHUB_SHA}.tar.gz"
+          cp vinylpi64-aarch64.tar.gz "$archive"
+          gh release upload rust-dev "$archive" --clobber
           gh release edit rust-dev --prerelease \
             --title 'Rust development build (ARM64)' \
             --notes "Latest tested branch commit: ${GITHUB_SHA}. Experimental; use scripts/update.sh on Pi."
