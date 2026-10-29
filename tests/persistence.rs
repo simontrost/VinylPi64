@@ -1,5 +1,6 @@
 //! Persistence invariants independent of the HTTP server and real hardware.
 use serde_json::json;
+use chrono::Datelike;
 use vinylpi64::{db::{Db, snapshot}, model::{Mode, Track}};
 
 fn song(id: &str, album: &str, cover: Option<&str>) -> Track {
@@ -106,4 +107,51 @@ fn sqlite_snapshot_contains_committed_wal_data_and_is_independent() {
     assert_eq!(copied.query("SELECT COUNT(*) n FROM songs", []).unwrap()[0]["n"], 1);
     assert_eq!(db.query("SELECT COUNT(*) n FROM songs", []).unwrap()[0]["n"], 2);
     assert_eq!(copied.query("PRAGMA integrity_check", []).unwrap()[0]["integrity_check"], "ok");
+}
+
+#[test]
+fn album_editions_share_a_statistic_without_rewriting_historical_events() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("albums.sqlite");
+    let db = Db::open(&path).unwrap();
+    let original = Track { artist: "Pink Floyd".into(), title: "One of These Days".into(),
+        album: Some("Meddle (2016 Remaster)".into()),
+        cover_url: Some("https://example.org/meddle.jpg".into()), ..Default::default() };
+    let current = Track { title: "Fearless".into(), album: Some("Meddle".into()), ..original.clone() };
+    for _ in 0..5 {
+        db.record_play(Mode::Vinyl, &original, true).unwrap();
+    }
+    db.record_play(Mode::Vinyl, &current, true).unwrap();
+    // Source history remains unmodified, while the public ranking merges aliases.
+    let history = db.query("SELECT album,count FROM yearly_albums WHERE source='vinyl' ORDER BY album", []).unwrap();
+    assert_eq!(history.len(), 2);
+    assert_eq!(db.query("SELECT COUNT(*) n FROM playback_events WHERE event_type='album_session'", []).unwrap()[0]["n"], 6);
+    let stat = db.stats("vinyl", None).unwrap();
+    assert_eq!(stat["top_albums"].as_array().unwrap().len(), 1);
+    assert_eq!(stat["top_albums"][0]["name"], "Meddle");
+    assert_eq!(stat["top_albums"][0]["count"], 6);
+    assert_eq!(stat["top_album_covers"][0]["cover_url"], "https://example.org/meddle.jpg");
+    drop(db);
+    let db = Db::open(&path).unwrap();
+    assert_eq!(db.stats("vinyl", None).unwrap()["top_albums"][0]["count"], 6);
+}
+
+#[test]
+fn album_ranking_preserves_artists_source_and_year_and_real_other_editions() {
+    let dir = tempfile::tempdir().unwrap();
+    let db = Db::open(&dir.path().join("albums.sqlite")).unwrap();
+    let a = song("A", "Greatest Hits (Remastered)", None);
+    let mut other_artist = song("B", "Greatest Hits", None);
+    other_artist.artist = "Another artist".into();
+    db.record_play(Mode::Vinyl, &a, true).unwrap();
+    db.record_play(Mode::Vinyl, &other_artist, true).unwrap();
+    let albums = db.stats("vinyl", None).unwrap();
+    assert_eq!(albums["top_albums"].as_array().unwrap().len(), 2);
+    let spotify = song("C", "Greatest Hits (Deluxe)", None);
+    db.record_play(Mode::Spotify, &spotify, false).unwrap();
+    assert_eq!(db.stats("spotify", None).unwrap()["top_albums"][0]["count"], 1);
+    assert_eq!(db.stats("combined", None).unwrap()["top_albums"].as_array().unwrap().len(), 2);
+    let year = chrono::Local::now().year();
+    assert_eq!(db.stats("vinyl", Some(year)).unwrap()["top_albums"].as_array().unwrap().len(), 2);
+    assert!(db.stats("vinyl", Some(year + 1)).unwrap()["top_albums"].as_array().unwrap().is_empty());
 }

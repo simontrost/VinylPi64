@@ -1,10 +1,11 @@
-use crate::model::{Mode, Track};
+use crate::model::{Mode, Track, album_identity, canonical_album_name};
 use anyhow::{Context, Result, ensure};
 use chrono::{Datelike, Local, Utc};
 use rusqlite::{Connection, OptionalExtension, params, types::ValueRef};
 use serde_json::{Value, json};
 use std::{
     path::Path,
+    collections::HashMap,
     sync::{Arc, Mutex},
     time::Duration,
 };
@@ -36,6 +37,46 @@ pub fn rows(c: &Connection, sql: &str, args: impl rusqlite::Params) -> Result<Ve
         .collect::<rusqlite::Result<Vec<_>>>()?;
     Ok(result)
 }
+/// Group historical album editions at read-time. No migration or rewriting
+/// of recorded events is necessary, and original release names remain intact
+/// in SQLite for auditing. Artists are included to prevent false merges.
+fn rank_albums(rows: Vec<Value>) -> Vec<Value> {
+    struct Album {
+        name: String,
+        artist: String,
+        cover_url: Option<String>,
+        count: i64,
+    }
+    let mut by_identity: HashMap<String, Album> = HashMap::new();
+    for row in rows {
+        let Some(raw_name) = row["name"].as_str() else { continue };
+        let name = canonical_album_name(raw_name);
+        if name.is_empty() { continue; }
+        let artist = row["artist"].as_str().unwrap_or("");
+        let count = row["count"].as_i64().unwrap_or(0);
+        if count <= 0 { continue; }
+        let cover = row["cover_url"].as_str().filter(|s| !s.is_empty()).map(str::to_owned);
+        let entry = by_identity.entry(album_identity(artist, raw_name)).or_insert_with(|| Album {
+            name,
+            artist: artist.to_owned(),
+            cover_url: None,
+            count: 0,
+        });
+        entry.count += count;
+        if entry.cover_url.is_none() {
+            entry.cover_url = cover;
+        }
+    }
+    let mut result = by_identity.into_values().collect::<Vec<_>>();
+    result.sort_by(|a,b| b.count.cmp(&a.count).then_with(|| a.name.cmp(&b.name)));
+    result.into_iter().take(10).map(|a| json!({
+        "name": a.name,
+        "artist": a.artist,
+        "cover_url": a.cover_url,
+        "count": a.count,
+    })).collect()
+}
+
 pub fn snapshot(source: &Path, dest: &Path) -> Result<()> {
     let c = Connection::open_with_flags(source, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)?;
     let mut to = Connection::open(dest)?;
@@ -272,7 +313,38 @@ impl Db {
             let args=params![scope,scope,year,year];
             let songs=rows(c,"WITH metadata AS(SELECT 'vinyl' source,song_key,cover_url,genre FROM songs UNION ALL SELECT 'spotify',track_id,cover_url,genre FROM spotify_songs) SELECT p.artist,p.title,MAX(p.album) album,MAX(m.cover_url) cover_url,MAX(m.genre) genre,SUM(p.count) count FROM yearly_plays p LEFT JOIN metadata m ON p.source=m.source AND p.song_key=m.song_key WHERE (?='combined' OR p.source=?) AND (? IS NULL OR year=?) GROUP BY lower(p.artist),lower(p.title) ORDER BY count DESC,p.title LIMIT 10",args)?;
             let artists=rows(c,&format!("SELECT artist name,SUM(count) count FROM yearly_plays WHERE {filter} GROUP BY lower(artist) ORDER BY count DESC,name LIMIT 10"),args)?;
-            let albums=rows(c,&format!("WITH covers AS(SELECT album,artist,cover_url FROM album_covers UNION ALL SELECT album,artist,cover_url FROM spotify_album_totals), totals AS(SELECT album name,SUM(count) count FROM yearly_albums WHERE {filter} GROUP BY lower(album)) SELECT name,count,COALESCE((SELECT cover_url FROM covers WHERE lower(album)=lower(name) AND trim(COALESCE(cover_url,''))!='' LIMIT 1),(SELECT cover_url FROM songs WHERE lower(album)=lower(name) AND trim(COALESCE(cover_url,''))!='' ORDER BY play_count DESC LIMIT 1),(SELECT cover_url FROM spotify_songs WHERE lower(album)=lower(name) AND trim(COALESCE(cover_url,''))!='' ORDER BY play_count DESC LIMIT 1)) cover_url,(SELECT artist FROM covers WHERE lower(album)=lower(name) LIMIT 1) artist FROM totals ORDER BY count DESC,name LIMIT 10"),args)?;
+            // Preserve per-source album/artist metadata until after we merge
+            // edition aliases. Never LIMIT before grouping: a "Meddle" session
+            // must be added to existing "Meddle (2016 Remaster)" sessions.
+            let album_rows=rows(c,r#"
+                SELECT y.source, y.album name, SUM(y.count) count,
+                    CASE WHEN y.source='vinyl' THEN
+                        COALESCE(
+                            (SELECT artist FROM album_covers WHERE lower(album)=lower(y.album) LIMIT 1),
+                            (SELECT artist FROM songs WHERE lower(album)=lower(y.album) ORDER BY play_count DESC LIMIT 1),
+                            (SELECT artist FROM yearly_plays WHERE source=y.source AND lower(album)=lower(y.album)
+                             GROUP BY artist ORDER BY SUM(count) DESC LIMIT 1), '')
+                    ELSE COALESCE(
+                            (SELECT artist FROM spotify_album_totals WHERE lower(album)=lower(y.album) LIMIT 1),
+                            (SELECT artist FROM spotify_songs WHERE lower(album)=lower(y.album) ORDER BY play_count DESC LIMIT 1),
+                            (SELECT artist FROM yearly_plays WHERE source=y.source AND lower(album)=lower(y.album)
+                             GROUP BY artist ORDER BY SUM(count) DESC LIMIT 1), '') END artist,
+                    CASE WHEN y.source='vinyl' THEN
+                        COALESCE(
+                            (SELECT cover_url FROM album_covers WHERE lower(album)=lower(y.album)
+                             AND trim(COALESCE(cover_url,''))!='' LIMIT 1),
+                            (SELECT cover_url FROM songs WHERE lower(album)=lower(y.album)
+                             AND trim(COALESCE(cover_url,''))!='' ORDER BY play_count DESC LIMIT 1))
+                    ELSE COALESCE(
+                            (SELECT cover_url FROM spotify_album_totals WHERE lower(album)=lower(y.album)
+                             AND trim(COALESCE(cover_url,''))!='' LIMIT 1),
+                            (SELECT cover_url FROM spotify_songs WHERE lower(album)=lower(y.album)
+                             AND trim(COALESCE(cover_url,''))!='' ORDER BY play_count DESC LIMIT 1)) END cover_url
+                FROM yearly_albums y
+                WHERE (?='combined' OR y.source=?) AND (? IS NULL OR y.year=?)
+                GROUP BY y.source, lower(y.album)
+            "#,args)?;
+            let albums=rank_albums(album_rows);
             // The ranked album list may contain legacy sessions without cover art.
             // The image gallery only shows albums for which artwork is known.
             let album_covers = albums.iter().filter(|album| album["cover_url"].as_str().is_some_and(|url| !url.is_empty())).cloned().collect::<Vec<_>>();

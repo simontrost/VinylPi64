@@ -5,7 +5,7 @@ use crate::{
     discogs::Discogs,
     display::{Content, Display},
     metadata::Metadata,
-    model::{Mode, Track, normalize},
+    model::{Mode, Track, album_identity},
     net,
     spotify::Spotify,
 };
@@ -42,7 +42,7 @@ pub struct Services {
     pub metadata: Arc<Metadata>,
     pub client: reqwest::Client,
 }
-#[derive(Default)]
+#[derive(Clone, Default)]
 struct Confirmation {
     candidate: String,
     consecutive: usize,
@@ -50,6 +50,8 @@ struct Confirmation {
     album: String,
     album_tracks: std::collections::HashSet<String>,
     album_recorded: bool,
+    pending_album: String,
+    pending_tracks: std::collections::HashSet<String>,
 }
 impl Confirmation {
     fn observe(&mut self, t: &Track, min: usize) -> (bool, bool) {
@@ -61,22 +63,40 @@ impl Confirmation {
             self.consecutive = 1
         };
         let count = self.consecutive >= min && self.counted != id;
-        let album = t.album.as_deref().map(normalize).unwrap_or_default();
+        let album = t.album.as_deref().map(|a| album_identity(&t.artist, a)).unwrap_or_default();
         let mut new_album = false;
         if count {
             self.counted = id.clone();
             if !album.is_empty() {
-                if self.album != album {
-                    self.album = album;
-                    self.album_tracks.clear();
-                    self.album_recorded = false;
+                if self.album.is_empty() {
+                    self.album = album.clone();
                 }
-                self.album_tracks.insert(id);
-                // Preserve the Python definition of an album session:
-                // at least two DISTINCT, confirmed songs on the same album.
-                if self.album_tracks.len() >= 2 && !self.album_recorded {
-                    self.album_recorded = true;
-                    new_album = true;
+                if self.album == album {
+                    self.pending_album.clear();
+                    self.pending_tracks.clear();
+                    self.album_tracks.insert(id);
+                    // Two DISTINCT, confirmed tracks: one session, regardless
+                    // of differences in explicit remaster/edition suffixes.
+                    if self.album_tracks.len() >= 2 && !self.album_recorded {
+                        self.album_recorded = true;
+                        new_album = true;
+                    }
+                } else {
+                    // A single confirmed but unrelated album match must not
+                    // end an ongoing session (and permit duplicate counting).
+                    // Switch only after two confirmed tracks on the new album.
+                    if self.pending_album != album {
+                        self.pending_album = album.clone();
+                        self.pending_tracks.clear();
+                    }
+                    self.pending_tracks.insert(id);
+                    if self.pending_tracks.len() >= 2 {
+                        self.album = album;
+                        self.album_tracks = std::mem::take(&mut self.pending_tracks);
+                        self.pending_album.clear();
+                        self.album_recorded = true;
+                        new_album = true;
+                    }
                 }
             }
         };
@@ -443,6 +463,9 @@ impl Engine {
                                     }
                                     spotify_previous = Some((id.clone(), progress, now));
                                 }
+                                // A failed SQLite transaction must not consume a
+                                // confirmation or lose a pending album session.
+                                let before_confirmation = confirmation.clone();
                                 let (count, new_album) = confirmation.observe(
                                     &t,
                                     if mode == Mode::Spotify {
@@ -458,7 +481,7 @@ impl Engine {
                                     s.db.log("INFO", &format!("Play confirmed: {} – {} [{}]{}", t.artist, t.title, mode.as_str(), if new_album { "; album session recorded" } else { "" }));
                                     if let Err(e) = s.db.record_play(mode, &t, new_album) {
                                         s.db.log("ERROR", &format!("Statistics write failed: {e}"));
-                                        confirmation.counted.clear();
+                                        confirmation = before_confirmation;
                                     } else if mode == Mode::Vinyl
                                         && let Some(duration) = t.duration_ms
                                         && let Err(e) =
@@ -618,6 +641,76 @@ mod tests {
         c.observe(&track("one"), 2);
         assert!(c.observe(&track("one"), 2).0);
     }
+    #[test]
+    fn counts_one_album_session_for_confirmed_editions_but_not_unconfirmed_tracks() {
+        let mut c = Confirmation::default();
+        let first = track("one");
+        let mut second = track("two");
+        second.album = Some("album (2016 Remaster)".into());
+        assert_eq!(c.observe(&first, 3), (false, false));
+        assert_eq!(c.observe(&first, 3), (false, false));
+        assert_eq!(c.observe(&first, 3), (true, false));
+        assert_eq!(c.observe(&second, 3), (false, false));
+        c.failure();
+        assert_eq!(c.observe(&second, 3), (false, false));
+        assert_eq!(c.observe(&second, 3), (false, false));
+        assert_eq!(c.observe(&second, 3), (true, true));
+        let mut third = track("three");
+        third.album = Some("album (Deluxe)".into());
+        for _ in 0..3 {
+            assert!(!c.observe(&third, 3).1);
+        }
+    }
+
+    #[test]
+    fn a_single_confirmed_wrong_album_cannot_duplicate_an_active_session() {
+        let mut c = Confirmation::default();
+        for title in ["one", "two"] {
+            c.observe(&track(title), 2);
+            assert_eq!(c.observe(&track(title), 2).1, title == "two");
+        }
+        let mut wrong = track("other");
+        wrong.artist = "different artist".into();
+        wrong.album = Some("unrelated album".into());
+        c.observe(&wrong, 2);
+        assert_eq!(c.observe(&wrong, 2), (true, false));
+        c.observe(&track("three"), 2);
+        assert_eq!(c.observe(&track("three"), 2), (true, false));
+        c.observe(&track("four"), 2);
+        assert_eq!(c.observe(&track("four"), 2), (true, false));
+    }
+
+    #[test]
+    fn a_new_album_requires_two_distinct_confirmed_tracks_to_start_a_new_session() {
+        let mut c = Confirmation::default();
+        c.observe(&track("one"), 2);
+        assert_eq!(c.observe(&track("one"), 2), (true, false));
+        c.observe(&track("two"), 2);
+        assert_eq!(c.observe(&track("two"), 2), (true, true));
+        let mut next = track("three");
+        next.album = Some("another album".into());
+        c.observe(&next, 2);
+        assert_eq!(c.observe(&next, 2), (true, false));
+        let mut later = track("four");
+        later.album = Some("another album (2016 Remaster)".into());
+        c.observe(&later, 2);
+        assert_eq!(c.observe(&later, 2), (true, true));
+        c.observe(&track("five"), 2);
+        assert!(!c.observe(&track("five"), 2).1);
+    }
+
+    #[test]
+    fn album_state_can_be_restored_after_failed_statistics_transaction() {
+        let mut c = Confirmation::default();
+        c.observe(&track("one"), 2);
+        assert_eq!(c.observe(&track("one"), 2), (true, false));
+        c.observe(&track("two"), 2);
+        let saved = c.clone();
+        assert_eq!(c.observe(&track("two"), 2), (true, true));
+        c = saved; // as engine does when the database transaction fails
+        assert_eq!(c.observe(&track("two"), 2), (true, true));
+    }
+
     #[test]
     fn wake_requires_sustained_signal_and_rearms() {
         let cfg = Config::default();
