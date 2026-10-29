@@ -4,13 +4,13 @@
 
 {% block page_styles %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/vinyl-loader.css') }}?v=20261022">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/stats.css') }}?v=20261029-stats-expand">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/stats.css') }}?v=20261029-radar-stable">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/spotify.css') }}">
 {% endblock %}
 
 {% block page_scripts %}
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="{{ url_for('static', filename='js/pages/stats.js') }}?v=20261029-stats-expand" defer></script>
+    <script src="{{ url_for('static', filename='js/pages/stats.js') }}?v=20261029-radar-stable" defer></script>
     <script src="{{ url_for('static', filename='js/pages/spotify_stats.js') }}?v=20261023-clean-ui" defer></script>
 {% endblock %}
 
@@ -74,7 +74,9 @@
                     <h2>Top Genres</h2>
                 </div>
                 <div id="genre-empty" class="stats-empty hidden">Genre statistics will appear after songs are recognized again.</div>
-                <canvas id="genre-radar" aria-label="Genre radar chart"></canvas>
+                <div class="genre-chart-container">
+                    <canvas id="genre-radar" aria-label="Genre radar chart"></canvas>
+                </div>
             </article>
             <article class="stats-card stats-chart-card album-carousel-card">
                 <div class="stats-card-heading">

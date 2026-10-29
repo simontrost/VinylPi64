@@ -8,11 +8,32 @@ use scraper::{ElementRef, Html, Selector};
 use serde_json::{Value, json};
 use std::time::Duration;
 use tokio::sync::Mutex;
+use tokio::time::Instant;
+
+const MUSICBRAINZ_BACKOFF: Duration = Duration::from_secs(10 * 60);
+
+struct MusicBrainzPacing {
+    next_request: Instant,
+    unavailable_until: Option<Instant>,
+}
+
+impl MusicBrainzPacing {
+    fn new() -> Self {
+        Self {
+            next_request: Instant::now(),
+            unavailable_until: None,
+        }
+    }
+
+    fn unavailable(&self, now: Instant) -> bool {
+        self.unavailable_until.is_some_and(|until| now < until)
+    }
+}
 
 pub struct Metadata {
     pub client: reqwest::Client,
     db: Db,
-    rate: Mutex<tokio::time::Instant>,
+    rate: Mutex<MusicBrainzPacing>,
 }
 pub fn escape(s: &str) -> String {
     s.replace('&', "&amp;")
@@ -78,7 +99,7 @@ impl Metadata {
         Self {
             client,
             db,
-            rate: Mutex::new(tokio::time::Instant::now()),
+            rate: Mutex::new(MusicBrainzPacing::new()),
         }
     }
     pub async fn enrich(&self, t: &mut Track) -> Result<()> {
@@ -89,25 +110,41 @@ impl Metadata {
         let value = if let Some(v) = self.db.cache(&key)? {
             v
         } else {
+            // A 503 response may indicate MusicBrainz is overloaded or rate-limiting.
+            // Skip optional lookups during cooldown instead of delaying recognition.
             let mut rate = self.rate.lock().await;
-            tokio::time::sleep_until(*rate).await;
-            *rate = tokio::time::Instant::now() + Duration::from_millis(1100);
+            if rate.unavailable(Instant::now()) {
+                return Ok(());
+            }
+            tokio::time::sleep_until(rate.next_request).await;
+            rate.next_request = Instant::now() + Duration::from_millis(1100);
             let escape_query = |s: &str| s.replace(['"', '\\'], " ");
             let query = format!(
                 "artist:\"{}\" AND recording:\"{}\"",
                 escape_query(&t.artist),
                 escape_query(&t.title)
             );
-            let v = net::json(
-                self.client
-                    .get("https://musicbrainz.org/ws/2/recording")
-                    .query(&[
-                        ("query", query),
-                        ("fmt", "json".into()),
-                        ("limit", "5".into()),
-                    ]),
-            )
-            .await?;
+            let response = self.client
+                .get("https://musicbrainz.org/ws/2/recording")
+                .query(&[
+                    ("query", query),
+                    ("fmt", "json".into()),
+                    ("limit", "5".into()),
+                ])
+                .send()
+                .await?;
+            let status = response.status();
+            if status == reqwest::StatusCode::SERVICE_UNAVAILABLE
+                || status == reqwest::StatusCode::TOO_MANY_REQUESTS
+            {
+                rate.unavailable_until = Some(Instant::now() + MUSICBRAINZ_BACKOFF);
+                self.db.log("INFO", &format!(
+                    "MusicBrainz temporarily unavailable (HTTP {status}); optional metadata lookups paused for 10 minutes"
+                ));
+                return Ok(());
+            }
+            let bytes = net::bytes(response, 8 * 1024 * 1024).await?;
+            let v: Value = serde_json::from_slice(&bytes)?;
             self.db.put_cache(&key, &v, 30 * 86400)?;
             v
         };
@@ -230,5 +267,18 @@ mod tests {
         let p=lyrics_payload(r#"<div data-lyrics-container="true"><a href="evil">one</a><br><i onclick="evil()">two</i><script>evil()</script><span data-exclude-from-selection="true">ad</span></div>"#).unwrap();
         assert_eq!(p["lyrics"], "one\ntwo");
         assert_eq!(p["lyrics_html"], "one<br><em>two</em>");
+    }
+    #[test]
+    fn musicbrainz_backoff_expires_without_blocking_recognition() {
+        let now = Instant::now();
+        let mut pacing = MusicBrainzPacing {
+            next_request: now,
+            unavailable_until: None,
+        };
+        assert!(!pacing.unavailable(now));
+        pacing.unavailable_until = Some(now + MUSICBRAINZ_BACKOFF);
+        assert!(pacing.unavailable(now));
+        assert!(pacing.unavailable(now + MUSICBRAINZ_BACKOFF - Duration::from_secs(1)));
+        assert!(!pacing.unavailable(now + MUSICBRAINZ_BACKOFF));
     }
 }

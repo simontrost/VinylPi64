@@ -1,5 +1,6 @@
 const MAX_VISIBLE = 5;
 let radarChart = null;
+let radarGenreSignature = null;
 let albumCarouselTimer = null;
 let albumCarouselIndex = 0;
 let shareAsset = { blob: null, file: null, url: null };
@@ -274,10 +275,15 @@ function renderGenreChart(genres = []) {
     const empty = document.getElementById("genre-empty");
     if (!canvas || !empty) return;
 
+    const signature = JSON.stringify(genres.map(genre => [String(genre.name || ""), Number(genre.count) || 0]));
+    // Unchanged statistics must not rebuild or restart the plot.
+    if (radarChart && signature === radarGenreSignature) return;
+
     if (radarChart) {
         radarChart.destroy();
         radarChart = null;
     }
+    radarGenreSignature = null;
 
     if (!genres.length || typeof Chart === "undefined") {
         canvas.classList.add("hidden");
@@ -310,7 +316,11 @@ function renderGenreChart(genres = []) {
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
+            resizeDelay: 100,
+            // No hover or click behavior is needed; it causes Chart.js redraws.
+            events: [],
+            animation: false,
+            plugins: { legend: { display: false }, tooltip: { enabled: false } },
             scales: {
                 r: {
                     beginAtZero: true,
@@ -322,6 +332,7 @@ function renderGenreChart(genres = []) {
             },
         },
     });
+    radarGenreSignature = signature;
 }
 
 function renderAlbumCarousel(albums = []) {

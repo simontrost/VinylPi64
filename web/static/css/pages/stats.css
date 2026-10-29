@@ -341,10 +341,19 @@
     overflow: hidden;
 }
 
-.stats-chart-card canvas {
-    width: 100% !important;
-    height: 280px !important;
+/* Chart.js observes its immediate parent. A dedicated stable container
+   avoids redraws when other dashboard cards change their layout. */
+.genre-chart-container {
+    position: relative;
+    width: 100%;
+    height: 280px;
     margin-top: 4px;
+}
+
+.genre-chart-container canvas {
+    display: block;
+    width: 100% !important;
+    height: 100% !important;
 }
 
 .album-carousel {
