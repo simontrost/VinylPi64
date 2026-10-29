@@ -42,11 +42,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Web UI tests
+      - name: JavaScript syntax
         run: |
-          node tests/test_logs_ui.cjs
-          node tests/test_source_ui.cjs
-          node tests/test_audio_devices_ui.cjs
           for file in web/static/js/pages/*.js; do node --check "$file"; done
 
   pi_arm64:

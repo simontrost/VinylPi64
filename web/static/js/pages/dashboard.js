@@ -144,6 +144,34 @@ function buildDiscogsSearchUrl() {
     return `https://www.discogs.com/search/?${params.toString()}`;
 }
 
+// An older saved recognition status may have been recorded before the Discogs
+// index-track positions were repaired. Once the tracklist is loaded, use its
+// authoritative positions for the visible dashboard (not the Pixoo output).
+function reconcileDiscogsTracklist(tracks) {
+    if (!Array.isArray(tracks) || CURRENT_TRACK.discogsTrackIndex === null) return;
+    const currentIndex = CURRENT_TRACK.discogsTrackIndex;
+    const current = tracks.find((track) => Number(track.track_index) === currentIndex);
+    if (!current) return;
+
+    const position = String(current.position || "").trim();
+    const side = String(current.side || "").trim().toUpperCase();
+    if (position) CURRENT_TRACK.discogsPosition = position;
+    if (side) {
+        CURRENT_TRACK.discogsSide = side;
+        const onSide = tracks.filter((track) => String(track.side || "").trim().toUpperCase() === side);
+        const sideIndex = onSide.findIndex((track) => Number(track.track_index) === currentIndex);
+        if (sideIndex >= 0) {
+            CURRENT_TRACK.discogsSideTrackNumber = sideIndex + 1;
+            CURRENT_TRACK.discogsSideTrackCount = onSide.length;
+        }
+    }
+    const next = tracks.find((track) => Number(track.track_index) === currentIndex + 1);
+    CURRENT_TRACK.discogsExpectedNextTitle = next?.title || "";
+    CURRENT_TRACK.discogsExpectedNextArtist = next?.artist || "";
+    CURRENT_TRACK.discogsExpectedNextPosition = next?.position || "";
+    CURRENT_TRACK.discogsExpectedNextSide = next?.side || "";
+}
+
 function renderDiscogsContext() {
     const context = document.getElementById("discogs-context");
     const addLink = document.getElementById("discogs-add-link");
@@ -170,6 +198,8 @@ function renderDiscogsContext() {
         return;
     }
 
+    const savedTracklist = discogsTracklistCache.get(String(CURRENT_TRACK.discogsReleaseId));
+    if (savedTracklist) reconcileDiscogsTracklist(savedTracklist.tracks);
     syncDiscogsTracklist();
 
     const confidence = Number(CURRENT_TRACK.discogsConfidence);
@@ -187,7 +217,7 @@ function renderDiscogsContext() {
     if (CURRENT_TRACK.discogsSideTrackNumber && CURRENT_TRACK.discogsSideTrackCount) {
         progressParts.push(`track ${CURRENT_TRACK.discogsSideTrackNumber} of ${CURRENT_TRACK.discogsSideTrackCount}`);
     } else if (CURRENT_TRACK.discogsTrackIndex !== null && CURRENT_TRACK.discogsTrackCount) {
-        progressParts.push(`track ${CURRENT_TRACK.discogsTrackIndex + 1} of ${CURRENT_TRACK.discogsTrackCount}`);
+        progressParts.push(`track ${CURRENT_TRACK.discogsTrackIndex} of ${CURRENT_TRACK.discogsTrackCount}`);
     }
     setText("discogs-track-progress", progressParts.join(" · "));
 
@@ -251,7 +281,7 @@ function makeTracklistRow(track, releaseArtist) {
 
     const position = document.createElement("span");
     position.className = "discogs-tracklist-position";
-    position.textContent = track.position || (Number.isFinite(index) ? String(index + 1) : "–");
+    position.textContent = track.position || (Number.isFinite(index) ? String(index) : "–");
 
     const copy = document.createElement("span");
     copy.className = "discogs-tracklist-track-copy";
@@ -302,6 +332,22 @@ function renderDiscogsTracklist(data) {
         return;
     }
     panel.classList.remove("discogs-tracklist-message");
+
+    reconcileDiscogsTracklist(tracks);
+    setText("discogs-position", CURRENT_TRACK.discogsPosition || "Collection");
+    if (CURRENT_TRACK.discogsSideTrackNumber && CURRENT_TRACK.discogsSideTrackCount) {
+        setText("discogs-track-progress", `Side ${CURRENT_TRACK.discogsSide} · track ${CURRENT_TRACK.discogsSideTrackNumber} of ${CURRENT_TRACK.discogsSideTrackCount}`);
+    }
+    const next = document.getElementById("discogs-next-track");
+    if (next) {
+        const nextTitle = CURRENT_TRACK.discogsExpectedNextTitle;
+        const nextPosition = CURRENT_TRACK.discogsExpectedNextPosition;
+        const differentSide = CURRENT_TRACK.discogsExpectedNextSide && CURRENT_TRACK.discogsSide
+            && CURRENT_TRACK.discogsExpectedNextSide !== CURRENT_TRACK.discogsSide;
+        next.textContent = nextTitle
+            ? `${differentSide ? "Next side" : "Next"}: ${nextPosition ? `${nextPosition} · ` : ""}${nextTitle}`
+            : "End of release";
+    }
 
     const groups = [];
     for (const track of tracks) {
