@@ -128,9 +128,6 @@ function updateSourceUI(data = {}) {
         vinylPiOriginalRenderDiscogsContext();
     }
 
-    if (vinylPiSourceMode === "spotify" && currentTrackKey) {
-        setText("now-playing-label", "Spotify");
-    }
 }
 
 async function loadSourceStatus() {

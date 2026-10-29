@@ -171,68 +171,6 @@ impl Engine {
             self.status.send_replace(json!({"source":mode,"artist":"","title":match mode{Mode::Off=>"Recognition off",Mode::Vinyl=>"Waiting for vinyl…",Mode::Spotify=>"Waiting for Spotify…"},"is_playing":false,"updated_at":chrono::Utc::now().timestamp_millis(),"bg_color":[0,0,0]}));
         }
     }
-    /// Album-derived dashboard color is independent from Pixoo playback. Older
-    /// saved statuses may still contain the gray placeholder from the first
-    /// Rust migration; restore their color without sending an image to Pixoo.
-    fn restore_dashboard_color(&self, mode: Mode, remembered: Option<&Value>, s: &Services) {
-        let Some(saved) = remembered else {
-            return;
-        };
-        let placeholder = saved["bg_color"].is_null()
-            || saved["bg_color"] == json!([30, 30, 30])
-            || saved["bg_color"] == json!([0, 0, 0]);
-        if !placeholder {
-            return;
-        }
-        let Some(cover_url) = saved["cover_url"].as_str().filter(|url| !url.is_empty()) else {
-            return;
-        };
-        let (Some(artist), Some(title)) = (saved["artist"].as_str(), saved["title"].as_str()) else {
-            return;
-        };
-        let cover_url = cover_url.to_owned();
-        let artist = artist.to_owned();
-        let title = title.to_owned();
-        let status = self.status.clone();
-        let db = s.db.clone();
-        let client = s.client.clone();
-        tokio::spawn(async move {
-            let result = async {
-                let url = url::Url::parse(&cover_url)?;
-                ensure!(["https", "http"].contains(&url.scheme()), "Invalid cover URL");
-                let bytes = net::bytes(client.get(url).send().await?, 8 * 1024 * 1024).await?;
-                let cover = crate::display::decode(&bytes)?
-                    .resize_exact(64, 64, image::imageops::FilterType::Triangle)
-                    .to_rgb8();
-                Ok::<_, anyhow::Error>(crate::display::dominant(&cover))
-            }
-            .await;
-            let Ok(color) = result else {
-                return;
-            };
-            let mut updated = None;
-            status.send_if_modified(|current| {
-                // An old fetch must never overwrite a subsequent source or song.
-                if current["source"] != mode.as_str()
-                    || current["artist"] != artist
-                    || current["title"] != title
-                    || current["cover_url"] != cover_url
-                    || current["bg_color"] == json!(color)
-                {
-                    return false;
-                }
-                current["bg_color"] = json!(color);
-                updated = Some(current.clone());
-                true
-            });
-            if let Some(value) = updated
-                && let Err(error) = db.save_status(mode, &value)
-            {
-                db.log("WARNING", &format!("Saving restored dashboard color failed: {error}"));
-            }
-        });
-    }
-
     async fn change(&self, mode: Mode, s: &Services) -> Result<()> {
         if mode == self.get_mode() {
             return Ok(());
@@ -254,7 +192,6 @@ impl Engine {
         let remembered = s.db.last_status(mode)?;
         self.mode.send_replace(mode);
         self.waiting(mode, remembered.clone());
-        self.restore_dashboard_color(mode, remembered.as_ref(), s);
         // Keep the previously displayed track in the dashboard; the Pixoo only
         // switches to a fresh track once recognition resumes.
         if mode == Mode::Off {
@@ -542,7 +479,16 @@ impl Engine {
                                 v["source"] = json!(mode);
                                 v["is_playing"] = json!(true);
                                 v["updated_at"] = json!(chrono::Utc::now().timestamp_millis());
-                                v["bg_color"] = json!([30, 30, 30]);
+                                let previous = self.status.borrow().clone();
+                                let keep_existing_color = previous["source"] == json!(mode)
+                                    && previous["artist"] == json!(t.artist)
+                                    && previous["title"] == json!(t.title)
+                                    && previous.get("bg_color").is_some();
+                                v["bg_color"] = if keep_existing_color {
+                                    previous["bg_color"].clone()
+                                } else {
+                                    json!([30, 30, 30])
+                                };
                                 if let Err(e) = s.db.save_status(mode, &v) {
                                     s.db.log("ERROR", &e.to_string());
                                 }

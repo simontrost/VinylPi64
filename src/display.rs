@@ -553,7 +553,6 @@ impl Display {
                     Content::Track(t) => {
                         // Artwork is optional. A CDN outage or a broken URL must not
                         // suppress the Pixoo update for an otherwise valid song.
-                        let mut artwork_color = None;
                         let cover = if let Some(url) = &t.cover_url {
                             let downloaded = async {
                                 let u = url::Url::parse(url)?;
@@ -570,14 +569,7 @@ impl Display {
                             }
                             .await;
                             match downloaded {
-                                Ok(image) => {
-                                    let sampled = image.resize_exact(
-                                        64, 64, image::imageops::FilterType::Triangle,
-                                    )
-                                    .to_rgb8();
-                                    artwork_color = Some(dominant(&sampled));
-                                    image
-                                }
+                                Ok(image) => image,
                                 Err(e) => {
                                     db.log(
                                         "WARNING",
@@ -592,36 +584,28 @@ impl Display {
                             DynamicImage::new_rgb8(64, 64)
                         };
                         let c = Composition::new(&root, &cfg, &t, cover)?;
-                        let color = artwork_color.unwrap_or([43, 43, 52]);
-                        let mut updated = None;
+                        let mut persisted_status: Option<(Mode, Value)> = None;
                         status.send_if_modified(|v| {
-                            if v["artist"] != t.artist
-                                || v["title"] != t.title
-                                || v["bg_color"] == json!(color)
-                            {
-                                return false;
+                            if v["artist"] == t.artist && v["title"] == t.title {
+                                v["bg_color"] = json!(c.background);
+                                v["updated_at"] = json!(chrono::Utc::now().timestamp_millis());
+                                let mode = match v["source"].as_str() {
+                                    Some("vinyl") => Some(Mode::Vinyl),
+                                    Some("spotify") => Some(Mode::Spotify),
+                                    _ => None,
+                                };
+                                if let Some(mode) = mode {
+                                    persisted_status = Some((mode, v.clone()));
+                                }
+                                true
+                            } else {
+                                false
                             }
-                            v["bg_color"] = json!(color);
-                            updated = Some(v.clone());
-                            true
                         });
-                        // The display previously updated the in-memory status only.
-                        // Persisting the color is essential when the same song is
-                        // restored later without replaying it on the Pixoo.
-                        if let Some(updated) = updated {
-                            let source = match updated["source"].as_str() {
-                                Some("vinyl") => Some(Mode::Vinyl),
-                                Some("spotify") => Some(Mode::Spotify),
-                                _ => None,
-                            };
-                            if let Some(source) = source
-                                && let Err(error) = db.save_status(source, &updated)
-                            {
-                                db.log(
-                                    "WARNING",
-                                    &format!("Saving dashboard cover color failed: {error}"),
-                                );
-                            }
+                        if let Some((mode, value)) = persisted_status
+                            && let Err(e) = db.save_status(mode, &value)
+                        {
+                            db.log("ERROR", &format!("Saving tinted dashboard status failed: {e}"));
                         }
                         composition = Some(c);
                     }
