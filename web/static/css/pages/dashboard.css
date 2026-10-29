@@ -155,7 +155,7 @@
 .discogs-tracklist-row.is-current .discogs-tracklist-title { color: #fff; font-weight: 780; }
 .discogs-tracklist-artist { overflow: hidden; color: rgba(255,255,255,.42); font-size: 10px; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
 .discogs-tracklist-trailing { display: inline-flex; align-items: center; justify-content: flex-end; gap: 8px; }
-.discogs-tracklist-duration { color: rgba(255,255,255,.38); font-size: 10px; font-variant-numeric: tabular-nums; }
+.discogs-tracklist-duration { flex-shrink: 0; min-width: 40px; color: rgba(255,255,255,.57); font-size: 11px; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .discogs-tracklist-playing { display: inline-flex; align-items: center; gap: 5px; color: var(--yellow); font-size: 9px; font-weight: 780; text-transform: uppercase; letter-spacing: .04em; }
 .discogs-tracklist-playing-dot { width: 6px; height: 6px; border-radius: 999px; background: var(--yellow); box-shadow: 0 0 0 3px rgba(245,197,66,.12); }
 

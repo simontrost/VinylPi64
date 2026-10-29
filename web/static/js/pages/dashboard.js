@@ -306,7 +306,10 @@ function makeTracklistRow(track, releaseArtist) {
     if (duration) {
         const durationElement = document.createElement("span");
         durationElement.className = "discogs-tracklist-duration";
-        durationElement.textContent = duration;
+        durationElement.textContent = `${track.duration_approximate ? "≈ " : ""}${duration}`;
+        if (track.duration_approximate) {
+            durationElement.title = "Approximate duration from a related Discogs master release; may differ from this pressing";
+        }
         trailing.appendChild(durationElement);
     }
 

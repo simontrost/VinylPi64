@@ -505,7 +505,7 @@ async fn api(
                 .trim_end_matches("/tracklist")
                 .parse::<i64>()
                 .map_err(anyhow::Error::from)?;
-            ok(app.discogs.tracklist(id)?)
+            ok(app.discogs.tracklist_with_durations(id).await?)
         }
         ("pixoo/status", true, _, _) => {
             let v = app

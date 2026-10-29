@@ -50,6 +50,77 @@ fn release_track_entries(release: &Value) -> Vec<&Value> {
         .collect()
 }
 
+/// Discogs duration is a text field (m:ss, h:mm:ss, sometimes m.ss).
+/// Empty/unknown or malformed values must not become zero-second tracks.
+fn duration_seconds(raw: &str) -> Option<i64> {
+    let normalized = raw.trim().replace('.', ":");
+    let parts = normalized.split(':').collect::<Vec<_>>();
+    if !(2..=3).contains(&parts.len()) {
+        return None;
+    }
+    let mut seconds = 0i64;
+    for (index, part) in parts.iter().enumerate() {
+        if part.is_empty() || !part.chars().all(|c| c.is_ascii_digit()) {
+            return None;
+        }
+        let value = part.parse::<i64>().ok()?;
+        if index > 0 && value >= 60 {
+            return None;
+        }
+        seconds = seconds.checked_mul(60)?.checked_add(value)?;
+    }
+    (seconds > 0 && seconds <= 24 * 3600).then_some(seconds)
+}
+
+/// Some Discogs index tracks supply only the durations of their nested parts.
+fn entry_duration_seconds(entry: &Value) -> Option<i64> {
+    if let Some(seconds) = duration_seconds(&text(entry, "duration")) {
+        return Some(seconds);
+    }
+    let parts = entry["sub_tracks"].as_array()?;
+    if parts.is_empty() {
+        return None;
+    }
+    parts.iter().try_fold(0i64, |sum, part| {
+        sum.checked_add(duration_seconds(&text(part, "duration"))?)
+    }).filter(|seconds| *seconds > 0 && *seconds <= 24 * 3600)
+}
+
+/// Never match a duration solely by row number. Editions can have different
+/// songs/bonus tracks; only an identically ordered tracklist may supply values.
+fn aligned_durations(tracks: &[Value], release: &Value) -> Option<Vec<Option<i64>>> {
+    let entries = release_track_entries(release);
+    if entries.len() != tracks.len()
+        || !tracks.iter().zip(&entries).all(|(row, entry)| {
+            let expected = normalized(&text(entry, "title"));
+            !expected.is_empty() && normalized(&text(row, "title")) == expected
+        })
+    {
+        return None;
+    }
+    Some(entries.into_iter().map(entry_duration_seconds).collect())
+}
+
+fn supplement_track_durations(tracks: &mut [Value], release: &Value, approximate: bool) -> usize {
+    let Some(durations) = aligned_durations(tracks, release) else {
+        return 0;
+    };
+    let mut added = 0;
+    for (track, seconds) in tracks.iter_mut().zip(durations) {
+        if track["duration_seconds"].as_i64().is_some_and(|seconds| seconds > 0) {
+            continue;
+        }
+        if let Some(seconds) = seconds {
+            track["duration_seconds"] = json!(seconds);
+            if approximate {
+                track["duration_approximate"] = json!(true);
+            }
+            added += 1;
+        }
+    }
+    added
+}
+
 fn side_for_position(position: &str) -> String {
     position.chars().take_while(char::is_ascii_alphabetic).collect()
 }
@@ -321,8 +392,48 @@ impl Discogs {
         Ok(())
     }
 
+    /// Restore missing durations from the exact release snapshot already stored
+    /// during collection sync. This also repairs older imported databases without
+    /// requiring another full Discogs synchronization.
+    fn repair_cached_track_durations(&self, release_id: i64) -> Result<()> {
+        let tracks = self.db.query(
+            "SELECT track_index,title,duration_seconds FROM discogs_tracks WHERE release_id=? ORDER BY track_index",
+            [release_id],
+        )?;
+        if tracks.is_empty() || !tracks.iter().any(|row| row["duration_seconds"].as_i64().is_none_or(|v| v <= 0)) {
+            return Ok(());
+        }
+        let cached = self.db.query(
+            "SELECT payload FROM rust_cache WHERE key=?",
+            [format!("discogs-release:{release_id}")],
+        )?;
+        let Some(raw) = cached.first().and_then(|row| row["payload"].as_str()) else {
+            return Ok(());
+        };
+        let Ok(detail) = serde_json::from_str::<Value>(raw) else {
+            return Ok(());
+        };
+        let Some(durations) = aligned_durations(&tracks, &detail) else {
+            return Ok(());
+        };
+        self.db.with(|conn| {
+            let tx = conn.transaction()?;
+            for (row, seconds) in tracks.iter().zip(durations) {
+                if let Some(seconds) = seconds {
+                    tx.execute(
+                        "UPDATE discogs_tracks SET duration_seconds=? WHERE release_id=? AND track_index=? AND (duration_seconds IS NULL OR duration_seconds<=0)",
+                        params![seconds, release_id, row["track_index"].as_i64()],
+                    )?;
+                }
+            }
+            tx.commit()?;
+            Ok(())
+        })
+    }
+
     pub fn tracklist(&self, id: i64) -> Result<Value> {
         self.repair_cached_track_positions(id)?;
+        self.repair_cached_track_durations(id)?;
         let release = self
             .db
             .query(
@@ -337,6 +448,75 @@ impl Discogs {
             json!({"ok":true,"release_id":id,"title":release["title"],"artist":release["artist"],"tracks":tracks,"track_count":tracks.len()}),
         )
     }
+    /// Existing releases may omit durations. Try the exact Discogs release first,
+    /// then the associated master tracklist as an *explicitly approximate* value.
+    /// Network failures never prevent access to the locally stored tracklist.
+    pub async fn tracklist_with_durations(&self, id: i64) -> Result<Value> {
+        let mut result = self.tracklist(id)?;
+        let needs_durations = result["tracks"]
+            .as_array()
+            .is_some_and(|tracks| tracks.iter().any(|track| track["duration_seconds"].as_i64().is_none_or(|v| v <= 0)));
+        if !needs_durations || std::env::var("DISCOGS_API_TOKEN").unwrap_or_default().trim().is_empty() {
+            return Ok(result);
+        }
+
+        // One lookup per release per week; both positive and negative results
+        // are cached so opening the dashboard never repeatedly hits Discogs.
+        let key = format!("discogs-track-duration-lookup:{id}");
+        let supplement = if let Some(cached) = self.db.cache(&key)? {
+            cached
+        } else {
+            let release = match self.get(&format!("/releases/{id}")).await {
+                Ok(release) => release,
+                Err(error) => {
+                    tracing::warn!(release_id = id, %error, "Discogs duration lookup unavailable");
+                    return Ok(result);
+                }
+            };
+            let master_id = release["master_id"].as_i64().filter(|id| *id > 0);
+            let master = if let Some(master_id) = master_id {
+                match self.get(&format!("/masters/{master_id}")).await {
+                    Ok(master) => master,
+                    Err(error) => {
+                        tracing::warn!(release_id = id, master_id, %error, "Discogs master durations unavailable");
+                        Value::Null
+                    }
+                }
+            } else {
+                Value::Null
+            };
+            let supplement = json!({"release":release,"master":master});
+            self.db.put_cache(&key, &supplement, 7 * 86400)?;
+            supplement
+        };
+
+        let Some(tracks) = result["tracks"].as_array_mut() else {
+            return Ok(result);
+        };
+        let exact = supplement_track_durations(tracks, &supplement["release"], false);
+        if exact > 0 {
+            // Persist only durations from the user's exact release. Durations
+            // from the master may differ between pressings and stay response-only.
+            self.db.with(|conn| {
+                let tx = conn.transaction()?;
+                for track in tracks.iter() {
+                    if let (Some(index), Some(seconds)) = (
+                        track["track_index"].as_i64(), track["duration_seconds"].as_i64(),
+                    ) {
+                        tx.execute(
+                            "UPDATE discogs_tracks SET duration_seconds=? WHERE release_id=? AND track_index=? AND (duration_seconds IS NULL OR duration_seconds<=0)",
+                            params![seconds, id, index],
+                        )?;
+                    }
+                }
+                tx.commit()?;
+                Ok(())
+            })?;
+        }
+        supplement_track_durations(tracks, &supplement["master"], true);
+        Ok(result)
+    }
+
     pub async fn sync(self: Arc<Self>, cfg: Config, cancel: CancellationToken) -> Result<bool> {
         let Ok(_guard) = self.sync.try_lock() else {
             return Ok(false);
@@ -427,7 +607,7 @@ impl Discogs {
                     let title = text(t, "title");
                     let a = artists(&t["artists"]);
                     let a = if a.is_empty() { artist.clone() } else { a };
-                    let duration = text(t,"duration").split(':').try_fold(0i64,|v,p|p.parse::<i64>().ok().map(|n|v*60+n));
+                    let duration = entry_duration_seconds(t);
                     tx.execute("INSERT INTO discogs_tracks(release_id,track_index,position,side,title,artist,duration_seconds,normalized_title,normalized_artist) VALUES(?,?,?,?,?,?,?,?,?)",params![id,index,position,side,title,a,duration,normalized(&title),normalized(&a)])?;
                     total += 1;
                 }
@@ -680,5 +860,92 @@ mod vinyl_matching_tests {
         assert_eq!(track.extra["discogs_release_id"].as_i64(), Some(123));
         assert!((track.extra["discogs_confidence"].as_f64().unwrap() - 0.96).abs() < 1e-9);
         assert_eq!(track.album.as_deref(), Some("Wish You Were Here"));
+    }
+}
+
+#[cfg(test)]
+mod track_duration_tests {
+    use super::*;
+
+    #[test]
+    fn duration_parser_handles_discogs_formats_and_index_parts() {
+        assert_eq!(duration_seconds("5:36"), Some(336));
+        assert_eq!(duration_seconds("1:02:03"), Some(3723));
+        assert_eq!(duration_seconds("5.36"), Some(336));
+        for bad in ["", "0:00", "5", "5:60", "?:??", "5:xx", "5:03 extra", "999999999:00"] {
+            assert_eq!(duration_seconds(bad), None, "{bad}");
+        }
+        let index = json!({"title":"Suite","duration":"","sub_tracks":[
+            {"title":"Part I","duration":"2:15"},
+            {"title":"Part II","duration":"3:20"}
+        ]});
+        assert_eq!(entry_duration_seconds(&index), Some(335));
+        assert_eq!(entry_duration_seconds(&json!({"sub_tracks":[
+            {"duration":"2:15"},{"duration":""}
+        ]})), None);
+        assert_eq!(entry_duration_seconds(&json!({"duration":"8:00","sub_tracks":[
+            {"duration":"2:15"},{"duration":"3:20"}
+        ]})), Some(480));
+    }
+
+    #[test]
+    fn master_durations_require_exact_track_order_and_are_marked_approximate() {
+        let local = vec![
+            json!({"track_index":1,"title":"One of These Days","duration_seconds":null}),
+            json!({"track_index":2,"title":"A Pillow Of Winds","duration_seconds":null}),
+            json!({"track_index":3,"title":"Echoes","duration_seconds":1380}),
+        ];
+        let master = json!({"tracklist":[
+            {"type_":"track","position":"1","title":"One Of These Days","duration":"5:56"},
+            {"type_":"track","position":"2","title":"A Pillow of Winds","duration":"5:13"},
+            {"type_":"track","position":"3","title":"Echoes","duration":"23:35"}
+        ]});
+        let mut tracks = local.clone();
+        assert_eq!(supplement_track_durations(&mut tracks, &master, true), 2);
+        assert_eq!(tracks[0]["duration_seconds"], 356);
+        assert_eq!(tracks[0]["duration_approximate"], true);
+        assert_eq!(tracks[1]["duration_seconds"], 313);
+        assert_eq!(tracks[2]["duration_seconds"], 1380); // Exact value takes priority.
+        assert!(tracks[2]["duration_approximate"].is_null());
+
+        let wrong_order = json!({"tracklist":[
+            {"title":"Echoes","duration":"23:35"},
+            {"title":"A Pillow of Winds","duration":"5:13"},
+            {"title":"One Of These Days","duration":"5:56"}
+        ]});
+        let mut unchanged = local.clone();
+        assert_eq!(supplement_track_durations(&mut unchanged, &wrong_order, true), 0);
+        assert_eq!(unchanged, local);
+        let missing_track = json!({"tracklist":[{"title":"One Of These Days","duration":"5:56"}]});
+        assert_eq!(supplement_track_durations(&mut unchanged, &missing_track, true), 0);
+        assert_eq!(unchanged, local);
+    }
+
+    #[test]
+    fn cached_exact_release_durations_repair_existing_db_without_resync() {
+        let tmp = tempfile::tempdir().unwrap();
+        let db = Db::open(&tmp.path().join("discogs.db")).unwrap();
+        db.with(|conn| {
+            conn.execute("INSERT INTO discogs_releases(release_id,title,artist) VALUES(555,'Meddle','Pink Floyd')", [])?;
+            for (index, title, duration) in [
+                (1, "One of These Days", None),
+                (2, "A Pillow of Winds", Some(300)),
+            ] {
+                conn.execute(
+                    "INSERT INTO discogs_tracks(release_id,track_index,title,artist,duration_seconds,normalized_title,normalized_artist) VALUES(555,?,?,?,?,?,?)",
+                    params![index, title, "Pink Floyd", duration, normalized(title), "pink floyd"],
+                )?;
+            }
+            Ok(())
+        }).unwrap();
+        db.put_cache("discogs-release:555", &json!({"tracklist":[
+            {"type_":"track","position":"A1","title":"One Of These Days","duration":"5:56"},
+            {"type_":"track","position":"A2","title":"A Pillow of Winds","duration":"5:13"}
+        ]}), 86400).unwrap();
+        let discogs = Discogs::new(reqwest::Client::new(), db);
+        let first = discogs.tracklist(555).unwrap();
+        assert_eq!(first["tracks"][0]["duration_seconds"], 356);
+        assert_eq!(first["tracks"][1]["duration_seconds"], 300); // Preserve original pressing data.
+        assert_eq!(first, discogs.tracklist(555).unwrap());
     }
 }
