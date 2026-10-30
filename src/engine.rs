@@ -212,14 +212,22 @@ impl Engine {
         let remembered = s.db.last_status(mode)?;
         self.mode.send_replace(mode);
         self.waiting(mode, remembered.clone());
-        // Keep the previously displayed track in the dashboard; the Pixoo only
-        // switches to a fresh track once recognition resumes.
-        if mode == Mode::Off {
-            s.display.show(Content::Fallback(false));
-        } else {
-            // A restored song belongs to the dashboard only. Never replay its
-            // album art on Pixoo until a *new* recognition is received.
-            s.display.show(Content::Hold);
+        // The dashboard may show the last recognized track while waiting.
+        // On the physical Pixoo, immediately replace any old album art or
+        // standby GIF with the normal fallback image when Vinyl or Spotify
+        // starts. Do not wait for the recognition-failure threshold.
+        // Fallback(false) is intentionally independent of fallback.enabled:
+        // that setting only governs the later failure-triggered fallback.
+        s.display.show(Content::Fallback(false));
+        if mode != Mode::Off {
+            if cfg.fallback.image_path.is_empty() {
+                s.db.log("WARNING", "Pixoo startup fallback image is not configured");
+            } else {
+                s.db.log(
+                    "INFO",
+                    &format!("Pixoo startup fallback queued for {}", mode.as_str()),
+                );
+            }
         }
         if mode == Mode::Off && old != Mode::Off {
             match cfg.pixoo_automations.off_action.as_str() {
