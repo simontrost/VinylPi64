@@ -277,6 +277,48 @@ fn gif_indices(frame: &RgbImage, palette: &[u8], cache: &mut HashMap<[u8; 3], u8
     }).collect()
 }
 
+/// Pixoo's URL-GIF player runs on the device itself. Sending a single
+/// Draw/SendHttpGif frame does not reliably replace a GIF that is still
+/// looping on the device: the frame may flash and the old GIF resumes.
+/// Use the SAME URL-GIF player for static content (fallback, side flip, and
+/// non-scrolling tracks) so each new image replaces the previous playback.
+fn write_pixoo_gif(
+    path: &Path,
+    composition: Option<&Composition>,
+    still: Option<&RgbImage>,
+    marquee_speed: f64,
+) -> Result<()> {
+    let palette = composition.map(shared_gif_palette).unwrap_or_default();
+    let file = std::fs::File::create(path)?;
+    let mut encoder = gif::Encoder::new(file, 64, 64, &palette)?;
+    encoder.set_repeat(gif::Repeat::Infinite)?;
+    if let Some(c) = composition {
+        // A stationary track needs just one frame, not 64 identical frames.
+        let cycle = if c.animated() { c.scroll_cycle() } else { 1 };
+        // Preserve the full shared scrolling cycle, but cap its frame count.
+        let step = cycle.div_ceil(512).max(1) as usize;
+        let mut colors = HashMap::new();
+        for offset in (0..cycle).step_by(step) {
+            let rgb = c.frame(offset);
+            let frame = gif::Frame {
+                width: 64,
+                height: 64,
+                delay: ((step as f64 * 100. / marquee_speed).round() as u16).max(2),
+                buffer: std::borrow::Cow::Owned(gif_indices(&rgb, &palette, &mut colors)),
+                ..Default::default()
+            };
+            encoder.write_frame(&frame)?;
+        }
+    } else if let Some(frame) = still {
+        // A one-frame GIF will remain on the Pixoo, replacing any earlier
+        // Device/PlayTFGif animation rather than briefly overlaying it.
+        encoder.write_frame(&gif::Frame::from_rgb_speed(64, 64, frame.as_raw(), 10))?;
+    } else {
+        anyhow::bail!("No image to encode as Pixoo GIF");
+    }
+    Ok(())
+}
+
 /// Fill the single-letter badge of the configurable side-flip graphic.
 /// The bundled image has the word SIDE and a blank badge for the target side.
 fn side_flip_frame(root: &Path, mut image: RgbImage, next_side: &str) -> Result<RgbImage> {
@@ -405,6 +447,21 @@ impl Pixoo {
     pub async fn command(&self, cmd: Value) -> Result<Value> {
         let _guard = self.gate.lock().await;
         self.post(&cmd).await
+    }
+    /// A new display revision can arrive while a GIF command is waiting for
+    /// the device lock. Never send that obsolete animation afterward.
+    async fn command_if_current(
+        &self,
+        cmd: Value,
+        revision: u64,
+        current: &AtomicU64,
+    ) -> Result<()> {
+        let _guard = self.gate.lock().await;
+        if current.load(Ordering::SeqCst) != revision {
+            return Ok(());
+        }
+        self.post(&cmd).await?;
+        Ok(())
     }
     async fn frame(&self, frame: &RgbImage, revision: u64, current: &AtomicU64) -> Result<()> {
         let _guard = self.gate.lock().await;
@@ -645,42 +702,19 @@ impl Display {
                             db.log("WARNING", &format!("Debug image export failed: {e}"));
                         }
                 }
-                if cfg.divoom.animation_mode == "gif_url"
-                    && let Some(c) = &composition
-                    && c.animated()
-                {
+                if cfg.divoom.animation_mode == "gif_url" {
+                    // Static images must replace the device-side song GIF too.
+                    // Draw/SendHttpGif alone can flash briefly, then the old
+                    // URL-GIF resumes until the next 30-second refresh.
                     let token = uuid::Uuid::new_v4().simple().to_string();
                     let dir = data.join("animations");
                     std::fs::create_dir_all(&dir)?;
-                    let file = std::fs::File::create(dir.join(format!("{token}.gif")))?;
-                    let palette = shared_gif_palette(c);
-                    let mut encoder = gif::Encoder::new(file, 64, 64, &palette)?;
-                    encoder.set_repeat(gif::Repeat::Infinite)?;
-                    let cycle = c.scroll_cycle();
-                    // Render the full shared cycle (never cut it off at 512px).
-                    // Bound the frame count instead, so long titles remain
-                    // seamless without exhausting the Pi Zero's memory.
-                    let step = cycle.div_ceil(512).max(1) as usize;
-                    let mut colors = HashMap::new();
-                    for offset in (0..cycle).step_by(step) {
-                        let rgb = c.frame(offset);
-                        // GIF delay is in 1/100 sec; clamp ultra-fast settings.
-                        let frame = gif::Frame {
-                            width: 64,
-                            height: 64,
-                            delay: ((step as f64 * 100. / cfg.image.marquee_speed)
-                                .round() as u16)
-                                .max(2),
-                            buffer: std::borrow::Cow::Owned(gif_indices(
-                                &rgb,
-                                &palette,
-                                &mut colors,
-                            )),
-                            ..Default::default()
-                        };
-                        encoder.write_frame(&frame)?;
-                    }
-                    drop(encoder);
+                    write_pixoo_gif(
+                        &dir.join(format!("{token}.gif")),
+                        composition.as_ref(),
+                        still.as_ref(),
+                        cfg.image.marquee_speed,
+                    )?;
                     // Keep disk use bounded; a previously served GIF may remain cached by Pixoo.
                     let mut files = std::fs::read_dir(&dir)?
                         .filter_map(Result::ok)
@@ -703,13 +737,13 @@ impl Display {
                         base.trim_end_matches('/')
                     );
                     ensure!(url.len() <= 255, "Pixoo GIF URL too long");
-                    if self.generation.load(Ordering::SeqCst) == revision {
-                        self.pixoo
-                            .command(
-                                json!({"Command":"Device/PlayTFGif","FileType":2,"FileName":url}),
-                            )
-                            .await?;
-                    }
+                    self.pixoo
+                        .command_if_current(
+                            json!({"Command":"Device/PlayTFGif","FileType":2,"FileName":url}),
+                            revision,
+                            &self.generation,
+                        )
+                        .await?;
                     return Ok(());
                 }
                 let animated = composition.as_ref().is_some_and(Composition::animated);
@@ -779,6 +813,11 @@ impl Display {
                         retry_delay = (retry_delay * 2).min(Duration::from_secs(30));
                     } else {
                         retry_delay = Duration::from_secs(2);
+                        // URL-GIFs loop on the Pixoo itself. Avoid restarting
+                        // them every 30 seconds, especially for static prompts.
+                        if cfg.divoom.animation_mode == "gif_url" {
+                            wait = Duration::from_secs(5 * 60);
+                        }
                     }
                 }
             }
@@ -852,6 +891,41 @@ mod tests {
         let b = gif_indices(&c.frame(10), &palette, &mut cache);
         assert_eq!(palette.len(), 768);
         assert_eq!(a[12 * 64 + 12], b[12 * 64 + 12]);
+    }
+
+    #[test]
+    fn stationary_fallback_gif_replaces_device_side_song_animation() {
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join("turn-record.gif");
+        let mut image = RgbImage::from_pixel(64, 64, Rgb([0, 0, 0]));
+        image.put_pixel(20, 30, Rgb([255, 0, 0]));
+        write_pixoo_gif(&path, None, Some(&image), 20.).unwrap();
+        let mut options = gif::DecodeOptions::new();
+        options.set_color_output(gif::ColorOutput::RGBA);
+        let mut reader = options.read_info(std::fs::File::open(&path).unwrap()).unwrap();
+        assert_eq!((reader.width(), reader.height()), (64, 64));
+        let first = reader.read_next_frame().unwrap().unwrap();
+        assert_eq!((first.width, first.height), (64, 64));
+        assert_eq!(first.buffer.len(), 64 * 64 * 4);
+        assert!(reader.read_next_frame().unwrap().is_none());
+    }
+
+    #[test]
+    fn a_non_scrolling_track_produces_one_gif_frame() {
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join("stationary-track.gif");
+        let composition = Composition {
+            base: RgbImage::from_pixel(64, 64, Rgb([12, 34, 56])),
+            lines: vec![],
+            background: [12, 34, 56],
+        };
+        write_pixoo_gif(&path, Some(&composition), None, 20.).unwrap();
+        let mut options = gif::DecodeOptions::new();
+        options.set_color_output(gif::ColorOutput::RGBA);
+        let mut reader = options.read_info(std::fs::File::open(&path).unwrap()).unwrap();
+        assert_eq!((reader.width(), reader.height()), (64, 64));
+        assert!(reader.read_next_frame().unwrap().is_some());
+        assert!(reader.read_next_frame().unwrap().is_none());
     }
 
     #[test]
