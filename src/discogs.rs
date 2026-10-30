@@ -161,6 +161,43 @@ fn track_match_key(title: &str) -> String {
         .join(" ")
 }
 
+/// Accept only tiny spelling errors in reasonably long titles. Album parts,
+/// track numbers and other numeric identifiers must never be fuzzy-matched.
+/// The caller must additionally verify the artist and an unambiguous release.
+fn small_title_typo(recognized: &str, collection: &str) -> Option<usize> {
+    let a = track_match_key(recognized);
+    let b = track_match_key(collection);
+    let (a, b) = (a.as_str(), b.as_str());
+    let a_numbers = a.split_whitespace().filter(|word| word.chars().any(|c| c.is_ascii_digit())).collect::<Vec<_>>();
+    let b_numbers = b.split_whitespace().filter(|word| word.chars().any(|c| c.is_ascii_digit())).collect::<Vec<_>>();
+    if a_numbers != b_numbers || a == b {
+        return None;
+    }
+    let (a, b) = (a.chars().collect::<Vec<_>>(), b.chars().collect::<Vec<_>>());
+    let longer = a.len().max(b.len());
+    let maximum = if longer >= 26 { 2 } else if longer >= 13 { 1 } else { 0 };
+    if maximum == 0 || a.len().abs_diff(b.len()) > maximum || longer > 160 {
+        return None;
+    }
+    let mut previous = (0..=b.len()).collect::<Vec<_>>();
+    let mut current = vec![0; b.len() + 1];
+    for (i, left) in a.iter().enumerate() {
+        current[0] = i + 1;
+        let mut row_min = current[0];
+        for (j, right) in b.iter().enumerate() {
+            current[j + 1] = (previous[j + 1] + 1)
+                .min(current[j] + 1)
+                .min(previous[j] + usize::from(left != right));
+            row_min = row_min.min(current[j + 1]);
+        }
+        if row_min > maximum {
+            return None;
+        }
+        std::mem::swap(&mut previous, &mut current);
+    }
+    (previous[b.len()] <= maximum).then_some(previous[b.len()])
+}
+
 /// Shazam sometimes appends an anniversary number to an otherwise identical
 /// album (e.g. "Wish You Were Here 50"). That is not a different LP title.
 fn album_match_key(album: &str) -> String {
@@ -635,20 +672,20 @@ impl Discogs {
         let old_idx = previous
             .and_then(|t| t.extra.get("discogs_track_index"))
             .and_then(Value::as_i64);
-        let best = matches
+        let artist_matches = |v: &Value| {
+            let a = normalized(v["artist"].as_str().unwrap_or(""));
+            a == wanted || (!a.is_empty()
+                && wanted.len() > 3
+                && (a.contains(&wanted) || wanted.contains(&a)))
+        };
+        let exact = matches
             .iter()
             .filter_map(|v| {
-                if track_match_key(v["title"].as_str().unwrap_or("")) != wanted_title {
+                if track_match_key(v["title"].as_str().unwrap_or("")) != wanted_title
+                    || !artist_matches(v)
+                {
                     return None;
                 }
-                let a = normalized(v["artist"].as_str().unwrap_or(""));
-                let artist_match = a == wanted
-                    || (!a.is_empty()
-                        && wanted.len() > 3
-                        && (a.contains(&wanted) || wanted.contains(&a)));
-                if !artist_match {
-                    return None;
-                };
                 let sequence = cfg.discogs.sequence_matching
                     && old_id == v["release_id"].as_i64()
                     && old_idx.is_some_and(|i| v["track_index"] == i || v["track_index"] == i + 1);
@@ -664,9 +701,54 @@ impl Discogs {
                 Some((v, score))
             })
             .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
-        if let Some((v, score)) = best
-            && score >= cfg.discogs.min_match_confidence
+
+        // An exact Discogs match always wins. For Shazam spelling errors, look
+        // only inside the already matched release (same/next track), or the
+        // explicitly identified album. Never guess from the global catalog.
+        let fuzzy_rows = if exact.is_none_or(|(_, score)| score < cfg.discogs.min_match_confidence)
+            && (old_id.is_some() || t.album.is_some())
         {
+            self.db.query(
+                "SELECT t.*,r.title release_title,r.artist release_artist,r.cover_url,r.year,r.label,r.catalog_number FROM discogs_tracks t JOIN discogs_releases r USING(release_id) WHERE t.release_id=? OR t.normalized_artist=? LIMIT 3000",
+                params![old_id, wanted],
+            )?
+        } else {
+            Vec::new()
+        };
+        let mut fuzzy_choices = fuzzy_rows.iter().filter_map(|v| {
+            if !artist_matches(v) {
+                return None;
+            }
+            let same_release = old_id == v["release_id"].as_i64();
+            let near_previous = same_release && old_idx.is_some_and(|i| {
+                v["track_index"] == i || v["track_index"] == i + 1
+            });
+            let same_album = t.album.as_deref().is_some_and(|album| {
+                album_match_key(album) == album_match_key(v["release_title"].as_str().unwrap_or(""))
+            });
+            if !same_album && !(t.album.is_none() && near_previous) {
+                return None;
+            }
+            let distance = small_title_typo(&t.title, v["title"].as_str().unwrap_or(""))?;
+            Some((v, distance, if near_previous { 0 } else { 1 }))
+        }).collect::<Vec<_>>();
+        fuzzy_choices.sort_by_key(|(_, distance, priority)| (*distance, *priority));
+        let fuzzy = fuzzy_choices.first().and_then(|(best, distance, priority)| {
+            // A tie between different songs is ambiguous. Treat it as an
+            // unmatched Shazam result, rather than silently showing the wrong LP.
+            let ambiguous = fuzzy_choices.iter().skip(1).any(|(other, d, p)| {
+                d == distance && p == priority
+                    && track_match_key(other["title"].as_str().unwrap_or(""))
+                        != track_match_key(best["title"].as_str().unwrap_or(""))
+            });
+            (!ambiguous).then_some((*best, if *priority == 0 { 0.95 } else { 0.92 }))
+        });
+        let chosen = exact
+            .filter(|(_, score)| *score >= cfg.discogs.min_match_confidence)
+            .map(|(v, score)| (v, score, false))
+            .or_else(|| fuzzy.filter(|(_, score)| *score >= cfg.discogs.min_match_confidence)
+                .map(|(v, score)| (v, score, true)));
+        if let Some((v, score, was_typo)) = chosen {
             let id = v["release_id"].as_i64().context("Release id")?;
             let index = v["track_index"].as_i64().context("Track index")?;
             self.repair_cached_track_positions(id)?;
@@ -675,6 +757,22 @@ impl Discogs {
                 [id],
             )?;
             let current = all.iter().find(|row| row["track_index"].as_i64() == Some(index)).context("Matched Discogs track missing")?;
+            // Display and count the *collection* title, not Shazam's spelling.
+            // Otherwise even exact aliases and one-off Shazam typos alternate
+            // between separate song identities and restart Pixoo animations.
+            if let Some(collection_title) = v["title"].as_str()
+                && !collection_title.is_empty()
+                && t.title != collection_title
+            {
+                t.extra.insert("shazam_original_title".into(), json!(t.title));
+                t.title = collection_title.to_owned();
+                if was_typo && cfg.debug.logs {
+                    self.db.log("INFO", &format!(
+                        "Discogs corrected Shazam title to collection: {} – {} (release {id})",
+                        t.artist, t.title
+                    ));
+                }
+            }
             t.album = v["release_title"].as_str().map(str::to_owned);
             if t.duration_ms.is_none() {
                 t.duration_ms = v["duration_seconds"]
@@ -949,5 +1047,107 @@ mod track_duration_tests {
         assert_eq!(first["tracks"][0]["duration_seconds"], 356);
         assert_eq!(first["tracks"][1]["duration_seconds"], 300); // Preserve original pressing data.
         assert_eq!(first, discogs.tracklist(555).unwrap());
+    }
+}
+
+#[cfg(test)]
+mod shazam_typo_tests {
+    use super::*;
+
+    fn collection() -> (tempfile::TempDir, Discogs, Config, Track) {
+        let dir = tempfile::tempdir().unwrap();
+        let db = Db::open(&dir.path().join("vinyl.db")).unwrap();
+        db.with(|c| {
+            c.execute("INSERT INTO discogs_releases(release_id,title,artist) VALUES(42,'Brothers In Arms','Dire Straits')", [])?;
+            for (index, title) in [(1, "Money for Nothing"), (2, "The Man's Too Strong"), (3, "Why Worry")] {
+                c.execute("INSERT INTO discogs_tracks(release_id,track_index,title,artist,normalized_title,normalized_artist) VALUES(42,?,?,? ,?,?)",
+                    params![index, title, "Dire Straits", normalized(title), normalized("Dire Straits")])?;
+            }
+            Ok(())
+        }).unwrap();
+        let mut cfg = Config::default();
+        cfg.discogs.enabled = true;
+        let matched = Track {
+            artist: "Dire Straits".into(),
+            title: "The Man's Too Strong".into(),
+            album: Some("Brothers In Arms".into()),
+            ..Default::default()
+        };
+        let discogs = Discogs::new(reqwest::Client::new(), db);
+        (dir, discogs, cfg, matched)
+    }
+
+    #[test]
+    fn typo_is_resolved_to_same_collection_track_and_identity() {
+        let (_dir, d, cfg, mut previous) = collection();
+        d.enrich(&mut previous, &cfg, None).unwrap();
+        assert_eq!(previous.extra["discogs_release_id"], 42);
+        let mut typo = Track {
+            artist: "Dire Straits".into(),
+            title: "The Man's Too Stong".into(),
+            ..Default::default()
+        };
+        d.enrich(&mut typo, &cfg, Some(&previous)).unwrap();
+        assert_eq!(typo.title, "The Man's Too Strong");
+        assert_eq!(typo.album.as_deref(), Some("Brothers In Arms"));
+        assert_eq!(typo.identity(), previous.identity());
+        assert_eq!(typo.extra["discogs_release_id"], 42);
+        assert_eq!(typo.extra["shazam_original_title"], "The Man's Too Stong");
+    }
+
+    #[test]
+    fn album_context_corrects_first_recognition_without_previous_song() {
+        let (_dir, d, cfg, _previous) = collection();
+        let mut typo = Track {
+            artist: "Dire Straits".into(),
+            title: "The Man's Too Stong".into(),
+            album: Some("Brothers In Arms".into()),
+            ..Default::default()
+        };
+        d.enrich(&mut typo, &cfg, None).unwrap();
+        assert_eq!(typo.title, "The Man's Too Strong");
+        assert_eq!(typo.extra["discogs_match_source"], "collection");
+    }
+
+    #[test]
+    fn ambiguous_spelling_is_not_guessed() {
+        let (_dir, d, cfg, mut previous) = collection();
+        d.db.with(|c| {
+            c.execute("UPDATE discogs_tracks SET title='The Man''s Too Stang',normalized_title='the man s too stang' WHERE release_id=42 AND track_index=3", [])?;
+            Ok(())
+        }).unwrap();
+        d.enrich(&mut previous, &cfg, None).unwrap();
+        let mut typo = Track {
+            artist: "Dire Straits".into(),
+            title: "The Man's Too Stong".into(),
+            ..Default::default()
+        };
+        d.enrich(&mut typo, &cfg, Some(&previous)).unwrap();
+        assert_eq!(typo.title, "The Man's Too Stong");
+        assert!(!typo.extra.contains_key("discogs_release_id"));
+    }
+
+    #[test]
+    fn unknown_or_ambiguous_songs_are_not_rewritten() {
+        let (_dir, d, cfg, mut previous) = collection();
+        d.enrich(&mut previous, &cfg, None).unwrap();
+        let mut unrelated = Track { artist: "Dire Straits".into(), title: "New Unknown Song".into(), ..Default::default() };
+        d.enrich(&mut unrelated, &cfg, Some(&previous)).unwrap();
+        assert_eq!(unrelated.title, "New Unknown Song");
+        assert!(!unrelated.extra.contains_key("discogs_release_id"));
+        let mut another_artist = Track { artist: "Different Artist".into(), title: "The Man's Too Stong".into(), ..Default::default() };
+        d.enrich(&mut another_artist, &cfg, Some(&previous)).unwrap();
+        assert_eq!(another_artist.title, "The Man's Too Stong");
+        let mut conflicting_album = Track { artist: "Dire Straits".into(), title: "The Man's Too Stong".into(), album: Some("Unrelated Record".into()), ..Default::default() };
+        d.enrich(&mut conflicting_album, &cfg, Some(&previous)).unwrap();
+        assert_eq!(conflicting_album.title, "The Man's Too Stong");
+    }
+
+    #[test]
+    fn short_titles_and_numbered_parts_do_not_fuzzy_match() {
+        assert_eq!(small_title_typo("One", "On"), None);
+        assert_eq!(small_title_typo("Part 1", "Part 2"), None);
+        assert_eq!(small_title_typo("The Man's Too Stong", "The Man's Too Strong"), Some(1));
+        assert_eq!(small_title_typo("Why Worry", "Why Hurry"), None);
     }
 }

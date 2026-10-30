@@ -42,7 +42,7 @@ pub struct Services {
     pub metadata: Arc<Metadata>,
     pub client: reqwest::Client,
 }
-#[derive(Clone, Default)]
+#[derive(Clone, Default, serde::Serialize, serde::Deserialize)]
 struct Confirmation {
     candidate: String,
     consecutive: usize,
@@ -105,6 +105,239 @@ impl Confirmation {
     fn failure(&mut self) {
         self.candidate.clear();
         self.consecutive = 0;
+    }
+}
+/// Checkpoints preserve the exact confirmed-track and album-session guards.
+/// The last-recognized track is stored alongside them so a new song can never
+/// accidentally inherit an old song's count protection.
+#[derive(serde::Serialize, serde::Deserialize)]
+struct ConfirmationCheckpoint {
+    seen_ms: i64,
+    track: Track,
+    state: Confirmation,
+}
+impl ConfirmationCheckpoint {
+    fn key(mode: Mode) -> &'static str {
+        match mode {
+            Mode::Vinyl => "recognition_checkpoint_vinyl_v1",
+            Mode::Spotify => "recognition_checkpoint_spotify_v1",
+            Mode::Off => "recognition_checkpoint_off_v1",
+        }
+    }
+    fn load(db: &Db, mode: Mode) -> Result<Option<Self>> {
+        let rows = db.query("SELECT value FROM meta WHERE key=?", [Self::key(mode)])?;
+        rows.first().and_then(|r| r["value"].as_str())
+            .map(serde_json::from_str::<Self>)
+            .transpose().map_err(Into::into)
+    }
+    fn save(db: &Db, mode: Mode, track: &Track, state: &Confirmation, at: i64) -> Result<()> {
+        let value = serde_json::to_string(&Self { seen_ms: at, track: track.clone(), state: state.clone() })?;
+        db.with(|conn| {
+            conn.execute("INSERT INTO meta(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", [Self::key(mode), value.as_str()])?;
+            Ok(())
+        })
+    }
+    fn restore(&self, current: &Track, mode: Mode, now_ms: i64, state: &mut Confirmation) -> bool {
+        if !(0..=PlaybackResume::STATUS_MAX_AGE_MS).contains(&(now_ms - self.seen_ms)) {
+            return false;
+        }
+        let same_song = self.track.identity() == current.identity()
+            && (mode != Mode::Spotify || self.track.key(mode) == current.key(mode));
+        if mode == Mode::Vinyl {
+            let album = current.album.as_deref()
+                .map(|name| album_identity(&current.artist, name))
+                .unwrap_or_default();
+            if !album.is_empty()
+                && (album == self.state.album || album == self.state.pending_album)
+            {
+                // Even if the needle has reached the NEXT song during the
+                // deployment, retain the confirmed album and any pending
+                // transition without counting a second album session.
+                state.album = self.state.album.clone();
+                state.album_tracks = self.state.album_tracks.clone();
+                state.album_recorded = self.state.album_recorded;
+                state.pending_album = self.state.pending_album.clone();
+                state.pending_tracks = self.state.pending_tracks.clone();
+            }
+        }
+        if !same_song {
+            return false;
+        }
+        if mode == Mode::Spotify
+            && let (Some(old), Some(new)) = (self.track.progress_ms, current.progress_ms)
+            && (new + 1500 < old || new > old.saturating_add(now_ms - self.seen_ms + 30_000))
+        {
+            return false;
+        }
+        *state = self.state.clone();
+        // An interrupted partial run of confirmations does not count as
+        // three consecutive results, but already confirmed plays stay counted.
+        state.failure();
+        true
+    }
+}
+
+/// A short service restart may interrupt an already counted playback. The
+/// most recent confirmed event and the continuously updated source status are
+/// persisted in SQLite, so we can resume that one song without recording it
+/// (and its artist/full duration) for a second time.
+struct PlaybackResume {
+    checkpoint: Option<ConfirmationCheckpoint>,
+    previous: Track,
+    last_seen_ms: i64,
+    counted_track: Option<String>,
+    last_counted_at: i64,
+    last_album_track: Option<String>,
+    last_album_session: Option<(String, String, i64)>,
+}
+impl PlaybackResume {
+    const STATUS_MAX_AGE_MS: i64 = 120_000;
+
+    fn from_db(db: &Db, mode: Mode) -> Result<Option<Self>> {
+        if mode == Mode::Off {
+            return Ok(None);
+        }
+        if let Some(checkpoint) = ConfirmationCheckpoint::load(db, mode)? {
+            let now_ms = chrono::Utc::now().timestamp_millis();
+            if (0..=Self::STATUS_MAX_AGE_MS).contains(&(now_ms - checkpoint.seen_ms)) {
+                return Ok(Some(Self {
+                    previous: checkpoint.track.clone(),
+                    last_seen_ms: checkpoint.seen_ms,
+                    counted_track: None,
+                    last_counted_at: 0,
+                    last_album_track: None,
+                    last_album_session: None,
+                    checkpoint: Some(checkpoint),
+                }));
+            }
+        }
+        let Some(status) = db.last_status(mode)? else {
+            return Ok(None);
+        };
+        let Some(last_seen_ms) = status["updated_at"].as_i64() else {
+            return Ok(None);
+        };
+        let now_ms = chrono::Utc::now().timestamp_millis();
+        if !(0..=Self::STATUS_MAX_AGE_MS).contains(&(now_ms - last_seen_ms)) {
+            return Ok(None);
+        }
+        let previous: Track = serde_json::from_value(status)?;
+        if previous.artist.is_empty() || previous.title.is_empty() {
+            return Ok(None);
+        }
+        let last = db.query(
+            "SELECT artist,title,album,song_key,occurred_at FROM playback_events WHERE source=? AND event_type='play' ORDER BY id DESC LIMIT 1",
+            [mode.as_str()],
+        )?;
+        let last_counted_at = last.first().and_then(|r| r["occurred_at"].as_i64()).unwrap_or(0);
+        let last_album_track = last.first().and_then(|r| {
+            let name = r["album"].as_str()?;
+            let artist = r["artist"].as_str()?;
+            let title = r["title"].as_str()?;
+            let current_album = previous.album.as_deref()?;
+            (album_identity(artist, name) == album_identity(&previous.artist, current_album))
+                .then(|| Track { artist: artist.into(), title: title.into(), ..Default::default() }.identity())
+        });
+        let counted_track = last.first().and_then(|r| {
+            if mode == Mode::Spotify {
+                return r["song_key"].as_str().map(str::to_owned);
+            }
+            let artist = r["artist"].as_str()?;
+            let title = r["title"].as_str()?;
+            Some(Track { artist: artist.into(), title: title.into(), ..Default::default() }.identity())
+        });
+        let last_album_session = if mode == Mode::Vinyl {
+            db.query(
+                "SELECT a.album,a.occurred_at,(SELECT p.artist FROM playback_events p WHERE p.source='vinyl' AND p.event_type='play' AND p.album=a.album AND p.occurred_at=a.occurred_at AND p.id<a.id ORDER BY p.id DESC LIMIT 1) artist FROM playback_events a WHERE a.source='vinyl' AND a.event_type='album_session' ORDER BY a.id DESC LIMIT 1",
+                [],
+            )?.first().and_then(|r| Some((r["album"].as_str()?.to_owned(), r["artist"].as_str()?.to_owned(), r["occurred_at"].as_i64()?)))
+        } else {
+            None
+        };
+        Ok(Some(Self {
+            checkpoint: None,
+            previous,
+            last_seen_ms,
+            counted_track,
+            last_counted_at,
+            last_album_track,
+            last_album_session,
+        }))
+    }
+
+    fn matches_song(&self, track: &Track, mode: Mode) -> bool {
+        self.previous.identity() == track.identity()
+            && (mode != Mode::Spotify || self.previous.key(mode) == track.key(mode))
+    }
+
+    /// Reuse the previous state on a matching song, or carry just the album
+    /// state once a different song has passed its full confirmation threshold.
+    fn resume(&self, current: &Track, mode: Mode, now_ms: i64, state: &mut Confirmation) -> bool {
+        if let Some(checkpoint) = &self.checkpoint {
+            // Return true only if this playback was already counted.
+            return checkpoint.restore(current, mode, now_ms, state)
+                && state.counted == current.identity();
+        }
+        if !(0..=Self::STATUS_MAX_AGE_MS).contains(&(now_ms - self.last_seen_ms)) {
+            return false;
+        }
+        let now = now_ms / 1000;
+        let album = current.album.as_deref().map(|a| album_identity(&current.artist, a)).unwrap_or_default();
+        let previous_album = self.previous.album.as_deref()
+            .map(|a| album_identity(&self.previous.artist, a)).unwrap_or_default();
+        if mode == Mode::Vinyl && !album.is_empty() && album == previous_album {
+            // Preserve the already counted album session across the restart,
+            // preventing a second session on the next two confirmed tracks.
+            if let Some((name, artist, at)) = &self.last_album_session
+                && (0..=7200).contains(&(now - at))
+                && album == album_identity(artist, name)
+            {
+                state.album = album.clone();
+                state.album_recorded = true;
+            }
+            if let Some(id) = &self.last_album_track
+                && (0..=7200).contains(&(now - self.last_counted_at))
+            {
+                state.album = album;
+                state.album_tracks.insert(id.clone());
+            }
+        }
+        if current.identity() != self.previous.identity()
+            || (mode == Mode::Spotify && current.key(mode) != self.previous.key(mode))
+        {
+            return false;
+        }
+        let counted_key = if mode == Mode::Spotify {
+            current.key(mode)
+        } else {
+            current.identity()
+        };
+        if self.counted_track.as_deref() != Some(counted_key.as_str()) {
+            return false;
+        }
+        let duration_ms = current.duration_ms.or(self.previous.duration_ms);
+        // Allow enough time for the current track to finish, but never treat
+        // an arbitrarily old play as a continuation. Unknown lengths use a
+        // bounded 10-minute window. This is a heuristic, not audio position.
+        let window_secs = duration_ms
+            .filter(|ms| *ms > 0)
+            .map(|ms| (ms / 1000 + 60).clamp(90, 1800))
+            .unwrap_or(600);
+        if !(0..=window_secs).contains(&(now - self.last_counted_at)) {
+            return false;
+        }
+        if mode == Mode::Spotify {
+            // Spotify exposes track progress. If it restarted at position 0,
+            // this is a real replay, not a process-restart continuation.
+            if let (Some(previous), Some(current)) = (self.previous.progress_ms, current.progress_ms) {
+                let gap_ms = now_ms - self.last_seen_ms;
+                if current + 1500 < previous || current > previous.saturating_add(gap_ms + 30_000) {
+                    return false;
+                }
+            }
+        }
+        state.counted = current.identity();
+        true
     }
 }
 #[derive(Default)]
@@ -269,6 +502,7 @@ impl Engine {
         cancel: CancellationToken,
     ) {
         let mut confirmation = Confirmation::default();
+        let mut resume: Option<PlaybackResume> = None;
         let mut last: Option<Track> = None;
         let mut failures = 0usize;
         let mut silence = 0.;
@@ -354,6 +588,13 @@ impl Engine {
                     let changed = command.mode != mode;
                     let result = self.change(command.mode, &s).await;
                     if result.is_ok() && changed {
+                        resume = match PlaybackResume::from_db(&s.db, command.mode) {
+                            Ok(guard) => guard,
+                            Err(e) => {
+                                s.db.log("WARNING", &format!("Unable to restore playback continuity: {e}"));
+                                None
+                            }
+                        };
                         confirmation = Confirmation::default();
                         last = None;
                         failures = 0;
@@ -412,6 +653,10 @@ impl Engine {
                                         && self.change(Mode::Vinyl, &s).await.is_ok()
                                     {
                                         manual = false;
+                                        resume = PlaybackResume::from_db(&s.db, Mode::Vinyl).unwrap_or_else(|e| {
+                                            s.db.log("WARNING", &format!("Unable to restore playback continuity: {e}"));
+                                            None
+                                        });
                                         confirmation = Confirmation::default();
                                         failures = 0;
                                         silence = 0.;
@@ -440,6 +685,28 @@ impl Engine {
                                 failures = 0;
                                 let id = t.identity();
                                 let changed = last.as_ref().is_none_or(|old| old.identity() != id);
+                                // Do not discard the restart guard because
+                                // of one stray Shazam match. A *different* song
+                                // must reach the usual confirmation threshold.
+                                let threshold = if mode == Mode::Spotify {
+                                    1
+                                } else {
+                                    cfg.behavior.stats_min_consecutive as usize
+                                };
+                                let confirmed_different = if confirmation.candidate == id {
+                                    confirmation.consecutive + 1 >= threshold
+                                } else {
+                                    threshold <= 1
+                                };
+                                let apply_resume = resume.as_ref().is_some_and(|guard| {
+                                    guard.matches_song(&t, mode) || confirmed_different
+                                });
+                                if apply_resume
+                                    && let Some(guard) = resume.take()
+                                    && guard.resume(&t, mode, chrono::Utc::now().timestamp_millis(), &mut confirmation)
+                                {
+                                    s.db.log("INFO", &format!("Continuing already counted playback after restart: {} – {} [{}]; duplicate statistics suppressed", t.artist, t.title, mode.as_str()));
+                                }
                                 if mode == Mode::Spotify {
                                     let progress = t.progress_ms.unwrap_or(0);
                                     let now = Instant::now();
@@ -471,14 +738,7 @@ impl Engine {
                                 // A failed SQLite transaction must not consume a
                                 // confirmation or lose a pending album session.
                                 let before_confirmation = confirmation.clone();
-                                let (count, new_album) = confirmation.observe(
-                                    &t,
-                                    if mode == Mode::Spotify {
-                                        1
-                                    } else {
-                                        cfg.behavior.stats_min_consecutive as usize
-                                    },
-                                );
+                                let (count, new_album) = confirmation.observe(&t, threshold);
                                 if cfg.debug.logs && !count && mode == Mode::Vinyl && changed {
                                     s.db.log("DEBUG", &format!("Recognition candidate: {} – {} (confirmation {}/{})", t.artist, t.title, confirmation.consecutive, cfg.behavior.stats_min_consecutive as usize));
                                 }
@@ -519,6 +779,19 @@ impl Engine {
                                 };
                                 if let Err(e) = s.db.save_status(mode, &v) {
                                     s.db.log("ERROR", &e.to_string());
+                                }
+                                // A single unconfirmed mismatching match must
+                                // not overwrite the prior restart checkpoint.
+                                if resume.is_none()
+                                    && let Err(e) = ConfirmationCheckpoint::save(
+                                        &s.db,
+                                        mode,
+                                        &t,
+                                        &confirmation,
+                                        v["updated_at"].as_i64().unwrap_or_default(),
+                                    )
+                                {
+                                    s.db.log("WARNING", &format!("Unable to persist recognition checkpoint: {e}"));
                                 }
                                 self.status.send_replace(v);
                                 let returning_from_fallback = display_fallback;
@@ -589,6 +862,7 @@ impl Engine {
                                     let _ = self.change(Mode::Off, &s).await;
                                     wake = Wake::default();
                                     confirmation = Confirmation::default();
+                                    resume = None;
                                     last = None;
                                 } else {
                                     let mut v = self.status.borrow().clone();
@@ -736,6 +1010,177 @@ mod tests {
         assert_eq!(c.observe(&track("two"), 2), (true, true));
     }
 
+    #[test]
+    fn restart_does_not_recount_a_confirmed_song_artist_duration_or_album() {
+        let dir = tempfile::tempdir().unwrap();
+        let db = Db::open(&dir.path().join("continuity.sqlite")).unwrap();
+        let mut first = track("Why Worry");
+        first.duration_ms = Some(360_000);
+        db.record_play(Mode::Vinyl, &first, true).unwrap();
+        db.seconds(Mode::Vinyl, None, 360., false).unwrap();
+        let mut status = serde_json::to_value(&first).unwrap();
+        status["updated_at"] = json!(chrono::Utc::now().timestamp_millis());
+        db.save_status(Mode::Vinyl, &status).unwrap();
+        drop(db);
+        let db = Db::open(&dir.path().join("continuity.sqlite")).unwrap();
+        let guard = PlaybackResume::from_db(&db, Mode::Vinyl).unwrap().unwrap();
+        let mut confirmation = Confirmation::default();
+        assert!(guard.resume(&first, Mode::Vinyl, chrono::Utc::now().timestamp_millis(), &mut confirmation));
+        for _ in 0..4 {
+            assert_eq!(confirmation.observe(&first, 3), (false, false));
+        }
+        let second = track("The Man's Too Strong");
+        confirmation.observe(&second, 3);
+        confirmation.observe(&second, 3);
+        assert_eq!(confirmation.observe(&second, 3), (true, false));
+        assert_eq!(db.query("SELECT count(*) n FROM playback_events WHERE event_type='play'", []).unwrap()[0]["n"], 1);
+        assert_eq!(db.stats("vinyl", None).unwrap()["total_minutes_listened"], 6);
+    }
+
+    #[test]
+    fn restart_lets_new_tracks_count_and_rejects_stale_continuations() {
+        let dir = tempfile::tempdir().unwrap();
+        let db = Db::open(&dir.path().join("continuity.sqlite")).unwrap();
+        let previous = track("Why Worry");
+        db.record_play(Mode::Vinyl, &previous, false).unwrap();
+        let now = chrono::Utc::now().timestamp_millis();
+        let mut status = serde_json::to_value(&previous).unwrap();
+        status["updated_at"] = json!(now);
+        db.save_status(Mode::Vinyl, &status).unwrap();
+        let guard = PlaybackResume::from_db(&db, Mode::Vinyl).unwrap().unwrap();
+        let mut confirmation = Confirmation::default();
+        assert!(!guard.resume(&track("Different Song"), Mode::Vinyl, now, &mut confirmation));
+        assert_eq!(confirmation.observe(&track("Different Song"), 2), (false, false));
+        // The previous track was already counted before the restart. Once a
+        // different song on the SAME album is confirmed, both distinct tracks
+        // qualify for the album's first session. Resuming must not suppress it.
+        assert_eq!(confirmation.observe(&track("Different Song"), 2), (true, true));
+        assert!(confirmation.album_recorded);
+        let mut stale = Confirmation::default();
+        assert!(!guard.resume(&previous, Mode::Vinyl, now + 121_000, &mut stale));
+        assert_eq!(stale.observe(&previous, 2), (false, false));
+        assert_eq!(stale.observe(&previous, 2), (true, false));
+    }
+
+    #[test]
+    fn persisted_checkpoint_retains_album_state_and_prevents_recounting() {
+        let dir = tempfile::tempdir().unwrap();
+        let db = Db::open(&dir.path().join("checkpoint.sqlite")).unwrap();
+        let a = track("A");
+        let b = track("B");
+        let mut before = Confirmation::default();
+        for _ in 0..3 { before.observe(&a, 3); }
+        for _ in 0..3 { before.observe(&b, 3); }
+        assert!(before.album_recorded);
+        assert_eq!(before.counted, b.identity());
+        let now = chrono::Utc::now().timestamp_millis();
+        ConfirmationCheckpoint::save(&db, Mode::Vinyl, &b, &before, now).unwrap();
+        drop(db);
+        let db = Db::open(&dir.path().join("checkpoint.sqlite")).unwrap();
+        let mut after = Confirmation::default();
+        let recovered = PlaybackResume::from_db(&db, Mode::Vinyl).unwrap().unwrap();
+        assert!(recovered.resume(&b, Mode::Vinyl, now + 1000, &mut after));
+        assert!(after.album_recorded);
+        assert_eq!(after.album_tracks.len(), 2);
+        for _ in 0..3 { assert_eq!(after.observe(&b, 3), (false, false)); }
+        let next = track("C");
+        for _ in 0..2 { after.observe(&next, 3); }
+        assert_eq!(after.observe(&next, 3), (true, false));
+    }
+
+    #[test]
+    fn incomplete_pre_restart_confirmation_needs_three_new_recognitions() {
+        let now = chrono::Utc::now().timestamp_millis();
+        let track = track("Uncounted");
+        let mut before = Confirmation::default();
+        assert_eq!(before.observe(&track, 3), (false, false));
+        assert_eq!(before.observe(&track, 3), (false, false));
+        let checkpoint = ConfirmationCheckpoint {
+            seen_ms: now - 1_000, track: track.clone(), state: before,
+        };
+        let mut after = Confirmation::default();
+        assert!(checkpoint.restore(&track, Mode::Vinyl, now, &mut after));
+        assert_eq!(after.observe(&track, 3), (false, false));
+        assert_eq!(after.observe(&track, 3), (false, false));
+        assert_eq!(after.observe(&track, 3), (true, false));
+    }
+
+    #[test]
+    fn persisted_checkpoint_does_not_suppress_a_different_first_track() {
+        let previous = track("Why Worry");
+        let now = chrono::Utc::now().timestamp_millis();
+        let mut old = Confirmation::default();
+        for _ in 0..3 { old.observe(&previous, 3); }
+        let checkpoint = ConfirmationCheckpoint { seen_ms: now, track: previous, state: old };
+        let mut state = Confirmation::default();
+        let mut different = track("Ride Across the River");
+        different.album = Some("Different album".into());
+        assert!(!checkpoint.restore(&different, Mode::Vinyl, now + 1000, &mut state));
+        assert_eq!(state.observe(&different, 3), (false, false));
+        assert_eq!(state.observe(&different, 3), (false, false));
+        assert_eq!(state.observe(&different, 3), (true, false));
+    }
+
+    #[test]
+    fn next_song_after_restart_preserves_existing_album_session() {
+        let now = chrono::Utc::now().timestamp_millis();
+        let mut before = Confirmation::default();
+        for name in ["one", "two"] {
+            for _ in 0..3 { before.observe(&track(name), 3); }
+        }
+        assert!(before.album_recorded);
+        let checkpoint = ConfirmationCheckpoint {
+            seen_ms: now - 10_000, track: track("two"), state: before,
+        };
+        let mut after = Confirmation::default();
+        let next = track("three");
+        assert!(!checkpoint.restore(&next, Mode::Vinyl, now, &mut after));
+        assert!(after.album_recorded);
+        for _ in 0..2 { after.observe(&next, 3); }
+        assert_eq!(after.observe(&next, 3), (true, false));
+    }
+
+    #[test]
+    fn persisted_checkpoint_expires_and_spotify_restarts_from_beginning() {
+        let now = chrono::Utc::now().timestamp_millis();
+        let mut previous = track("Repeat");
+        previous.track_id = Some("spotify:test:123".into());
+        previous.progress_ms = Some(180_000);
+        let mut prior = Confirmation::default();
+        assert!(prior.observe(&previous, 1).0);
+        let checkpoint = ConfirmationCheckpoint {
+            seen_ms: now - 20_000, track: previous.clone(), state: prior,
+        };
+        let mut repeated = previous;
+        repeated.progress_ms = Some(2_000);
+        let mut fresh = Confirmation::default();
+        assert!(!checkpoint.restore(&repeated, Mode::Spotify, now, &mut fresh));
+        assert!(fresh.observe(&repeated, 1).0);
+        let mut after_gap = Confirmation::default();
+        assert!(!checkpoint.restore(&repeated, Mode::Spotify, now + 121_000, &mut after_gap));
+    }
+
+    #[test]
+    fn spotify_rewind_after_restart_is_a_new_play() {
+        let now = chrono::Utc::now().timestamp_millis();
+        let mut previous = track("Repeat");
+        previous.progress_ms = Some(153_000);
+        let guard = PlaybackResume {
+            checkpoint: None,
+            previous: previous.clone(), last_seen_ms: now - 5_000,
+            counted_track: Some(previous.identity()), last_counted_at: now / 1000 - 40,
+            last_album_track: None, last_album_session: None,
+        };
+        let mut resumed = previous.clone();
+        resumed.progress_ms = Some(156_000);
+        let mut normal = Confirmation::default();
+        assert!(guard.resume(&resumed, Mode::Spotify, now, &mut normal));
+        assert!(!normal.observe(&resumed, 1).0);
+        resumed.progress_ms = Some(1_000);
+        let mut replay = Confirmation::default();
+        assert!(!guard.resume(&resumed, Mode::Spotify, now, &mut replay));
+        assert!(replay.observe(&resumed, 1).0);
+    }
     #[test]
     fn wake_requires_sustained_signal_and_rearms() {
         let cfg = Config::default();
