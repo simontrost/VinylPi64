@@ -10,7 +10,7 @@ SERVICE=vinylpi64-rust.service
 BIN="$ROOT/target/release/vinylpi64"
 DATA_DIR="${VINYLPI_UPDATE_DATA_DIR:-$ROOT/.rust-smoke-data}"
 BACKUP_ROOT="$ROOT/data/rust-update-backups"
-PORT="${VINYLPI_UPDATE_PORT:-8081}"
+PORT="${VINYLPI_UPDATE_PORT:-8080}"
 
 fail() { echo "ERROR: $*" >&2; exit 1; }
 command -v git >/dev/null && command -v curl >/dev/null && command -v sha256sum >/dev/null && command -v tar >/dev/null || fail 'git, curl, sha256sum and tar are required'
