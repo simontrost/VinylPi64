@@ -200,9 +200,10 @@ fn artists(v: &Value) -> String {
         .collect::<Vec<_>>()
         .join(", ")
 }
-/// Return a side-flip target only for the next physical side of the same
-/// already matched Discogs release (A->B, C->D, E->F, ...).
-/// Other transitions, unmatched tracks, and missing metadata are ignored.
+/// Return the next consecutive physical side of the same matched Discogs
+/// release (A->B, B->C, C->D, ...). The B->C transition crosses records on
+/// multi-disc releases but still requires a record-change prompt.
+/// Nonconsecutive transitions, unmatched tracks and missing data are ignored.
 pub fn side_flip_target(track: &Track) -> Option<String> {
     track.extra.get("discogs_release_id")?.as_i64()?;
     let from = track
@@ -225,7 +226,7 @@ pub fn side_flip_target(track: &Track) -> Option<String> {
     if !a.is_ascii_uppercase() || !b.is_ascii_uppercase() {
         return None;
     }
-    if (a - b'A').is_multiple_of(2) && b == a + 1 {
+    if b == a + 1 {
         Some(to)
     } else {
         None
@@ -746,10 +747,11 @@ mod side_flip_tests {
     }
 
     #[test]
-    fn only_paired_side_transitions_prompt() {
-        assert_eq!(side_flip_target(&matched("a", "b")), Some("B".to_owned()));
-        assert_eq!(side_flip_target(&matched("C", "D")), Some("D".to_owned()));
-        for (from, to) in [("B", "C"), ("A", "C"), ("D", "A"), ("A", "A"), ("A1", "B")] {
+    fn all_consecutive_side_transitions_prompt_including_between_discs() {
+        for (from, to) in [("a", "B"), ("B", "c"), ("C", "D"), ("D", "E"), ("E", "F")] {
+            assert_eq!(side_flip_target(&matched(from, to)), Some(to.to_ascii_uppercase()));
+        }
+        for (from, to) in [("A", "C"), ("B", "D"), ("D", "A"), ("A", "A"), ("A1", "B"), ("B", "A")] {
             assert!(
                 side_flip_target(&matched(from, to)).is_none(),
                 "{from} -> {to}"

@@ -238,11 +238,11 @@
     /* Rows 6–10 expand the card instead of being clipped in a scroll area. */
     overflow: visible;
     min-height: 0;
-    flex: 1 0 auto;
 }
 
 .stats-list-card {
-    min-height: 475px;
+    /* No reserved empty space below Show all/Show less, especially on mobile. */
+    min-height: 0;
     height: auto;
     display: flex;
     flex-direction: column;

@@ -429,9 +429,6 @@ impl Engine {
                                 }
                             }
                             if let Some(t) = track {
-                                if cfg.debug.logs && (last.as_ref().is_none_or(|old| old.identity() != t.identity())) {
-                                    s.db.log("INFO", &format!("{} recognized: {} – {}{}",mode.as_str(),t.artist,t.title,t.album.as_ref().map(|a|format!(" ({a})")).unwrap_or_default()));
-                                }
                                 failures = 0;
                                 let id = t.identity();
                                 let changed = last.as_ref().is_none_or(|old| old.identity() != id);
@@ -516,9 +513,29 @@ impl Engine {
                                     s.db.log("ERROR", &e.to_string());
                                 }
                                 self.status.send_replace(v);
-                                if changed || display_fallback {
+                                let returning_from_fallback = display_fallback;
+                                if changed || returning_from_fallback {
                                     s.display.show(Content::Track(Box::new(t.clone())));
                                     display_fallback = false;
+                                }
+                                if cfg.debug.logs {
+                                    let action = if changed {
+                                        "Pixoo update queued (new track)"
+                                    } else if returning_from_fallback {
+                                        "Pixoo update queued (returning from fallback)"
+                                    } else {
+                                        "same as before; Pixoo unchanged"
+                                    };
+                                    s.db.log(
+                                        if changed { "INFO" } else { "DEBUG" },
+                                        &format!(
+                                            "{} recognized: {} – {}{}; {action}",
+                                            mode.as_str(),
+                                            t.artist,
+                                            t.title,
+                                            t.album.as_ref().map(|a| format!(" ({a})")).unwrap_or_default()
+                                        ),
+                                    );
                                 }
                                 last = Some(t);
                             } else {
