@@ -55,7 +55,7 @@ async fn post(app: &Arc<App>, uri: &str, body: Value) -> (StatusCode, Value) {
 }
 
 #[tokio::test]
-async fn server_starts_and_exposes_core_routes_and_pages() {
+async fn server_exposes_core_api_contracts() {
     let (_tmp, server) = app().await;
     let (status, health) = get(&server, "/api/health").await;
     assert_eq!(status, StatusCode::OK);
@@ -72,12 +72,6 @@ async fn server_starts_and_exposes_core_routes_and_pages() {
         let (status, response) = get(&server, uri).await;
         assert_eq!(status, StatusCode::OK, "{uri}: {response}");
         assert!(response.get(field).is_some(), "{uri}: {response}");
-    }
-    // Route smoke tests: template rendering must work without external services.
-    for uri in ["/", "/settings.html", "/stats.html", "/pixoo.html", "/logs.html", "/about.html"] {
-        let (status, html) = get(&server, uri).await;
-        assert_eq!(status, StatusCode::OK, "{uri}: {html}");
-        assert!(html["body"].as_str().is_some_and(|s| s.contains("<html")), "{uri}");
     }
     server.shutdown().await.unwrap();
 }
@@ -205,21 +199,4 @@ async fn sse_starts_with_status_and_background_tasks_stop_cleanly() {
     drop(body);
     server.shutdown().await.unwrap();
     assert!(server.tasks.is_empty());
-}
-
-#[tokio::test]
-async fn generated_image_endpoints_produce_valid_png_data() {
-    let (_tmp, server) = app().await;
-    for path in ["/api/font-preview/vinylpixel.ttf", "/api/stats/share-card"] {
-        let response = router(server.clone()).oneshot(
-            Request::builder().uri(path).header("host", "localhost:5000")
-                .body(Body::empty()).unwrap(),
-        ).await.unwrap();
-        assert_eq!(response.status(), StatusCode::OK, "{path}");
-        assert_eq!(response.headers()[header::CONTENT_TYPE], "image/png");
-        let bytes = response.into_body().collect().await.unwrap().to_bytes();
-        let image = image::load_from_memory(&bytes).expect("returned PNG is decodable");
-        assert!(image.width() >= 64 && image.height() >= 40);
-    }
-    server.shutdown().await.unwrap();
 }

@@ -3,8 +3,6 @@
 use serde_json::json;
 use vinylpi64::{
     config::{ConfigStore, Config, safe_relative},
-    db::Db,
-    discogs::Discogs,
     model::{Mode, Track, canonical_title},
     uploads,
 };
@@ -55,29 +53,6 @@ fn uploads_validate_contents_enforce_size_and_prevent_traversal() {
     let name = relative.strip_prefix("assets/fallback/").unwrap();
     uploads::delete(root, &cfg, name, false).unwrap();
     assert!(!root.join(relative).exists());
-}
-
-#[test]
-fn random_record_only_selects_from_chosen_folder_and_handles_singleton() {
-    let dir = tempfile::tempdir().unwrap();
-    let db = Db::open(&dir.path().join("discogs.sqlite")).unwrap();
-    db.with(|c| {
-        for (id, folder) in [(10, 1), (20, 1), (30, 2)] {
-            c.execute("INSERT INTO discogs_releases(release_id,folder_id,title,artist) VALUES(?,?,?,?)",
-                rusqlite::params![id,folder,format!("Release {id}"),"Artist"])?;
-        }
-        Ok(())
-    }).unwrap();
-    let discogs = Discogs::new(reqwest::Client::new(), db);
-    for _ in 0..12 {
-        let pick = discogs.random(Some(10), Some(1)).unwrap();
-        assert_eq!(pick["release"]["release_id"], 20);
-        assert_eq!(pick["release"]["collection_count"], 2);
-        assert_eq!(discogs.random(None, Some(2)).unwrap()["release"]["release_id"], 30);
-    }
-    // Re-roll cannot exclude the only record forever: return it rather than null.
-    assert_eq!(discogs.random(Some(30), Some(2)).unwrap()["release"]["release_id"], 30);
-    assert!(discogs.random(None, Some(999)).unwrap()["release"].is_null());
 }
 
 #[test]

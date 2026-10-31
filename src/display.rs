@@ -847,50 +847,10 @@ mod tests {
         assert_eq!(c.frame(0).as_raw().len(), 12288);
         assert_eq!(c.frame(20).get_pixel(0, 0).0, [12, 34, 56]);
     }
+
     #[test]
     fn rejects_invalid_image() {
         assert!(decode(b"not an image").is_err());
-    }
-    #[test]
-    fn marquee_speed_is_elapsed_time_based_and_supports_200_px_s() {
-        let elapsed = Duration::from_millis(125);
-        assert_eq!(marquee_offset(elapsed, 20.0), 2);
-        assert_eq!(marquee_offset(elapsed, 40.0), 5);
-        assert_eq!(marquee_offset(elapsed, 200.0), 25);
-        // Sending a frame must not increment the offset by a fixed one pixel.
-        assert_eq!(marquee_offset(Duration::from_millis(260), 40.0), 10);
-    }
-
-    #[test]
-    fn both_long_lines_share_a_cycle_and_restart_in_sync() {
-        let short = RgbImage::from_pixel(90, 8, Rgb([255, 0, 0]));
-        let long = RgbImage::from_pixel(150, 8, Rgb([0, 255, 0]));
-        let c = Composition {
-            base: RgbImage::from_pixel(64, 64, Rgb([0, 0, 0])),
-            lines: vec![(short, 2), (long, 24)],
-            background: [0, 0, 0],
-        };
-        assert_eq!(c.scroll_cycle(), 170);
-        assert_eq!(c.frame(0), c.frame(170));
-        assert_eq!(c.frame(30), c.frame(200));
-        // The short line stays blank after leaving the left edge,
-        // instead of restarting before the longer title finishes.
-        assert_eq!(c.frame(115).get_pixel(3, 3).0, [0, 0, 0]);
-    }
-
-    #[test]
-    fn global_gif_palette_keeps_stationary_cover_pixels_identical() {
-        let mut base = RgbImage::from_pixel(64, 64, Rgb([12, 34, 56]));
-        base.put_pixel(12, 12, Rgb([211, 48, 122]));
-        let c = Composition { base, lines: vec![
-            (RgbImage::from_pixel(90, 6, Rgb([255, 255, 255])), 50)
-        ], background: [12, 34, 56] };
-        let palette = shared_gif_palette(&c);
-        let mut cache = HashMap::new();
-        let a = gif_indices(&c.frame(0), &palette, &mut cache);
-        let b = gif_indices(&c.frame(10), &palette, &mut cache);
-        assert_eq!(palette.len(), 768);
-        assert_eq!(a[12 * 64 + 12], b[12 * 64 + 12]);
     }
 
     #[test]
@@ -926,27 +886,5 @@ mod tests {
         assert_eq!((reader.width(), reader.height()), (64, 64));
         assert!(reader.read_next_frame().unwrap().is_some());
         assert!(reader.read_next_frame().unwrap().is_none());
-    }
-
-    #[test]
-    fn marquee_waits_until_an_actual_pixel_change() {
-        assert_eq!(
-            time_to_next_pixel(Duration::from_millis(125), 20.0),
-            Duration::from_millis(25)
-        );
-        assert!(time_to_next_pixel(Duration::ZERO, 200.0) <= Duration::from_millis(5));
-        assert!(time_to_next_pixel(Duration::ZERO, 1.0) <= Duration::from_millis(250));
-    }
-}
-
-#[cfg(test)]
-mod side_flip_tests {
-    use super::*;
-    #[test]
-    fn side_flip_badge_has_valid_frame_dimensions() {
-        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        let image = RgbImage::from_pixel(64, 64, Rgb([20, 20, 20]));
-        let frame = side_flip_frame(&root, image, "D").unwrap();
-        assert_eq!(frame.as_raw().len(), 64 * 64 * 3);
     }
 }

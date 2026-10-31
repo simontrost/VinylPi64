@@ -89,19 +89,101 @@ pub fn snapshot(source: &Path, dest: &Path) -> Result<()> {
     ensure!(check == "ok", "Database integrity check failed");
     Ok(())
 }
+// Keep schema evolution in one transaction: an interrupted upgrade must not
+// leave partially applied columns or annual statistics behind.
+fn initialize_schema(connection: &mut Connection) -> Result<()> {
+    let tx = connection.transaction()?;
+    tx.execute_batch(include_str!("../migrations/001_compatible.sql"))?;
+
+    // Add columns introduced after the original Python schema. The reference
+    // database is built from the same bundled schema as a fresh installation.
+    let reference = Connection::open_in_memory()?;
+    reference.execute_batch(include_str!("../migrations/001_compatible.sql"))?;
+    let tables = rows(
+        &reference,
+        "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'",
+        [],
+    )?;
+    for table in tables {
+        let name = table["name"].as_str().context("table name")?;
+        let expected = rows(&reference, &format!("PRAGMA table_info({name})"), [])?;
+        let actual = rows(&tx, &format!("PRAGMA table_info({name})"), [])?;
+        for column in expected {
+            if actual.iter().any(|existing| existing["name"] == column["name"]) {
+                continue;
+            }
+            let key = column["name"].as_str().context("column")?;
+            let ty = column["type"].as_str().context("column type")?;
+            ensure!(
+                column["pk"].as_i64() == Some(0),
+                "Cannot migrate missing key {name}.{key}"
+            );
+            tx.execute_batch(&format!("ALTER TABLE {name} ADD COLUMN {key} {ty}"))?;
+            // SQLite cannot ADD a column with a non-constant default.
+            // Populate old rows after the column has been added.
+            if let Some(default) = column["dflt_value"].as_str() {
+                tx.execute_batch(&format!(
+                    "UPDATE {name} SET {key}={default} WHERE {key} IS NULL"
+                ))?;
+            }
+        }
+    }
+
+    tx.execute_batch(
+        "CREATE TABLE IF NOT EXISTS runtime_logs(id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp REAL NOT NULL, level TEXT NOT NULL, logger TEXT NOT NULL, message TEXT NOT NULL, details TEXT);
+         CREATE TABLE IF NOT EXISTS rust_cache(key TEXT PRIMARY KEY,payload TEXT NOT NULL,expires INTEGER NOT NULL);
+         INSERT OR REPLACE INTO meta(key,value) VALUES('rust_schema_version','1');",
+    )?;
+
+    // Historical Python aggregates have no event timestamps. Seed the annual
+    // snapshot exactly once rather than fabricating individual play events.
+    for (source, table, key, albums, count, usage) in [
+        ("vinyl", "songs", "song_key", "album_sessions", "session_count", "listening_totals"),
+        ("spotify", "spotify_songs", "track_id", "spotify_album_totals", "play_count", "spotify_listening_totals"),
+    ] {
+        let marker = format!("annual_seed_{source}_v1");
+        let seeded = tx
+            .query_row("SELECT 1 FROM meta WHERE key=?", [&marker], |row| row.get::<_, i64>(0))
+            .optional()?
+            .is_some();
+        if seeded {
+            continue;
+        }
+        tx.execute(
+            &format!("INSERT INTO yearly_plays(source,year,song_key,artist,title,album,count) SELECT ?,2026,{key},artist,title,album,play_count FROM {table} WHERE play_count>0 ON CONFLICT DO NOTHING"),
+            [source],
+        )?;
+        tx.execute(
+            &format!("INSERT INTO yearly_albums(source,year,album,count) SELECT ?,2026,album,{count} FROM {albums} WHERE {count}>0 ON CONFLICT DO NOTHING"),
+            [source],
+        )?;
+        tx.execute(
+            &format!("INSERT INTO yearly_usage(source,year,kind,seconds) SELECT ?,2026,'listening',total_seconds FROM {usage} WHERE id=1 AND total_seconds>0 ON CONFLICT DO NOTHING"),
+            [source],
+        )?;
+        if source == "vinyl" {
+            tx.execute_batch("INSERT INTO yearly_usage(source,year,kind,seconds) SELECT 'vinyl',2026,'pickup',total_seconds FROM pickup_usage_totals WHERE id=1 AND total_seconds>0 ON CONFLICT DO NOTHING")?;
+        }
+        tx.execute("INSERT INTO meta(key,value) VALUES(?,'2026')", [marker])?;
+    }
+    tx.commit()?;
+    Ok(())
+}
+
 impl Db {
     pub fn open(path: &Path) -> Result<Self> {
-        if let Some(p) = path.parent() {
-            std::fs::create_dir_all(p)?;
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)?;
         }
-        let c = Connection::open(path)?;
-        c.busy_timeout(Duration::from_secs(5))?;
-        c.execute_batch("PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL;")?;
-        let initialized = c
+        let connection = Connection::open(path)?;
+        connection.busy_timeout(Duration::from_secs(5))?;
+        connection.execute_batch("PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL;")?;
+
+        let initialized = connection
             .query_row(
                 "SELECT value FROM meta WHERE key='rust_schema_version'",
                 [],
-                |r| r.get::<_, String>(0),
+                |row| row.get::<_, String>(0),
             )
             .optional()
             .ok()
@@ -113,36 +195,9 @@ impl Db {
                 &path.with_extension(format!("pre-rust-{}.db", uuid::Uuid::new_v4())),
             )?;
         }
-        let db = Self(Arc::new(Mutex::new(c)));
-        db.with(|c|{
-            let tx=c.transaction()?;
-            tx.execute_batch(include_str!("../migrations/001_compatible.sql"))?;
-            // Compare against the reference schema to apply additive pre-v7 columns.
-            let reference=Connection::open_in_memory()?;reference.execute_batch(include_str!("../migrations/001_compatible.sql"))?;
-            let tables=rows(&reference,"SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'",[])?;
-            for table in tables {let name=table["name"].as_str().context("table name")?;let expected=rows(&reference,&format!("PRAGMA table_info({name})"),[])?;let actual=rows(&tx,&format!("PRAGMA table_info({name})"),[])?;
-                for col in expected { if actual.iter().any(|x|x["name"]==col["name"]){continue};let key=col["name"].as_str().context("column")?;let ty=col["type"].as_str().context("column type")?;
-                    ensure!(col["pk"].as_i64()==Some(0),"Cannot migrate missing key {name}.{key}");
-                    // SQLite cannot ADD a column with a non-constant default. Timestamp
-                    // columns in older schemas are filled explicitly after adding.
-                    tx.execute_batch(&format!("ALTER TABLE {name} ADD COLUMN {key} {ty}"))?;
-                    if let Some(default)=col["dflt_value"].as_str(){tx.execute_batch(&format!("UPDATE {name} SET {key}={default} WHERE {key} IS NULL"))?;}
-                }
-            }
-            tx.execute_batch("CREATE TABLE IF NOT EXISTS runtime_logs(id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp REAL NOT NULL, level TEXT NOT NULL, logger TEXT NOT NULL, message TEXT NOT NULL, details TEXT); CREATE TABLE IF NOT EXISTS rust_cache(key TEXT PRIMARY KEY,payload TEXT NOT NULL,expires INTEGER NOT NULL); INSERT OR REPLACE INTO meta(key,value) VALUES('rust_schema_version','1');")?;
-            for (source,table,key,albums,count,usage) in [("vinyl","songs","song_key","album_sessions","session_count","listening_totals"),("spotify","spotify_songs","track_id","spotify_album_totals","play_count","spotify_listening_totals")] {
-                let marker=format!("annual_seed_{source}_v1");
-                let seeded=tx.query_row("SELECT 1 FROM meta WHERE key=?",[&marker],|r|r.get::<_,i64>(0)).optional()?.is_some();
-                if !seeded {
-                    tx.execute(&format!("INSERT INTO yearly_plays(source,year,song_key,artist,title,album,count) SELECT ?,2026,{key},artist,title,album,play_count FROM {table} WHERE play_count>0 ON CONFLICT DO NOTHING"),[source])?;
-                    tx.execute(&format!("INSERT INTO yearly_albums(source,year,album,count) SELECT ?,2026,album,{count} FROM {albums} WHERE {count}>0 ON CONFLICT DO NOTHING"),[source])?;
-                    tx.execute(&format!("INSERT INTO yearly_usage(source,year,kind,seconds) SELECT ?,2026,'listening',total_seconds FROM {usage} WHERE id=1 AND total_seconds>0 ON CONFLICT DO NOTHING"),[source])?;
-                    if source=="vinyl"{tx.execute_batch("INSERT INTO yearly_usage(source,year,kind,seconds) SELECT 'vinyl',2026,'pickup',total_seconds FROM pickup_usage_totals WHERE id=1 AND total_seconds>0 ON CONFLICT DO NOTHING")?;}
-                    tx.execute("INSERT INTO meta(key,value) VALUES(?,'2026')",[marker])?;
-                }
-            }
-            tx.commit()?;Ok(())
-        })?;
+
+        let db = Self(Arc::new(Mutex::new(connection)));
+        db.with(initialize_schema)?;
         Ok(db)
     }
     pub fn with<T>(&self, f: impl FnOnce(&mut Connection) -> Result<T>) -> Result<T> {

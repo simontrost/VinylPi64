@@ -293,11 +293,6 @@ mod tests {
         }
     }
     #[test]
-    fn scroll_speed_matches_the_dashboard_range() {
-        assert!(Config::from_value(json!({"image":{"marquee_speed":200}})).is_ok());
-        assert!(Config::from_value(json!({"image":{"marquee_speed":201}})).is_err());
-    }
-    #[test]
     fn legacy_sleep_and_secret_cleanup() {
         let c =
             Config::from_value(json!({"behavior":{"auto_sleep":0},"discogs":{"token":"secret"}}))

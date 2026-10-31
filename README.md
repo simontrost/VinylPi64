@@ -83,7 +83,7 @@ cargo test --locked --workspace
 cargo build --release --locked
 ```
 
-A Pi Zero 2 W only has 512 MB RAM; compiling this application directly on that device may exceed its memory and disk capacity. Prefer a cross build or build on a stronger ARM Linux computer with the same target architecture. See `scripts/cross-build.sh` and `Dockerfile.cross` (cross-build path must be validated on your build host).
+A Pi Zero 2 W only has 512 MB RAM; compiling directly on the device may exceed its memory and disk capacity. Prefer the native ARM64 build produced by GitHub Actions or build on a stronger ARM64 Linux host. The repository does not currently provide a local cross-compilation script.
 
 ### Developer updates via GitHub Actions (no local Docker)
 
@@ -168,13 +168,13 @@ Do not enable the Rust service until USB audio, Pixoo recovery and data migratio
 
 ## Optional: API token
 
-Local API endpoints can be protected with an environment variable:
+Home Assistant control endpoints (`/api/ha/*`) require an API token:
 
 ```bash
 VINYLPI_API_TOKEN=replace_with_a_long_random_value
 ```
 
-Store it in `vinylpi.env` and keep that file private.
+Store it in `vinylpi.env` and keep that file private. **The other dashboard and device-control endpoints are not authenticated by this token.** Run the server only on trusted networks; do not expose port 8080/8081 directly to the public internet. Host and cross-origin checks are not a substitute for authentication.
 
 ## Optional: Home Assistant
 
