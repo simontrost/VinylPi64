@@ -4,7 +4,7 @@
 
 {% block page_styles %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/vinyl-loader.css') }}?v=20261022">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/stats.css') }}?v=20261029-compact-list">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/stats.css') }}?v=20261030-library-search">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/spotify.css') }}">
 {% endblock %}
 
@@ -12,6 +12,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="{{ url_for('static', filename='js/pages/stats.js') }}?v=20261029-radar-stable" defer></script>
     <script src="{{ url_for('static', filename='js/pages/spotify_stats.js') }}?v=20261023-clean-ui" defer></script>
+    <script src="{{ url_for('static', filename='js/pages/stats_search.js') }}?v=20261030-library-search" defer></script>
 {% endblock %}
 
 {% block content %}
@@ -62,6 +63,28 @@
     </section>
 
     <section class="stats-section" aria-live="polite">
+        <article class="stats-card stats-library-search" aria-labelledby="stats-search-heading">
+            <div class="stats-search-header">
+                <div>
+                    <span class="eyebrow">Your music library</span>
+                    <h2 id="stats-search-heading">Explore your listening history</h2>
+                    <p>Search played tracks, artists and albums. Your synced Discogs collection also includes records you haven't played yet.</p>
+                </div>
+            </div>
+            <label class="stats-search-input-wrap" for="stats-search-input">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m16 16 5 5"/></svg>
+                <input id="stats-search-input" type="search" placeholder="Search a song, artist or album…" autocomplete="off" maxlength="120" aria-controls="stats-search-results">
+            </label>
+            <div class="stats-search-filters" role="group" aria-label="Search result type">
+                <button type="button" class="stats-search-filter is-active" data-search-type="all" aria-pressed="true">All</button>
+                <button type="button" class="stats-search-filter" data-search-type="song" aria-pressed="false">Songs</button>
+                <button type="button" class="stats-search-filter" data-search-type="artist" aria-pressed="false">Artists</button>
+                <button type="button" class="stats-search-filter" data-search-type="album" aria-pressed="false">Albums</button>
+            </div>
+            <p id="stats-search-feedback" class="stats-search-feedback" role="status" aria-live="polite">Enter at least 2 characters to search.</p>
+            <ul id="stats-search-results" class="stats-search-results" aria-label="Search results"></ul>
+            <button id="stats-search-more" type="button" class="stats-search-more hidden">Show more results</button>
+        </article>
         <div class="stats-grid">
             <article class="stats-card stats-list-card"><h2>Top Songs</h2><ul id="stats-songs" class="stats-list"></ul></article>
             <article class="stats-card stats-list-card"><h2>Top Artists</h2><ul id="stats-artists" class="stats-list"></ul></article>

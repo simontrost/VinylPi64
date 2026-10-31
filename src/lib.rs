@@ -14,4 +14,5 @@ pub mod net;
 pub mod pickup;
 pub mod spotify;
 pub mod share;
+pub mod stats_search;
 pub mod uploads;

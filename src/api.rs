@@ -672,6 +672,24 @@ async fn api(
                 .map_err(anyhow::Error::from)??;
             ok(v)
         }
+        ("stats/search", true, _, _) => {
+            let (scope, year) = filter(&q)?;
+            let term = q.get("q").cloned().unwrap_or_default();
+            let kind = q.get("type").cloned().unwrap_or_else(|| "all".into());
+            let offset = q
+                .get("offset")
+                .map_or(Ok(0), |v| v.parse::<usize>())
+                .context("Invalid offset")?;
+            let limit = q
+                .get("limit")
+                .map_or(Ok(30), |v| v.parse::<usize>())
+                .context("Invalid limit")?;
+            let db = app.db.clone();
+            let result = tokio::task::spawn_blocking(move || {
+                crate::stats_search::search(&db, &term, &scope, year, &kind, offset, limit)
+            }).await.map_err(anyhow::Error::from)??;
+            ok(result)
+        }
         ("stats/years", true, _, _) => {
             use chrono::Datelike;
             let years=app.db.query("SELECT year FROM yearly_plays UNION SELECT year FROM yearly_albums UNION SELECT year FROM yearly_usage UNION SELECT ? ORDER BY year DESC",[chrono::Local::now().year()])?;
