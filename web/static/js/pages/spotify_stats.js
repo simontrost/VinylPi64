@@ -31,6 +31,12 @@ function updateStatsScopeUI() {
         button.setAttribute("aria-pressed", active ? "true" : "false");
     });
 
+    const libraryLink = document.getElementById("stats-library-link");
+    if (libraryLink) {
+        const params = new URLSearchParams({ scope: vinylPiStatsScope, year: vinylPiStatsYear });
+        libraryLink.href = `/library.html?${params}`;
+    }
+
     const copy = statsScopeCopy(vinylPiStatsScope);
     const overview = document.getElementById("stats-overview-label");
     if (overview) overview.textContent = copy.label || "Listening overview";
@@ -146,6 +152,16 @@ async function loadStats() {
 };
 
 document.addEventListener("DOMContentLoaded", () => {
+    // Preserve the library page's source/period when returning to Statistics.
+    const fromLibrary = new URLSearchParams(window.location.search);
+    const initialScope = fromLibrary.get("scope");
+    const initialYear = fromLibrary.get("year");
+    if (["vinyl", "spotify", "combined"].includes(initialScope)) vinylPiStatsScope = initialScope;
+    if (initialYear === "all" || /^\d{4}$/.test(initialYear || "")) {
+        vinylPiStatsYear = initialYear;
+        const yearPicker = document.getElementById("stats-year-select");
+        if (yearPicker) yearPicker.value = vinylPiStatsYear;
+    }
     document.querySelectorAll("[data-stats-scope]").forEach((button) => {
         button.addEventListener("click", () => {
             vinylPiStatsScope = button.dataset.statsScope || "vinyl";

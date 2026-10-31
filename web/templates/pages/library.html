@@ -1,0 +1,69 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Music Library – VinylPi64{% endblock %}
+
+{% block page_styles %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/spotify.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/library.css') }}?v=20261031">
+{% endblock %}
+
+{% block page_scripts %}
+    <script src="{{ url_for('static', filename='js/pages/stats_search.js') }}?v=20261031-library-page" defer></script>
+{% endblock %}
+
+{% block content %}
+<main class="main">
+    <header class="main-header library-header">
+        <div>
+            <a id="library-back" class="library-back" href="/stats.html">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 5-7 7 7 7"/></svg>
+                Statistics
+            </a>
+            <h1 class="header-title pixel-title">Music Library</h1>
+        </div>
+        <a href="/about.html" class="header-logo-link" aria-label="About VinylPi64" title="About VinylPi64"><img src="/static/images/logo.webp" alt="VinylPi64 logo" class="header-logo"></a>
+    </header>
+
+    <section class="library-layout" aria-labelledby="library-intro-heading">
+        <div class="card library-search-panel">
+            <div class="library-intro">
+                <span class="eyebrow">Listening history + Discogs</span>
+                <h2 id="library-intro-heading">Find your music</h2>
+                <p>Search songs, artists and albums across your listening history and synced collection. Unplayed records appear with 0 plays.</p>
+            </div>
+
+            <label class="library-input-wrap" for="stats-search-input">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 4.7 4.7"/></svg>
+                <input id="stats-search-input" type="search" placeholder="Search a song, artist or album…" autocomplete="off" maxlength="120" aria-controls="stats-search-results">
+            </label>
+
+            <div class="library-filter-row">
+                <div class="library-type-filters" role="group" aria-label="Result type">
+                    <button type="button" class="library-type-filter is-active" data-search-type="all" aria-pressed="true">All</button>
+                    <button type="button" class="library-type-filter" data-search-type="artist" aria-pressed="false">Artists</button>
+                    <button type="button" class="library-type-filter" data-search-type="album" aria-pressed="false">Albums</button>
+                    <button type="button" class="library-type-filter" data-search-type="song" aria-pressed="false">Songs</button>
+                </div>
+                <div class="library-source-filters">
+                    <div class="stats-scope-control" role="group" aria-label="Listening source">
+                        <button type="button" class="stats-scope-button active" data-stats-scope="vinyl" aria-pressed="true">Vinyl</button>
+                        <button type="button" class="stats-scope-button" data-stats-scope="spotify" aria-pressed="false">Spotify</button>
+                        <button type="button" class="stats-scope-button" data-stats-scope="combined" aria-pressed="false">Combined</button>
+                    </div>
+                    <label class="library-year-picker" for="stats-year-select">
+                        <span>Period</span>
+                        <select id="stats-year-select" aria-label="Listening period"><option value="all">All time</option></select>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <p id="stats-search-feedback" class="library-feedback" role="status" aria-live="polite">Enter at least 2 characters to search.</p>
+        <div id="stats-search-results" class="library-results" aria-label="Search results"></div>
+        <div class="library-pagination">
+            <button id="stats-search-more" type="button" class="library-more hidden">Show more results</button>
+            <p id="stats-search-page-status" class="library-page-status" role="status" aria-live="polite"></p>
+        </div>
+    </section>
+</main>
+{% endblock %}

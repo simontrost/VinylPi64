@@ -172,6 +172,7 @@ pub fn router(app: Arc<App>) -> Router {
         .route("/index.html", get(page))
         .route("/settings.html", get(page))
         .route("/stats.html", get(page))
+        .route("/library.html", get(page))
         .route("/pixoo.html", get(page))
         .route("/logs.html", get(page))
         .route("/about.html", get(page))
