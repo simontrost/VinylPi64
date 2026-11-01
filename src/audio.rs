@@ -1,5 +1,5 @@
 use crate::config::Audio;
-use anyhow::{Result, bail};
+use anyhow::{Context, Result, bail};
 use serde_json::Value;
 use tokio_util::sync::CancellationToken;
 
@@ -120,28 +120,124 @@ fn select_input(configured: &str, list: &[Value]) -> Result<String> {
     anyhow::bail!("Configured USB input not found: '{configured}'. ALSA inputs: [{}]. Select an available device in Settings > Audio or disable auto-wake when no turntable is attached.", available)
 }
 
+// Do not open a second ALSA capture endpoint while an interrupted blocking
+// operation still owns the first one. Dropping a Tokio JoinHandle does NOT
+// stop the synchronous ALSA call behind it.
+#[cfg(target_os = "linux")]
+fn capture_lock() -> Result<std::sync::MutexGuard<'static, ()>> {
+    use std::sync::{Mutex, OnceLock};
+    static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+    LOCK.get_or_init(|| Mutex::new(()))
+        .try_lock()
+        .map_err(|_| anyhow::anyhow!("Audio device still in use by an earlier capture; waiting for release"))
+}
+
+#[cfg(target_os = "linux")]
+fn start_capture_pcm(pcm: &alsa::pcm::PCM) -> Result<()> {
+    // ALSA can report an XRUN already at snd_pcm_start(), rather than readi().
+    // Recover it here as well; persistent USB timeouts are intentionally not
+    // masked by an unlimited recovery loop.
+    match pcm.start() {
+        Ok(()) => Ok(()),
+        Err(e) if e.errno() == 32 || e.errno() == 86 => {
+            pcm.try_recover(e, false).context("Recovering ALSA capture at start")?;
+            pcm.start().context("Restarting ALSA capture after recovery")?;
+            Ok(())
+        }
+        Err(e) => Err(e).context("Starting ALSA capture"),
+    }
+}
+
+/// Continuous, single-stream wake monitor, equivalent to Python's
+/// sounddevice.RawInputStream. Never reconfigure USB alternate interfaces
+/// between the 0.5s wake windows. This runs in one blocking worker and ends
+/// when the source changes or its cancellation token is set.
+#[cfg(target_os = "linux")]
+pub fn monitor(
+    cfg: &Audio,
+    cancel: &CancellationToken,
+    output: tokio::sync::mpsc::Sender<Result<f64, String>>,
+) -> Result<()> {
+    use alsa::{Direction, ValueOr, pcm::{Access, Format, HwParams, PCM}};
+    use tokio::sync::mpsc::error::TrySendError;
+
+    let _lock = capture_lock()?;
+    if cancel.is_cancelled() { return Ok(()); }
+    let name = select_input(&cfg.device_name_contains, &devices()?)?;
+    let pcm = PCM::new(&name, Direction::Capture, true)
+        .with_context(|| format!("Opening ALSA auto-wake input '{name}'"))?;
+    {
+        let hw = HwParams::any(&pcm).context("Querying ALSA wake hardware params")?;
+        hw.set_channels(cfg.channels as u32)?;
+        hw.set_rate(cfg.sample_rate as u32, ValueOr::Nearest)?;
+        hw.set_format(Format::s16())?;
+        hw.set_access(Access::RWInterleaved)?;
+        pcm.hw_params(&hw).context("Configuring ALSA wake input")?;
+    }
+    let rate = pcm.hw_params_current()?.get_rate()?;
+    let channels = cfg.channels as usize;
+    let frames = (rate / 2).max(256) as usize;
+    let mut data = vec![0i16; frames * channels];
+    let io = pcm.io_i16()?;
+    start_capture_pcm(&pcm)?;
+    tracing::debug!(device=%name, rate, channels, "Continuous Vinyl auto-wake stream started");
+
+    loop {
+        if cancel.is_cancelled() || output.is_closed() { break; }
+        let mut offset = 0usize;
+        // Only bound the reading phase. USB control calls while opening the
+        // device may block in the kernel; the exclusive lock prevents overlap.
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while offset < data.len() {
+            if cancel.is_cancelled() || output.is_closed() { return Ok(()); }
+            if std::time::Instant::now() > deadline {
+                bail!("Continuous ALSA wake read timed out");
+            }
+            match io.readi(&mut data[offset..]) {
+                Ok(n) => {
+                    offset += n * channels;
+                    if n == 0 { std::thread::sleep(std::time::Duration::from_millis(10)); }
+                }
+                Err(e) if e.errno() == 11 => {
+                    std::thread::sleep(std::time::Duration::from_millis(10));
+                }
+                Err(e) => { pcm.try_recover(e, false).context("Recovering wake stream read")?; }
+            }
+        }
+        match output.try_send(Ok(dbfs(&data))) {
+            Ok(()) => (),
+            Err(TrySendError::Full(_)) => (), // No buffering buildup during transitions.
+            Err(TrySendError::Closed(_)) => break,
+        }
+    }
+    Ok(())
+}
+
 #[cfg(target_os = "linux")]
 pub fn capture(cfg: &Audio, seconds: f64, cancel: &CancellationToken, wav_path: &str) -> Result<Vec<i16>> {
     use alsa::{
         Direction, ValueOr,
         pcm::{Access, Format, HwParams, PCM},
     };
+    let _lock = capture_lock()?;
+    if cancel.is_cancelled() { bail!("Audio capture cancelled"); }
     let name = select_input(&cfg.device_name_contains, &devices()?)?;
-    let pcm = PCM::new(&name, Direction::Capture, true)?;
+    let pcm = PCM::new(&name, Direction::Capture, true)
+        .with_context(|| format!("Opening ALSA input '{name}'"))?;
     {
         let hw = HwParams::any(&pcm)?;
         hw.set_channels(cfg.channels as u32)?;
         hw.set_rate(cfg.sample_rate as u32, ValueOr::Nearest)?;
         hw.set_format(Format::s16())?;
         hw.set_access(Access::RWInterleaved)?;
-        pcm.hw_params(&hw)?;
+        pcm.hw_params(&hw).context("Configuring ALSA capture hardware parameters")?;
     }
     let rate = pcm.hw_params_current()?.get_rate()?;
     let channels = cfg.channels as usize;
     let count = (seconds * rate as f64) as usize * channels;
     let mut data = vec![0i16; count];
     let io = pcm.io_i16()?;
-    pcm.start()?;
+    start_capture_pcm(&pcm)?;
     let mut offset = 0;
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs_f64(seconds + 5.);
     while offset < count {
@@ -160,7 +256,7 @@ pub fn capture(cfg: &Audio, seconds: f64, cancel: &CancellationToken, wav_path: 
             }
             Err(e) if e.errno() == 11 => std::thread::sleep(std::time::Duration::from_millis(10)),
             Err(e) => {
-                pcm.try_recover(e, false)?;
+                pcm.try_recover(e, false).context("Recovering ALSA capture read")?;
             }
         }
     }
@@ -195,6 +291,15 @@ fn write_debug_wav(path: &str, samples: &[i16], rate: u32, channels: u16) -> Res
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn capture_endpoint_cannot_be_opened_twice() {
+        let first = capture_lock().expect("first capture owns the USB input");
+        assert!(capture_lock().is_err(), "another worker must not open the same input");
+        drop(first);
+        assert!(capture_lock().is_ok(), "the USB input must become available again");
+    }
+
     #[test]
     fn silence_and_full_scale() {
         assert_eq!(dbfs(&[0; 50]), -120.);

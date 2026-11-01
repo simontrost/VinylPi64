@@ -22,6 +22,7 @@ type Observation = (Option<Track>, Option<(f64, f64)>);
 enum EngineEvent {
     Stop,
     Command(Option<ModeCommand>),
+    ConfigChanged,
     Observation(Box<Result<Observation>>),
 }
 pub struct ModeCommand {
@@ -382,6 +383,44 @@ impl Wake {
         }
     }
 }
+// The Python implementation uses one long-lived RawInputStream while the
+// dashboard is Off. Keep the same USB/ALSA capture interface open throughout
+// auto-wake instead of issuing thousands of set-interface calls per hour.
+#[cfg(target_os = "linux")]
+struct AudioMonitor {
+    key: (String, u32, u32),
+    cancel: CancellationToken,
+    task: tokio::task::JoinHandle<()>,
+    readings: mpsc::Receiver<Result<f64, String>>,
+}
+
+#[cfg(target_os = "linux")]
+impl AudioMonitor {
+    fn start(cfg: crate::config::Audio, cancel: &CancellationToken) -> Self {
+        let key = (cfg.device_name_contains.clone(), cfg.sample_rate as u32, cfg.channels as u32);
+        let (tx, readings) = mpsc::channel(8);
+        let worker_cancel = cancel.child_token();
+        let capture_cancel = worker_cancel.clone();
+        let task = tokio::task::spawn_blocking(move || {
+            if let Err(e) = audio::monitor(&cfg, &capture_cancel, tx.clone()) {
+                let _ = tx.try_send(Err(format!("{e:#}")));
+            }
+        });
+        Self { key, cancel: worker_cancel, task, readings }
+    }
+
+    async fn stop(self) {
+        self.cancel.cancel();
+        // readi() is nonblocking, so normally the worker exits within one
+        // polling iteration. A stuck kernel ioctl cannot be forcibly aborted;
+        // the exclusive capture lock in audio.rs prevents a second stream.
+        let mut task = self.task;
+        if tokio::time::timeout(Duration::from_secs(2), &mut task).await.is_err() {
+            tracing::warn!("Timed out waiting for ALSA wake monitor to release USB input");
+        }
+    }
+}
+
 impl Engine {
     pub fn new() -> (Arc<Self>, mpsc::Receiver<ModeCommand>) {
         let (tx, rx) = mpsc::channel(16);
@@ -517,6 +556,9 @@ impl Engine {
         let mut next = tokio::time::Instant::now();
         let mut spotify_previous: Option<(String, i64, Instant)> = None;
         let mut unavailable = 0u32;
+        #[cfg(target_os = "linux")]
+        let mut audio_monitor: Option<AudioMonitor> = None;
+        let mut config_rx = s.config.tx.subscribe();
         loop {
             let mode = self.get_mode();
             let cfg = s.config.get();
@@ -533,6 +575,16 @@ impl Engine {
             } else {
                 cfg.audio.sample_seconds
             };
+            // Close/restart the continuous wake stream only when the source or
+            // capture format actually changes. Config updates are watched below.
+            #[cfg(target_os = "linux")]
+            if audio_monitor.as_ref().is_some_and(|monitor| {
+                mode != Mode::Off
+                    || !cfg.behavior.vinyl_auto_wake_enabled
+                    || monitor.key != (cfg.audio.device_name_contains.clone(), cfg.audio.sample_rate as u32, cfg.audio.channels as u32)
+            }) && let Some(monitor) = audio_monitor.take() {
+                monitor.stop().await;
+            }
             let operation_cancel = cancel.child_token();
             let _cancel_on_drop = operation_cancel.clone().drop_guard();
             let operation = async {
@@ -545,6 +597,19 @@ impl Engine {
                 {
                     cancel.cancelled().await;
                     return Ok((None, None));
+                }
+                if mode == Mode::Off {
+                    #[cfg(target_os = "linux")]
+                    {
+                        if audio_monitor.is_none() {
+                            audio_monitor = Some(AudioMonitor::start(cfg.audio.clone(), &cancel));
+                        }
+                        let monitor = audio_monitor.as_mut().expect("wake monitor started");
+                        let level = monitor.readings.recv().await
+                            .context("Continuous auto-wake monitor exited")?
+                            .map_err(anyhow::Error::msg)?;
+                        return Ok((None, Some((level, epoch.elapsed().as_secs_f64()))));
+                    }
                 }
                 if mode == Mode::Vinyl && cfg.debug.logs {
                     s.db.log("DEBUG", &format!("Recording vinyl audio sample ({seconds:.1}s)…"));
@@ -580,12 +645,28 @@ impl Engine {
                 }
                 Ok((track, Some((level, observed))))
             };
-            let event = tokio::select! {biased; _=cancel.cancelled()=>EngineEvent::Stop,command=commands.recv()=>EngineEvent::Command(command),result=operation=>EngineEvent::Observation(Box::new(result))};
+            let event = tokio::select! {
+                biased;
+                _ = cancel.cancelled() => EngineEvent::Stop,
+                command = commands.recv() => EngineEvent::Command(command),
+                _ = config_rx.changed() => EngineEvent::ConfigChanged,
+                result = operation => EngineEvent::Observation(Box::new(result)),
+            };
             match event {
                 EngineEvent::Stop => break,
+                EngineEvent::ConfigChanged => {
+                    // Re-evaluate wake enable/device settings immediately.
+                    next = tokio::time::Instant::now();
+                }
                 EngineEvent::Command(command) => {
                     let Some(command) = command else { break };
                     let changed = command.mode != mode;
+                    // Releasing the wake stream BEFORE switching sources keeps
+                    // the normal Vinyl recorder from opening concurrently.
+                    #[cfg(target_os = "linux")]
+                    if changed && mode == Mode::Off && let Some(monitor) = audio_monitor.take() {
+                        monitor.stop().await;
+                    }
                     let result = self.change(command.mode, &s).await;
                     if result.is_ok() && changed {
                         resume = match PlaybackResume::from_db(&s.db, command.mode) {
@@ -621,6 +702,10 @@ impl Engine {
                         });
                     match result {
                         Err(e) => {
+                            #[cfg(target_os = "linux")]
+                            if mode == Mode::Off && let Some(monitor) = audio_monitor.take() {
+                                monitor.stop().await;
+                            }
                             pickup.reset();
                             unavailable = (unavailable + 1).min(6);
                             let delay = (5u64 << unavailable.saturating_sub(1)).min(300);
@@ -649,17 +734,19 @@ impl Engine {
                             unavailable = 0;
                             if let Some((level, observed)) = level {
                                 if mode == Mode::Off {
-                                    if wake.observe(level, seconds, &cfg)
-                                        && self.change(Mode::Vinyl, &s).await.is_ok()
-                                    {
-                                        manual = false;
-                                        resume = PlaybackResume::from_db(&s.db, Mode::Vinyl).unwrap_or_else(|e| {
-                                            s.db.log("WARNING", &format!("Unable to restore playback continuity: {e}"));
-                                            None
-                                        });
-                                        confirmation = Confirmation::default();
-                                        failures = 0;
-                                        silence = 0.;
+                                    if wake.observe(level, seconds, &cfg) {
+                                        #[cfg(target_os = "linux")]
+                                        if let Some(monitor) = audio_monitor.take() { monitor.stop().await; }
+                                        if self.change(Mode::Vinyl, &s).await.is_ok() {
+                                            manual = false;
+                                            resume = PlaybackResume::from_db(&s.db, Mode::Vinyl).unwrap_or_else(|e| {
+                                                s.db.log("WARNING", &format!("Unable to restore playback continuity: {e}"));
+                                                None
+                                            });
+                                            confirmation = Confirmation::default();
+                                            failures = 0;
+                                            silence = 0.;
+                                        }
                                     }
                                     continue;
                                 }
@@ -912,6 +999,8 @@ impl Engine {
                 }
             }
         }
+        #[cfg(target_os = "linux")]
+        if let Some(monitor) = audio_monitor.take() { monitor.stop().await; }
         self.mode.send_replace(Mode::Off);
         s.db.log("INFO", "Recognition engine stopped");
     }
