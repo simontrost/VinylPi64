@@ -41,6 +41,7 @@ let trackInfoAbortController = null;
 let statusEventSource = null;
 const discogsTracklistCache = new Map();
 let discogsTracklistRequest = null;
+let renderedDiscogsTracklist = null;
 
 function setText(id, value) {
     const element = document.getElementById(id);
@@ -264,6 +265,27 @@ function resetDiscogsTracklist({ preserveRelease = false } = {}) {
         panel.classList.add("hidden");
         panel.replaceChildren();
     }
+    renderedDiscogsTracklist = null;
+}
+
+// Update the playing marker in place. Replacing the full tracklist on every
+// status poll can disturb scroll anchoring while someone is reading lyrics.
+function setTracklistRowPlaying(row, isCurrent) {
+    row.classList.toggle("is-current", isCurrent);
+    if (isCurrent) row.setAttribute("aria-current", "true");
+    else row.removeAttribute("aria-current");
+
+    const trailing = row.querySelector(".discogs-tracklist-trailing");
+    if (!trailing) return;
+    const playing = trailing.querySelector(".discogs-tracklist-playing");
+    if (!isCurrent) {
+        playing?.remove();
+    } else if (!playing) {
+        const marker = document.createElement("span");
+        marker.className = "discogs-tracklist-playing";
+        marker.innerHTML = '<span class="discogs-tracklist-playing-dot" aria-hidden="true"></span><span>Playing</span>';
+        trailing.appendChild(marker);
+    }
 }
 
 function makeTracklistRow(track, releaseArtist) {
@@ -271,13 +293,10 @@ function makeTracklistRow(track, releaseArtist) {
     row.className = "discogs-tracklist-row";
 
     const index = Number(track.track_index);
+    row.dataset.trackIndex = Number.isFinite(index) && track.track_index != null ? String(index) : "";
     const isCurrent = CURRENT_TRACK.discogsTrackIndex !== null
-        && Number.isFinite(index)
+        && row.dataset.trackIndex !== ""
         && index === CURRENT_TRACK.discogsTrackIndex;
-    if (isCurrent) {
-        row.classList.add("is-current");
-        row.setAttribute("aria-current", "true");
-    }
 
     const position = document.createElement("span");
     position.className = "discogs-tracklist-position";
@@ -313,14 +332,8 @@ function makeTracklistRow(track, releaseArtist) {
         trailing.appendChild(durationElement);
     }
 
-    if (isCurrent) {
-        const playing = document.createElement("span");
-        playing.className = "discogs-tracklist-playing";
-        playing.innerHTML = '<span class="discogs-tracklist-playing-dot" aria-hidden="true"></span><span>Playing</span>';
-        trailing.appendChild(playing);
-    }
-
     row.append(position, copy, trailing);
+    setTracklistRowPlaying(row, isCurrent);
     return row;
 }
 
@@ -330,6 +343,7 @@ function renderDiscogsTracklist(data) {
 
     const tracks = Array.isArray(data?.tracks) ? data.tracks : [];
     if (!tracks.length) {
+        renderedDiscogsTracklist = null;
         panel.textContent = "No tracklist available for this release.";
         panel.classList.add("discogs-tracklist-message");
         return;
@@ -350,6 +364,24 @@ function renderDiscogsTracklist(data) {
         next.textContent = nextTitle
             ? `${differentSide ? "Next side" : "Next"}: ${nextPosition ? `${nextPosition} · ` : ""}${nextTitle}`
             : "End of release";
+    }
+
+    const releaseId = String(CURRENT_TRACK.discogsReleaseId || "");
+    if (renderedDiscogsTracklist?.releaseId === releaseId
+        && renderedDiscogsTracklist.data === data
+        && panel.querySelector(".discogs-tracklist-row")) {
+        // Status updates may arrive every few seconds. Keep the existing DOM
+        // and the user's scroll position; only change the playing highlight.
+        if (renderedDiscogsTracklist.trackIndex !== CURRENT_TRACK.discogsTrackIndex) {
+            for (const row of panel.querySelectorAll(".discogs-tracklist-row")) {
+                const isCurrent = CURRENT_TRACK.discogsTrackIndex !== null
+                    && row.dataset.trackIndex !== ""
+                    && Number(row.dataset.trackIndex) === CURRENT_TRACK.discogsTrackIndex;
+                setTracklistRowPlaying(row, isCurrent);
+            }
+            renderedDiscogsTracklist.trackIndex = CURRENT_TRACK.discogsTrackIndex;
+        }
+        return;
     }
 
     const groups = [];
@@ -392,13 +424,11 @@ function renderDiscogsTracklist(data) {
     }
 
     panel.replaceChildren(fragment);
-
-    const currentRow = panel.querySelector(".discogs-tracklist-row.is-current");
-    if (currentRow) {
-        window.requestAnimationFrame(() => {
-            currentRow.scrollIntoView({ block: "nearest", behavior: "smooth" });
-        });
-    }
+    renderedDiscogsTracklist = {
+        releaseId,
+        data,
+        trackIndex: CURRENT_TRACK.discogsTrackIndex,
+    };
 }
 
 function syncDiscogsTracklist() {

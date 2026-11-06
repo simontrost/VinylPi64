@@ -292,4 +292,12 @@
     );
     CREATE INDEX IF NOT EXISTS idx_playback_events_year_time ON playback_events(source, occurred_at DESC);
     CREATE INDEX IF NOT EXISTS idx_yearly_plays_year ON yearly_plays(source, year, count DESC);
-    
+
+    -- Precise attribution for listening increments recorded from this version onward.
+    CREATE TABLE IF NOT EXISTS yearly_song_seconds (
+        source TEXT NOT NULL CHECK(source IN ('vinyl','spotify')),
+        year INTEGER NOT NULL,
+        song_key TEXT NOT NULL,
+        seconds REAL NOT NULL DEFAULT 0,
+        PRIMARY KEY(source,year,song_key)
+    );

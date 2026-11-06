@@ -18,7 +18,15 @@
 }
 .library-input-wrap:focus-within { border-color: var(--yellow); }
 .library-input-wrap svg { width: 20px; height: 20px; flex: 0 0 20px; fill: none; stroke: var(--muted); stroke-width: 2; stroke-linecap: round; }
-.library-input-wrap input { width: 100%; min-width: 0; border: none; outline: none; color: var(--text); background: transparent; font: inherit; font-size: 14px; }
+/* Override the more specific global input rule: a single border, not two cards. */
+.library-input-wrap input[type="search"] {
+    flex: 1 1 auto; width: 100%; min-width: 0; min-height: 50px; padding: 0;
+    border: 0; border-radius: 0; outline: 0; box-shadow: none;
+    -webkit-appearance: none; appearance: none;
+    color: var(--text); background: transparent; font: inherit; font-size: 14px;
+}
+.library-input-wrap input[type="search"]:focus-visible { outline: none; box-shadow: none; }
+.library-input-wrap input[type="search"]::-webkit-search-decoration { display: none; }
 .library-input-wrap input::placeholder { color: var(--muted); opacity: .9; }
 .library-filter-row { display: flex; gap: 16px 20px; justify-content: space-between; align-items: center; flex-wrap: wrap; margin-top: 18px; }
 .library-type-filters, .library-source-filters { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
@@ -43,8 +51,40 @@
 .library-group--song { --kind-color: #8fcfdb; --kind-bg: rgba(143,207,219,.11); }
 .library-group-icon { background: var(--kind-bg); color: var(--kind-color); }
 .library-group-list { margin: 0; padding: 0 20px; list-style: none; }
-.library-hit { display: flex; align-items: center; gap: 14px; padding: 13px 0; min-width: 0; border-bottom: 1px solid var(--border); }
-.library-hit:last-child { border-bottom: 0; }
+/* The swipe action sits behind a row, not on top of the scroll area. */
+.library-swipe-item { position: relative; overflow: hidden; border-bottom: 1px solid var(--border); list-style: none; }
+.library-swipe-item:last-child { border-bottom: 0; }
+.library-hit {
+    position: relative; z-index: 1; display: flex; align-items: center; gap: 14px;
+    padding: 13px 0; min-width: 0; background: var(--surface);
+    transition: transform .18s ease; touch-action: pan-y;
+}
+.library-swipe-item.is-revealed .library-hit { transform: translateX(-88px); }
+.library-delete-action {
+    position: absolute; inset: 0 0 0 auto; width: 88px; border: 0;
+    color: #fff; background: #b92f3a; font: inherit; font-size: 12px; font-weight: 750;
+    cursor: pointer;
+}
+.library-delete-trigger {
+    flex: 0 0 auto; display: grid; place-items: center; width: 28px; height: 30px;
+    margin-left: 2px; padding: 0; border: 0; border-radius: 8px;
+    background: transparent; color: var(--muted-2); cursor: pointer;
+}
+.library-delete-trigger svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.library-delete-trigger:hover { color: #ff9fa4; background: rgba(239,68,68,.12); }
+.library-delete-trigger:focus-visible, .library-delete-action:focus-visible { outline: 2px solid var(--yellow); outline-offset: -2px; }
+.library-delete-dialog {
+    width: min(420px, calc(100% - 32px)); padding: 24px;
+    border: 1px solid var(--border-strong); border-radius: 18px;
+    background: var(--surface-2); color: var(--text); box-shadow: 0 18px 70px rgba(0,0,0,.5);
+}
+.library-delete-dialog::backdrop { background: rgba(0,0,0,.7); backdrop-filter: blur(4px); }
+.library-delete-dialog h2 { margin: 0 0 10px; font-size: 19px; }
+.library-delete-dialog p { margin: 0 0 24px; font-size: 13px; color: var(--muted); line-height: 1.6; }
+.library-delete-dialog-actions { display: flex; justify-content: flex-end; gap: 10px; }
+.library-delete-dialog button { min-height: 40px; padding: 8px 15px; border: 1px solid var(--border-strong); border-radius: 10px; background: var(--surface-3); color: var(--text); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.library-delete-dialog button.library-delete-confirm { border-color: rgba(239,68,68,.5); background: #a82e3b; color: #fff; }
+.library-delete-dialog button:disabled { opacity: .55; cursor: wait; }
 .library-artwork {
     display: grid; place-items: center; flex: 0 0 52px; width: 52px; height: 52px;
     border-radius: 9px; background: var(--kind-bg); color: var(--kind-color);
@@ -81,6 +121,7 @@
     .library-group-header { padding: 15px; }
     .library-group-list { padding: 0 14px; }
     .library-hit { gap: 10px; }
+    .library-delete-trigger { display: none; }
     .library-artwork { flex-basis: 42px; width: 42px; height: 42px; }
     .library-hit-count { min-width: 48px; }
 }

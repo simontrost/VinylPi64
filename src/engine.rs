@@ -837,7 +837,7 @@ impl Engine {
                                     } else if mode == Mode::Vinyl
                                         && let Some(duration) = t.duration_ms
                                         && let Err(e) =
-                                            s.db.seconds(mode, None, duration as f64 / 1000., false)
+                                            s.db.seconds(mode, Some(&t.key(mode)), duration as f64 / 1000., false)
                                     {
                                         s.db.log("ERROR", &e.to_string());
                                     }

@@ -1,4 +1,4 @@
-/* Read-only search of recorded plays and the synced Discogs collection. */
+/* Music library search and source-scoped removal of incorrect play history. */
 document.addEventListener("DOMContentLoaded", () => {
     const input = document.getElementById("stats-search-input");
     const results = document.getElementById("stats-search-results");
@@ -27,6 +27,13 @@ document.addEventListener("DOMContentLoaded", () => {
     let controller = null;
     let debounce = null;
     const groups = new Map();
+    const confirmDialog = document.getElementById("library-delete-dialog");
+    const deleteTitle = document.getElementById("library-delete-title");
+    const deleteDetails = document.getElementById("library-delete-details");
+    const deleteCancel = document.getElementById("library-delete-cancel");
+    const deleteSubmit = document.getElementById("library-delete-submit");
+    let pendingDelete = null;
+    let deleting = false;
 
     input.value = (query.get("q") || "").slice(0, 120);
 
@@ -121,10 +128,81 @@ document.addEventListener("DOMContentLoaded", () => {
         return artwork;
     }
 
+    function openDeleteDialog(hit) {
+        if (deleting || !confirmDialog || !Array.isArray(hit.delete_entries) || !hit.delete_entries.length) return;
+        pendingDelete = hit;
+        deleteTitle.textContent = `Delete “${hit.title}”?`;
+        const sources = [...new Set(hit.delete_entries.map(entry => entry.source))];
+        const sourceLabel = sources.map(value => value === "spotify" ? "Spotify" : "Vinyl").join(" + ");
+        deleteDetails.textContent = `Remove all recorded plays of this song from ${sourceLabel}, including artist and yearly song statistics. This cannot be undone. Your Discogs collection will not be changed.`;
+        confirmDialog.showModal();
+    }
+
+    async function deletePendingSong() {
+        if (!pendingDelete || deleting) return;
+        deleting = true;
+        deleteSubmit.disabled = true;
+        deleteCancel.disabled = true;
+        deleteSubmit.textContent = "Deleting…";
+        try {
+            const response = await fetch("/api/stats/song/delete", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ entries: pendingDelete.delete_entries }),
+                cache: "no-store",
+            });
+            const body = await response.json();
+            if (!response.ok || !body.ok) throw new Error(body.error || `HTTP ${response.status}`);
+            confirmDialog.close();
+            pendingDelete = null;
+            startSearch();
+            feedback.textContent = `${body.removed_plays} play${body.removed_plays === 1 ? "" : "s"} deleted. Discogs entries remain in your collection.`;
+        } catch (error) {
+            console.error("Could not delete song history:", error);
+            deleteDetails.textContent = `Could not delete this song: ${error.message}. No changes were saved.`;
+        } finally {
+            deleting = false;
+            deleteSubmit.disabled = false;
+            deleteCancel.disabled = false;
+            deleteSubmit.textContent = "Delete song";
+        }
+    }
+
+    function attachSwipe(item, surface) {
+        let startX = null;
+        let startY = null;
+        let dragging = false;
+        const reveal = () => item.classList.toggle("is-revealed", true);
+        const close = () => item.classList.remove("is-revealed");
+        surface.addEventListener("touchstart", event => {
+            if (event.touches.length !== 1) return;
+            startX = event.touches[0].clientX;
+            startY = event.touches[0].clientY;
+            dragging = false;
+        }, { passive: true });
+        surface.addEventListener("touchmove", event => {
+            if (startX === null || event.touches.length !== 1) return;
+            const dx = event.touches[0].clientX - startX;
+            const dy = event.touches[0].clientY - startY;
+            if (Math.abs(dy) > Math.abs(dx)) { startX = null; return; }
+            if (Math.abs(dx) > 14) dragging = true;
+        }, { passive: true });
+        surface.addEventListener("touchend", event => {
+            if (startX === null || !dragging) return;
+            const dx = event.changedTouches[0].clientX - startX;
+            if (dx < -45) reveal();
+            else if (dx > 45) close();
+            startX = null;
+        }, { passive: true });
+        surface.addEventListener("touchcancel", () => { startX = null; }, { passive: true });
+    }
+
     function createHit(hit, albumUnit) {
         const item = document.createElement("li");
-        item.className = "library-hit";
-        item.append(artworkFor(hit));
+        item.className = "library-swipe-item";
+        const surface = document.createElement("div");
+        surface.className = "library-hit";
+        surface.append(artworkFor(hit));
 
         const copy = document.createElement("div");
         copy.className = "library-hit-copy";
@@ -149,7 +227,7 @@ document.addEventListener("DOMContentLoaded", () => {
             collection.textContent = "In your collection";
             copy.append(collection);
         }
-        item.append(copy);
+        surface.append(copy);
 
         const count = document.createElement("div");
         count.className = "library-hit-count";
@@ -160,7 +238,26 @@ document.addEventListener("DOMContentLoaded", () => {
         const unit = hit.kind === "album" ? albumUnit : "play";
         label.textContent = Number(hit.count) === 1 ? unit : `${unit}s`;
         count.append(number, label);
-        item.append(count);
+        surface.append(count);
+        if (hit.kind === "song" && Array.isArray(hit.delete_entries) && hit.delete_entries.length) {
+            item.classList.add("library-swipe-item--editable");
+            const action = document.createElement("button");
+            action.type = "button";
+            action.className = "library-delete-action";
+            action.textContent = "Delete";
+            action.setAttribute("aria-label", `Delete history for ${hit.title} by ${hit.artist}`);
+            action.addEventListener("click", () => openDeleteDialog(hit));
+            item.append(action);
+            const trigger = document.createElement("button");
+            trigger.type = "button";
+            trigger.className = "library-delete-trigger";
+            trigger.setAttribute("aria-label", `Delete history for ${hit.title} by ${hit.artist}`);
+            trigger.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6m4-6v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>';
+            trigger.addEventListener("click", () => openDeleteDialog(hit));
+            surface.append(trigger);
+            attachSwipe(item, surface);
+        }
+        item.append(surface);
         return item;
     }
 
@@ -236,6 +333,13 @@ document.addEventListener("DOMContentLoaded", () => {
         if (q.length >= 2) debounce = setTimeout(() => fetchPage(id, false), delay);
     }
 
+    if (confirmDialog) {
+        deleteCancel?.addEventListener("click", () => confirmDialog.close());
+        deleteSubmit?.addEventListener("click", deletePendingSong);
+        confirmDialog.addEventListener("close", () => {
+            if (!deleting) pendingDelete = null;
+        });
+    }
     input.addEventListener("input", () => startSearch(280));
     more.addEventListener("click", () => fetchPage(requestId, true));
     document.querySelectorAll("[data-search-type]").forEach(button => button.addEventListener("click", () => {

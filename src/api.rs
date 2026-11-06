@@ -691,6 +691,15 @@ async fn api(
             }).await.map_err(anyhow::Error::from)??;
             ok(result)
         }
+        ("stats/song/delete", _, true, _) => {
+            let entries: Vec<crate::stats_search::DeleteEntry> = serde_json::from_value(
+                body.get("entries").cloned().context("Missing entries")?
+            ).context("Invalid song deletion entries")?;
+            let db = app.db.clone();
+            let result = tokio::task::spawn_blocking(move || db.delete_song_history(&entries))
+                .await.map_err(anyhow::Error::from)??;
+            ok(result)
+        }
         ("stats/years", true, _, _) => {
             use chrono::Datelike;
             let years=app.db.query("SELECT year FROM yearly_plays UNION SELECT year FROM yearly_albums UNION SELECT year FROM yearly_usage UNION SELECT ? ORDER BY year DESC",[chrono::Local::now().year()])?;

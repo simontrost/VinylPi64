@@ -4,11 +4,11 @@
 
 {% block page_styles %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/spotify.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/library.css') }}?v=20261031">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/library.css') }}?v=20261106-delete">
 {% endblock %}
 
 {% block page_scripts %}
-    <script src="{{ url_for('static', filename='js/pages/stats_search.js') }}?v=20261031-library-page" defer></script>
+    <script src="{{ url_for('static', filename='js/pages/stats_search.js') }}?v=20261106-delete" defer></script>
 {% endblock %}
 
 {% block content %}
@@ -65,5 +65,13 @@
             <p id="stats-search-page-status" class="library-page-status" role="status" aria-live="polite"></p>
         </div>
     </section>
+    <dialog id="library-delete-dialog" class="library-delete-dialog" aria-labelledby="library-delete-title" aria-describedby="library-delete-details">
+        <h2 id="library-delete-title">Delete song history?</h2>
+        <p id="library-delete-details"></p>
+        <div class="library-delete-dialog-actions">
+            <button id="library-delete-cancel" type="button">Cancel</button>
+            <button id="library-delete-submit" class="library-delete-confirm" type="button">Delete song</button>
+        </div>
+    </dialog>
 </main>
 {% endblock %}

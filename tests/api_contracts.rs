@@ -200,3 +200,23 @@ async fn sse_starts_with_status_and_background_tasks_stop_cleanly() {
     server.shutdown().await.unwrap();
     assert!(server.tasks.is_empty());
 }
+
+#[tokio::test]
+async fn library_delete_requires_explicit_song_keys_and_updates_artist_counts() {
+    let (_tmp, server) = app().await;
+    let song = Track { artist: "Band".into(), title: "False hit".into(), album: Some("Album".into()), ..Default::default() };
+    let other = Track { artist: "Band".into(), title: "Valid hit".into(), album: Some("Album".into()), ..Default::default() };
+    server.db.record_play(Mode::Vinyl,&song,false).unwrap();
+    server.db.record_play(Mode::Vinyl,&other,false).unwrap();
+    server.db.record_play(Mode::Vinyl,&other,false).unwrap();
+    let (_, search) = get(&server,"/api/stats/search?scope=vinyl&type=song&q=false").await;
+    let entries = search["items"][0]["delete_entries"].clone();
+    assert_eq!(entries[0]["source"],"vinyl");
+    assert_eq!(post(&server,"/api/stats/song/delete",json!({"entries":[]})).await.0,StatusCode::BAD_REQUEST);
+    let (status,result) = post(&server,"/api/stats/song/delete",json!({"entries":entries})).await;
+    assert_eq!(status,StatusCode::OK,"{result}");
+    assert_eq!(result["removed_plays"],1);
+    assert_eq!(get(&server,"/api/stats?scope=vinyl").await.1["top_artists"][0]["count"],2);
+    assert_eq!(get(&server,"/api/stats/search?scope=vinyl&type=song&q=false").await.1["total"],0);
+    server.shutdown().await.unwrap();
+}

@@ -155,3 +155,81 @@ fn album_ranking_preserves_artists_source_and_year_and_real_other_editions() {
     assert_eq!(db.stats("vinyl", Some(year)).unwrap()["top_albums"].as_array().unwrap().len(), 2);
     assert!(db.stats("vinyl", Some(year + 1)).unwrap()["top_albums"].as_array().unwrap().is_empty());
 }
+
+#[test]
+fn deleting_false_recognition_recalculates_artist_totals_and_yearly_counts() {
+    use vinylpi64::stats_search::{search, DeleteEntry};
+    let dir = tempfile::tempdir().unwrap();
+    let db = Db::open(&dir.path().join("database.db")).unwrap();
+    let wrong = Track { artist:"One Artist".into(), title:"Wrong Match".into(), album:Some("Record".into()), ..Default::default() };
+    let correct = Track { artist:"One Artist".into(), title:"Correct Match".into(), album:Some("Record".into()), ..Default::default() };
+    db.record_play(Mode::Vinyl, &wrong, true).unwrap();
+    db.record_play(Mode::Vinyl, &correct, false).unwrap();
+    db.record_play(Mode::Vinyl, &correct, false).unwrap();
+    db.seconds(Mode::Vinyl, Some(&wrong.key(Mode::Vinyl)), 12., false).unwrap();
+    db.seconds(Mode::Vinyl, Some(&correct.key(Mode::Vinyl)), 24., false).unwrap();
+    let entries = search(&db,"wrong", "vinyl", None,"song",0,30).unwrap()["items"][0]["delete_entries"].clone();
+    let entries: Vec<DeleteEntry> = serde_json::from_value(entries).unwrap();
+    let out = db.delete_song_history(&entries).unwrap();
+    assert_eq!(out["removed_plays"],1);
+    let remaining = db.stats("vinyl",None).unwrap();
+    assert_eq!(remaining["top_songs"][0]["count"],2);
+    assert_eq!(remaining["top_artists"][0]["count"],2);
+    assert_eq!(remaining["total_minutes_listened"],0); // 24 seconds rounds to zero minutes.
+    assert_eq!(db.query("SELECT play_count FROM artist_totals WHERE artist='One Artist'",[]).unwrap()[0]["play_count"],2);
+    assert_eq!(db.query("SELECT COUNT(*) n FROM playback_events WHERE event_type='play'",[]).unwrap()[0]["n"],2);
+    assert_eq!(db.query("SELECT COUNT(*) n FROM yearly_song_seconds WHERE song_key=?", [&wrong.key(Mode::Vinyl)]).unwrap()[0]["n"],0);
+    // A second deletion fails without modifying the remaining history.
+    assert!(db.delete_song_history(&entries).is_err());
+    assert_eq!(db.stats("vinyl",None).unwrap()["top_artists"][0]["count"],2);
+    // The remaining song belongs to the same album; the album session remains valid.
+    assert_eq!(db.stats("vinyl",None).unwrap()["top_albums"][0]["count"],1);
+}
+
+#[test]
+fn deleting_last_artist_and_combined_song_keeps_discogs_and_other_source_isolated() {
+    use vinylpi64::stats_search::{search, DeleteEntry};
+    let dir = tempfile::tempdir().unwrap();
+    let db = Db::open(&dir.path().join("database.db")).unwrap();
+    let mut track = Track { artist:"Only Artist".into(), title:"Bad Song".into(), album:Some("Discogs Album".into()), track_id:Some("spotify-track".into()), ..Default::default() };
+    db.with(|c| {
+        c.execute("INSERT INTO discogs_releases(release_id,title,artist) VALUES (88,'Discogs Album','Only Artist')",[])?;
+        c.execute("INSERT INTO discogs_tracks(release_id,track_index,title,artist,normalized_title,normalized_artist) VALUES(88,1,'Bad Song','Only Artist','bad song','only artist')",[])?;
+        Ok(())
+    }).unwrap();
+    db.record_play(Mode::Vinyl,&track,true).unwrap();
+    db.record_play(Mode::Spotify,&track,false).unwrap();
+    let entries: Vec<DeleteEntry> = serde_json::from_value(search(&db,"bad song","vinyl",None,"song",0,30).unwrap()["items"][0]["delete_entries"].clone()).unwrap();
+    db.delete_song_history(&entries).unwrap();
+    assert_eq!(db.stats("vinyl",None).unwrap()["top_artists"],json!([]));
+    assert_eq!(db.stats("spotify",None).unwrap()["top_songs"][0]["count"],1);
+    assert_eq!(search(&db,"bad song","vinyl",None,"song",0,30).unwrap()["items"][0]["in_collection"],true);
+    assert_eq!(search(&db,"bad song","vinyl",None,"song",0,30).unwrap()["items"][0]["count"],0);
+    assert_eq!(search(&db,"bad song","vinyl",None,"song",0,30).unwrap()["items"][0]["delete_entries"],json!([]));
+    let spotify_entries: Vec<DeleteEntry> = serde_json::from_value(search(&db,"bad song","spotify",None,"song",0,30).unwrap()["items"][0]["delete_entries"].clone()).unwrap();
+    db.delete_song_history(&spotify_entries).unwrap();
+    assert_eq!(db.stats("spotify",None).unwrap()["top_artists"],json!([]));
+    assert!(db.query("SELECT * FROM spotify_album_totals",[]).unwrap().is_empty());
+    assert_eq!(db.query("SELECT COUNT(*) n FROM discogs_tracks",[]).unwrap()[0]["n"],1);
+    track.title = "Unrelated".into();
+    db.record_play(Mode::Spotify,&track,false).unwrap();
+    assert_eq!(db.stats("spotify",None).unwrap()["top_songs"][0]["count"],1);
+}
+
+#[test]
+fn deleting_combined_selection_is_atomic_when_any_key_is_invalid() {
+    use vinylpi64::stats_search::{search, DeleteEntry};
+    let dir = tempfile::tempdir().unwrap();
+    let db = Db::open(&dir.path().join("database.db")).unwrap();
+    let track = Track { artist:"Group".into(), title:"Same Track".into(), track_id:Some("stream-1".into()), ..Default::default() };
+    db.record_play(Mode::Vinyl,&track,false).unwrap();
+    db.record_play(Mode::Spotify,&track,false).unwrap();
+    let entries: Vec<DeleteEntry> = serde_json::from_value(search(&db,"same track","combined",None,"song",0,30).unwrap()["items"][0]["delete_entries"].clone()).unwrap();
+    assert_eq!(entries.len(),2);
+    let invalid = vec![entries[0].clone(), DeleteEntry { source:"spotify".into(), song_key:"missing".into() }];
+    assert!(db.delete_song_history(&invalid).is_err());
+    assert_eq!(db.stats("combined",None).unwrap()["top_songs"][0]["count"],2);
+    db.delete_song_history(&entries).unwrap();
+    assert_eq!(db.stats("combined",None).unwrap()["top_songs"],json!([]));
+    assert!(db.query("SELECT * FROM yearly_plays",[]).unwrap().is_empty());
+}

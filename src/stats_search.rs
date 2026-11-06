@@ -6,9 +6,15 @@ use crate::{
 };
 use anyhow::{Result, ensure};
 use rusqlite::params;
-use serde::Serialize;
+use serde::{Serialize, Deserialize};
 use serde_json::{Value, json};
 use std::collections::HashMap;
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct DeleteEntry {
+    pub source: String,
+    pub song_key: String,
+}
 
 #[derive(Serialize)]
 struct Hit {
@@ -19,6 +25,7 @@ struct Hit {
     cover_url: Option<String>,
     count: i64,
     in_collection: bool,
+    delete_entries: Vec<DeleteEntry>,
     #[serde(skip_serializing)]
     album_names: Vec<String>,
 }
@@ -33,6 +40,7 @@ impl Hit {
             cover_url: None,
             count: 0,
             in_collection: false,
+            delete_entries: Vec::new(),
             album_names: Vec::new(),
         }
     }
@@ -102,13 +110,13 @@ pub fn search(
             rows(&tx, "SELECT t.title,t.artist,r.title album,COALESCE(r.cover_url,r.thumb_url,'') cover_url FROM discogs_tracks t JOIN discogs_releases r USING(release_id)", [])?
         } else { Vec::new() };
         let plays = rows(&tx, r#"
-            SELECT p.artist,p.title,COALESCE(p.album,'') album,SUM(p.count) count,
+            SELECT p.source,p.song_key,p.artist,p.title,COALESCE(p.album,'') album,SUM(p.count) count,
                    MAX(COALESCE(s.cover_url,sp.cover_url,'')) cover_url
             FROM yearly_plays p
             LEFT JOIN songs s ON p.source='vinyl' AND p.song_key=s.song_key
             LEFT JOIN spotify_songs sp ON p.source='spotify' AND p.song_key=sp.track_id
             WHERE (?1='combined' OR p.source=?1) AND (?2 IS NULL OR p.year=?2)
-            GROUP BY lower(p.artist),lower(p.title),lower(COALESCE(p.album,''))
+            GROUP BY p.source,p.song_key
         "#, params![scope, year])?;
         let album_plays = rows(&tx, r#"
             SELECT y.source,y.album,SUM(y.count) count,
@@ -177,6 +185,13 @@ pub fn search(
             let key = format!("{}\n{}", normalize(artist), canonical_title(title));
             let hit = songs.entry(key).or_insert_with(|| Hit::new("song", title, artist));
             hit.count += count;
+            if count > 0 {
+                let source = field(&r, "source");
+                let song_key = field(&r, "song_key");
+                if !song_key.is_empty() && !hit.delete_entries.iter().any(|e| e.source == source && e.song_key == song_key) {
+                    hit.delete_entries.push(DeleteEntry { source: source.to_owned(), song_key: song_key.to_owned() });
+                }
+            }
             hit.add_album(album);
             cover(hit, field(&r, "cover_url"));
             let artist_hit = artists.entry(normalize(artist))

@@ -1,4 +1,4 @@
-use crate::model::{Mode, Track, album_identity, canonical_album_name};
+use crate::model::{Mode, Track, album_identity, canonical_album_name, normalize, canonical_title};
 use anyhow::{Context, Result, ensure};
 use chrono::{Datelike, Local, Utc};
 use rusqlite::{Connection, OptionalExtension, params, types::ValueRef};
@@ -287,9 +287,127 @@ impl Db {
             tx.execute("INSERT INTO playback_events(source,event_type,occurred_at,song_key,artist,title,album) VALUES(?,'play',?,?,?,?,?)",params![source,now,key,t.artist,t.title,t.album])?;
             if (new_album || mode==Mode::Spotify) && let Some(a)=&t.album {
                 tx.execute("INSERT INTO yearly_albums(source,year,album,count) VALUES(?,?,?,1) ON CONFLICT(source,year,album) DO UPDATE SET count=count+1",params![source,year,a])?;
-                if mode==Mode::Vinyl{tx.execute("INSERT INTO playback_events(source,event_type,occurred_at,album) VALUES('vinyl','album_session',?,?)",params![now,a])?;}
+                if mode==Mode::Vinyl{tx.execute("INSERT INTO playback_events(source,event_type,occurred_at,album,song_key) VALUES('vinyl','album_session',?,?,?)",params![now,a,key])?;}
             }
             tx.commit()?;Ok(())
+        })
+    }
+    /// Delete exactly the persisted source-specific song identities selected in
+    /// the Library. All counter updates are committed atomically. A Discogs
+    /// release/track is never removed by this operation.
+    pub fn delete_song_history(&self, entries: &[crate::stats_search::DeleteEntry]) -> Result<Value> {
+        ensure!(!entries.is_empty() && entries.len() <= 100, "invalid_delete_selection");
+        self.with(|c| {
+            let tx = c.transaction()?;
+            let mut seen = std::collections::HashSet::new();
+            let mut selected = Vec::new();
+            let mut identity: Option<String> = None;
+            for entry in entries {
+                ensure!(["vinyl", "spotify"].contains(&entry.source.as_str())
+                    && !entry.song_key.is_empty() && entry.song_key.len() <= 512,
+                    "invalid_song_key");
+                ensure!(seen.insert((entry.source.as_str(), entry.song_key.as_str())), "duplicate_song_key");
+                let (table, key) = if entry.source == "vinyl" { ("songs", "song_key") } else { ("spotify_songs", "track_id") };
+                let sql = format!("SELECT artist,title,album,play_count,COALESCE({},0) seconds FROM {table} WHERE {key}=?",
+                    if entry.source == "vinyl" { "measured_listen_seconds" } else { "listened_seconds" });
+                let song = rows(&tx, &sql, [&entry.song_key])?.into_iter().next()
+                    .context("song_not_found")?;
+                let signature = format!("{}\n{}", normalize(song["artist"].as_str().unwrap_or("")), canonical_title(song["title"].as_str().unwrap_or("")));
+                if let Some(expected) = &identity { ensure!(*expected == signature, "mixed_song_selection"); }
+                identity = Some(signature);
+                ensure!(song["play_count"].as_i64().unwrap_or(0) > 0, "song_has_no_history");
+                selected.push((entry, song));
+            }
+            let mut removed = 0i64;
+            let mut vinyl_albums = std::collections::HashSet::new();
+            for (entry, song) in &selected {
+                let source = entry.source.as_str();
+                let key = entry.song_key.as_str();
+                let album = song["album"].as_str().unwrap_or("");
+                removed += song["play_count"].as_i64().unwrap_or(0);
+                if source == "vinyl" && !album.is_empty() { vinyl_albums.insert(album.to_owned()); }
+
+                // An album session is not a per-track play. If other tracks
+                // from the album remain, its session remains valid; only drop
+                // the deleted song as the session's event reference.
+                if source == "vinyl" {
+                    tx.execute("UPDATE playback_events SET song_key=NULL WHERE source='vinyl' AND event_type='album_session' AND song_key=?",[key])?;
+                }
+
+                // Listening increments are attributable to the track, but old
+                // schema versions did not record which year received them.
+                let tracked = rows(&tx,"SELECT year,seconds FROM yearly_song_seconds WHERE source=? AND song_key=?",params![source,key])?;
+                let exact: f64 = tracked.iter().map(|r|r["seconds"].as_f64().unwrap_or(0.)).sum();
+                let seconds = song["seconds"].as_f64().unwrap_or(0.).max(0.);
+                let total_table = if source == "vinyl" { "listening_totals" } else { "spotify_listening_totals" };
+                tx.execute(&format!("UPDATE {total_table} SET total_seconds=MAX(0,total_seconds-?) WHERE id=1"),[seconds])?;
+                for r in &tracked {
+                    tx.execute("UPDATE yearly_usage SET seconds=MAX(0,seconds-?) WHERE source=? AND year=? AND kind='listening'",
+                        params![r["seconds"].as_f64().unwrap_or(0.),source,r["year"].as_i64().unwrap_or(0)])?;
+                }
+                // For legacy increments with no per-year provenance, debit the
+                // one recorded year when unambiguous; otherwise keep annual
+                // history rather than incorrectly assigning a time to a year.
+                let old_seconds = (seconds-exact).max(0.);
+                if old_seconds > 0. {
+                    let years = rows(&tx,"SELECT year FROM yearly_plays WHERE source=? AND song_key=? AND count>0",params![source,key])?;
+                    if years.len() == 1 {
+                        tx.execute("UPDATE yearly_usage SET seconds=MAX(0,seconds-?) WHERE source=? AND year=? AND kind='listening'",
+                            params![old_seconds,source,years[0]["year"].as_i64().unwrap_or(0)])?;
+                    }
+                }
+                tx.execute("DELETE FROM yearly_song_seconds WHERE source=? AND song_key=?",params![source,key])?;
+                tx.execute("DELETE FROM yearly_plays WHERE source=? AND song_key=?",params![source,key])?;
+                tx.execute("DELETE FROM playback_events WHERE source=? AND event_type='play' AND song_key=?",params![source,key])?;
+                let (table, col) = if source == "vinyl" { ("songs","song_key") } else { ("spotify_songs","track_id") };
+                tx.execute(&format!("DELETE FROM {table} WHERE {col}=?"),[key])?;
+                let stored: Option<String> = tx.query_row("SELECT status_json FROM source_status WHERE source=?",[source],|row|row.get(0)).optional()?;
+                if let Some(raw) = stored
+                    && let Ok(status) = serde_json::from_str::<Value>(&raw)
+                    && normalize(status["artist"].as_str().unwrap_or(""))
+                        == normalize(song["artist"].as_str().unwrap_or(""))
+                    && canonical_title(status["title"].as_str().unwrap_or(""))
+                        == canonical_title(song["title"].as_str().unwrap_or(""))
+                {
+                    tx.execute("DELETE FROM source_status WHERE source=?",[source])?;
+                }
+            }
+
+            // Derive totals from remaining primary song rows, not from a
+            // possibly stale delta of historic aggregate counters.
+            tx.execute_batch("DELETE FROM artist_totals;
+                INSERT INTO artist_totals(artist,play_count)
+                    SELECT artist,SUM(play_count) FROM songs WHERE play_count>0 GROUP BY artist;
+                DELETE FROM spotify_artist_totals;
+                INSERT INTO spotify_artist_totals(artist,play_count)
+                    SELECT artist,SUM(play_count) FROM spotify_songs WHERE play_count>0 GROUP BY artist;
+                -- Keep enriched artwork/artist metadata on surviving albums.
+                UPDATE spotify_album_totals SET play_count=COALESCE(
+                    (SELECT SUM(play_count) FROM spotify_songs WHERE spotify_songs.album=spotify_album_totals.album),0);
+                DELETE FROM spotify_album_totals WHERE play_count<=0;
+                INSERT OR IGNORE INTO spotify_album_totals(album,artist,cover_url,play_count)
+                    SELECT album,MAX(artist),MAX(cover_url),SUM(play_count)
+                    FROM spotify_songs WHERE album IS NOT NULL AND trim(album)!='' AND play_count>0 GROUP BY album;
+                DELETE FROM yearly_albums WHERE source='spotify';
+                INSERT INTO yearly_albums(source,year,album,count)
+                    SELECT 'spotify',year,album,SUM(count) FROM yearly_plays
+                    WHERE source='spotify' AND album IS NOT NULL AND trim(album)!='' GROUP BY year,album;
+                DELETE FROM album_sessions WHERE session_count<=0;
+                DELETE FROM album_covers WHERE play_count<=0;
+                DELETE FROM yearly_albums WHERE count<=0;")?;
+            // A session remains valid while other recorded tracks of the
+            // album exist. Remove all orphaned sessions if none remain.
+            for album in vinyl_albums {
+                let remaining: i64 = tx.query_row("SELECT COALESCE(SUM(play_count),0) FROM songs WHERE album=?",[&album],|r|r.get(0))?;
+                if remaining == 0 {
+                    tx.execute("DELETE FROM album_sessions WHERE album=?",[&album])?;
+                    tx.execute("DELETE FROM album_covers WHERE album=?",[&album])?;
+                    tx.execute("DELETE FROM yearly_albums WHERE source='vinyl' AND album=?",[&album])?;
+                    tx.execute("DELETE FROM playback_events WHERE source='vinyl' AND event_type='album_session' AND album=?",[&album])?;
+                }
+            }
+            tx.commit()?;
+            Ok(json!({"ok":true,"removed_plays":removed,"removed_entries":entries.len()}))
         })
     }
     pub fn seconds(&self, mode: Mode, key: Option<&str>, seconds: f64, pickup: bool) -> Result<()> {
@@ -306,7 +424,11 @@ impl Db {
         };
         self.with(|c|{let tx=c.transaction()?;tx.execute(&format!("UPDATE {table} SET total_seconds=total_seconds+? WHERE id=1"),[seconds])?;
             tx.execute("INSERT INTO yearly_usage(source,year,kind,seconds) VALUES(?,?,?,?) ON CONFLICT(source,year,kind) DO UPDATE SET seconds=seconds+excluded.seconds",params![mode.as_str(),Local::now().year(),if pickup{"pickup"}else{"listening"},seconds])?;
-            if let Some(key)=key{if mode==Mode::Spotify{tx.execute("UPDATE spotify_songs SET listened_seconds=listened_seconds+? WHERE track_id=?",params![seconds,key])?;}else{tx.execute("UPDATE songs SET measured_listen_seconds=COALESCE(measured_listen_seconds,0)+? WHERE song_key=?",params![seconds,key])?;}}
+            if let Some(key)=key{
+                if !pickup {
+                    tx.execute("INSERT INTO yearly_song_seconds(source,year,song_key,seconds) VALUES(?,?,?,?) ON CONFLICT(source,year,song_key) DO UPDATE SET seconds=seconds+excluded.seconds",params![mode.as_str(),Local::now().year(),key,seconds])?;
+                }
+                if mode==Mode::Spotify{tx.execute("UPDATE spotify_songs SET listened_seconds=listened_seconds+? WHERE track_id=?",params![seconds,key])?;}else{tx.execute("UPDATE songs SET measured_listen_seconds=COALESCE(measured_listen_seconds,0)+? WHERE song_key=?",params![seconds,key])?;}}
             tx.commit()?;Ok(())})
     }
     /// Return the last successfully recognized track for this source, not the
