@@ -158,21 +158,100 @@ pub fn delete(root: &Path, cfg: &ConfigStore, name: &str, font: bool) -> Result<
     std::fs::remove_file(p)?;
     Ok(())
 }
+// Render directly to the preview canvas instead of reusing the 64px Pixoo
+// text sprite. The gallery needs a different baseline, font size and aspect
+// ratio; reusing the sprite made glyphs tiny and cut off after CSS scaling.
+fn draw_preview_text(
+    image: &mut image::RgbImage,
+    font: &fontdue::Font,
+    text: &str,
+    size: f32,
+    left: i32,
+    top: i32,
+    color: [u8; 3],
+) {
+    let ascent = font
+        .horizontal_line_metrics(size)
+        .map_or(size, |metrics| metrics.ascent);
+    let baseline = top + ascent.round() as i32;
+    let mut pen_x = left as f32;
+
+    for ch in text.chars().take(120) {
+        let (metrics, bitmap) = font.rasterize(ch, size);
+        let glyph_x = pen_x.round() as i32 + metrics.xmin;
+        let glyph_y = baseline - metrics.height as i32 - metrics.ymin;
+        for y in 0..metrics.height {
+            let dy = glyph_y + y as i32;
+            if dy < 0 || dy >= image.height() as i32 {
+                continue;
+            }
+            for x in 0..metrics.width {
+                let dx = glyph_x + x as i32;
+                if dx < 0 || dx >= image.width() as i32 {
+                    continue;
+                }
+                // Hard edges are intentional: these previews represent fonts
+                // used on a 64x64 pixel display, not smoothed vector text.
+                if bitmap[y * metrics.width + x] >= 128 {
+                    image.put_pixel(dx as u32, dy as u32, image::Rgb(color));
+                }
+            }
+        }
+        pen_x += metrics.advance_width;
+    }
+}
+
 pub fn font_preview(root: &Path, name: &str) -> Result<Vec<u8>> {
-    ensure!(!name.contains('/'), "Invalid font name");
+    ensure!(!name.contains(['/', '\\']), "Invalid font name");
     let path = child(&root.join("assets/fonts"), name)?;
-    let f = fontdue::Font::from_bytes(std::fs::read(path)?, fontdue::FontSettings::default())
-        .map_err(|e| anyhow::anyhow!("{e}"))?;
-    let sprite = display::text_sprite(
-        &f,
-        "VINYLPI 64 Aa Bb 0123",
-        12.,
-        [255, 255, 255],
-        [21, 21, 25],
+    let font = fontdue::Font::from_bytes(std::fs::read(&path)?, fontdue::FontSettings::default())
+        .map_err(|e| anyhow::anyhow!("Invalid preview font: {e}"))?;
+
+    // Match the original Python gallery's 540x132 preview. The CSS already
+    // uses this aspect ratio, so the browser no longer zooms and crops it.
+    const WIDTH: u32 = 540;
+    const HEIGHT: u32 = 132;
+    let mut image = image::RgbImage::from_pixel(WIDTH, HEIGHT, image::Rgb([18, 18, 25]));
+    draw_preview_text(&mut image, &font, "VINYLPI64", 30., 22, 20, [248, 246, 250]);
+    draw_preview_text(
+        &mut image,
+        &font,
+        "NOW PLAYING  •  SIDE B  •  01:23",
+        18.,
+        22,
+        76,
+        [245, 197, 66],
     );
-    let mut img = image::RgbImage::from_pixel(320, 40, image::Rgb([21, 21, 25]));
-    image::imageops::overlay(&mut img, &sprite, 8, 10);
-    display::png(img)
+    for x in 22..(WIDTH - 22) {
+        image.put_pixel(x, 112, image::Rgb([58, 54, 68]));
+    }
+
+    // The small label intentionally uses a fixed UI font rather than the
+    // previewed font, which may not contain all filename characters.
+    if let Ok(ui_font) = display::font(root, "assets/fonts/VCR_OSD_MONO_1.001.ttf") {
+        let label = path
+            .file_stem()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .chars()
+            .take(22)
+            .collect::<String>();
+        let label_width = label
+            .chars()
+            .map(|ch| ui_font.metrics(ch, 9.).advance_width)
+            .sum::<f32>()
+            .ceil() as i32;
+        draw_preview_text(
+            &mut image,
+            &ui_font,
+            &label,
+            9.,
+            (WIDTH as i32 - 22 - label_width).max(22),
+            114,
+            [177, 171, 187],
+        );
+    }
+    display::png(image)
 }
 pub fn read(root: &Path, name: &str) -> Result<Vec<u8>> {
     let p = child(root, name)?;
@@ -188,5 +267,13 @@ mod tests {
         for p in ["../secret", "/etc/passwd", "a\\b", "C:/x"] {
             assert!(child(d.path(), p).is_err());
         }
+    }
+
+    #[test]
+    fn preview_matches_gallery_dimensions() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let bytes = font_preview(root, "vinylpixel.ttf").unwrap();
+        let image = image::load_from_memory_with_format(&bytes, image::ImageFormat::Png).unwrap();
+        assert_eq!((image.width(), image.height()), (540, 132));
     }
 }

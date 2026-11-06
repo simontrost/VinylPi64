@@ -996,6 +996,46 @@ document.addEventListener("DOMContentLoaded", () => {
   const openFontGallery = document.getElementById("openFontGallery");
   const fontGallery = document.getElementById("fontGallery");
 
+  // If the Rust rasterizer cannot render a particular font, let the browser
+  // draw that font instead of leaving a broken image in the gallery.
+  async function showBrowserFontPreview(img, font) {
+    const canvas = document.createElement("canvas");
+    canvas.width = 540;
+    canvas.height = 132;
+    canvas.setAttribute("role", "img");
+    canvas.setAttribute("aria-label", img.alt);
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    ctx.fillStyle = "#121219";
+    ctx.fillRect(0, 0, 540, 132);
+    img.replaceWith(canvas);
+    try {
+      const family = `VinylPiPreviewFallback${Date.now()}${Math.floor(Math.random() * 1e6)}`;
+      const face = new FontFace(family, `url("${font.url}")`);
+      await face.load();
+      document.fonts.add(face);
+      ctx.textBaseline = "top";
+      ctx.fillStyle = "#f8f6fa";
+      ctx.font = `30px "${family}"`;
+      ctx.fillText("VINYLPI64", 22, 20);
+      ctx.fillStyle = "#f5c542";
+      ctx.font = `18px "${family}"`;
+      ctx.fillText("NOW PLAYING  •  SIDE B  •  01:23", 22, 76);
+    } catch (error) {
+      console.warn("Font preview unavailable", font.filename, error);
+      ctx.fillStyle = "#b1abbb";
+      ctx.font = "16px monospace";
+      ctx.fillText("Preview unavailable", 22, 46);
+    }
+    ctx.fillStyle = "#3a3644";
+    ctx.fillRect(22, 112, 496, 1);
+    ctx.fillStyle = "#b1abbb";
+    ctx.font = "10px monospace";
+    ctx.textAlign = "right";
+    ctx.fillText(font.name || font.filename, 518, 116);
+  }
+
   async function loadFontGallery() {
     if (!fontGallery || !fontPathInput) return;
     fontGallery.innerHTML = "Loading fonts …";
@@ -1020,9 +1060,12 @@ document.addEventListener("DOMContentLoaded", () => {
         item.setAttribute("aria-label", `Use font ${font.name || font.filename}`);
 
         const preview = document.createElement("img");
-        preview.src = `${font.preview_url}?v=${encodeURIComponent(font.filename)}`;
+        // Bump the version when preview generation changes so old 320x40
+        // images are not reused from the browser cache after an update.
         preview.alt = `Preview of ${font.name || font.filename}`;
         preview.loading = "lazy";
+        preview.onerror = () => { void showBrowserFontPreview(preview, font); };
+        preview.src = `${font.preview_url}?v=2`;
 
         const meta = document.createElement("div");
         meta.className = "font-gallery-meta";
