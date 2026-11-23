@@ -284,7 +284,7 @@ textarea:disabled { cursor: not-allowed; opacity: 0.55; }
     border-color: rgba(239, 68, 68, 0.32);
 }
 
-input:not([type="checkbox"]):not([type="radio"]),
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
 select,
 textarea {
     width: 100%;

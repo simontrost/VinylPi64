@@ -48,6 +48,15 @@ html, body { background: var(--bg); }
     background: var(--surface-2); border-color: var(--brand-accent-border);
 }
 .nav a.active { background: rgba(255,255,255,.055); }
+/* Keep mobile navigation transparent: the active icon/orb is the highlight,
+   not a rectangular background behind the entire menu item. */
+@media (max-width: 800px) {
+    .nav a.active,
+    .nav a.active:hover {
+        background: transparent;
+        border-color: transparent;
+    }
+}
 .nav a.active::after { background: var(--pink); }
 .nav-center .nav-orb, .nav a.nav-center.active .nav-orb {
     background: #27212d;
@@ -73,7 +82,7 @@ html, body { background: var(--bg); }
     background: var(--brand-accent-hover);
     border-color: var(--purple);
 }
-input:not([type="checkbox"]):not([type="radio"]), select, textarea,
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea,
 .form-row input[type="text"], .form-row input[type="password"],
 .form-row input[type="number"], .pixoo-select {
     background: var(--surface-4);
@@ -173,7 +182,8 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
 .display-fit-card { background: var(--surface); border-color: var(--border); }
 .display-fit-status, .mobile-display-preview-fit { color: var(--muted); }
 .discogs-progress-track span, .display-fit-track span { background: var(--purple); }
-.display-range-row input[type="range"] { background: var(--surface-3); }
+/* Range inputs use the track and thumb defined in their page stylesheet. */
+.display-range-row input[type="range"] { background: transparent; }
 .settings-card::after { background: var(--pink); }
 .form-group, .adaptive-sample-block, .mobile-settings-menu, .display-preview-panel {
     background: var(--surface-2);
