@@ -16,6 +16,16 @@ pub struct DeleteEntry {
     pub song_key: String,
 }
 
+/// Editing is deliberately limited to reducing existing history. The submitted
+/// original value is an optimistic concurrency guard, not a source of truth.
+#[derive(Clone, Debug, Deserialize)]
+pub struct ReduceRequest {
+    pub entries: Vec<DeleteEntry>,
+    pub expected_count: i64,
+    pub new_count: i64,
+    pub year: Option<i32>,
+}
+
 #[derive(Serialize)]
 struct Hit {
     kind: &'static str,

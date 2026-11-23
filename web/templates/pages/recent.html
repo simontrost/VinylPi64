@@ -1,0 +1,48 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Recently Played – VinylPi64{% endblock %}
+
+{% block page_styles %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/spotify.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/library.css') }}?v=20261123-edit">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/recent.css') }}?v=20261123">
+{% endblock %}
+
+{% block page_scripts %}
+    <script src="{{ url_for('static', filename='js/pages/recent.js') }}?v=20261123" defer></script>
+{% endblock %}
+
+{% block content %}
+<main class="main">
+    <header class="main-header library-header">
+        <div>
+            <a href="/stats.html" id="recent-back" class="library-back">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 5-7 7 7 7"/></svg>
+                Statistics
+            </a>
+            <h1 class="header-title pixel-title">Recently Played</h1>
+        </div>
+        <a href="/about.html" class="header-logo-link" aria-label="About VinylPi64" title="About VinylPi64"><img src="/static/images/logo.webp" alt="VinylPi64 logo" class="header-logo"></a>
+    </header>
+    <section class="recent-layout" aria-labelledby="recent-heading">
+        <div class="card recent-intro">
+            <div>
+                <span class="eyebrow">Listening timeline</span>
+                <h2 id="recent-heading">Your latest songs</h2>
+                <p>Every confirmed playback in chronological order, newest first.</p>
+            </div>
+            <div class="stats-scope-control" role="group" aria-label="Listening source">
+                <button type="button" class="stats-scope-button active" data-recent-scope="vinyl" aria-pressed="true">Vinyl</button>
+                <button type="button" class="stats-scope-button" data-recent-scope="spotify" aria-pressed="false">Spotify</button>
+                <button type="button" class="stats-scope-button" data-recent-scope="combined" aria-pressed="false">Combined</button>
+            </div>
+        </div>
+        <p id="recent-status" class="library-feedback" role="status" aria-live="polite">Loading history…</p>
+        <div id="recent-results" class="recent-results" aria-label="Recently played songs"></div>
+        <div class="library-pagination">
+            <button type="button" id="recent-more" class="library-more hidden">Show older songs</button>
+        </div>
+        <p class="recent-import-note">Earlier imported listening statistics do not include individual playback timestamps and cannot appear here.</p>
+    </section>
+</main>
+{% endblock %}

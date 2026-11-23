@@ -37,6 +37,9 @@ function updateStatsScopeUI() {
         libraryLink.href = `/library.html?${params}`;
     }
 
+    const recentLink = document.getElementById("stats-recent-link");
+    if (recentLink) recentLink.href = `/recent.html?scope=${encodeURIComponent(vinylPiStatsScope)}`;
+
     const copy = statsScopeCopy(vinylPiStatsScope);
     const overview = document.getElementById("stats-overview-label");
     if (overview) overview.textContent = copy.label || "Listening overview";

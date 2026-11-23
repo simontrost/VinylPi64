@@ -410,6 +410,188 @@ impl Db {
             Ok(json!({"ok":true,"removed_plays":removed,"removed_entries":entries.len()}))
         })
     }
+    /// Reduce a Library song's play count without inventing history. The
+    /// selected source/year rows, events, track totals and attributable listen
+    /// time are updated in one SQLite transaction. Latest plays are removed
+    /// first, and vinyl album sessions remain independent of individual plays.
+    pub fn reduce_song_history(&self, request: &crate::stats_search::ReduceRequest) -> Result<Value> {
+        use std::collections::{HashMap, HashSet};
+        ensure!(!request.entries.is_empty() && request.entries.len() <= 100, "invalid_edit_selection");
+        ensure!(request.expected_count > 0 && request.new_count >= 0
+            && request.new_count < request.expected_count, "play_count_can_only_decrease");
+        ensure!(request.year.is_none_or(|year| (2000..=2100).contains(&year)), "invalid_year");
+
+        self.with(|c| {
+            let tx = c.transaction()?;
+            let mut seen = HashSet::new();
+            let mut identity: Option<String> = None;
+            // Each row is a source-specific, year-specific counter. The yearly
+            // aggregate is also the backing store for a Library search result.
+            let mut years: Vec<(String, String, i32, i64, i64)> = Vec::new();
+            let mut original: HashMap<(String, String), (i64, f64, String)> = HashMap::new();
+            let mut total = 0i64;
+            for entry in &request.entries {
+                let source = entry.source.as_str();
+                ensure!(["vinyl", "spotify"].contains(&source)
+                    && !entry.song_key.is_empty() && entry.song_key.len() <= 512, "invalid_song_key");
+                ensure!(seen.insert((source, entry.song_key.as_str())), "duplicate_song_key");
+                let (table, key_column, seconds_column) = if source == "vinyl" {
+                    ("songs", "song_key", "measured_listen_seconds")
+                } else { ("spotify_songs", "track_id", "listened_seconds") };
+                let song = rows(&tx, &format!(
+                    "SELECT artist,title,COALESCE(album,'') album,play_count,COALESCE({seconds_column},0) seconds FROM {table} WHERE {key_column}=?"
+                ), [&entry.song_key])?.into_iter().next().context("song_not_found")?;
+                let signature = format!("{}\n{}", normalize(song["artist"].as_str().unwrap_or("")),
+                    canonical_title(song["title"].as_str().unwrap_or("")));
+                if let Some(ref expected) = identity { ensure!(*expected == signature, "mixed_song_selection"); }
+                identity = Some(signature);
+                let lifetime = song["play_count"].as_i64().unwrap_or(0);
+                ensure!(lifetime > 0, "song_has_no_history");
+                original.insert((entry.source.clone(), entry.song_key.clone()), (
+                    lifetime, song["seconds"].as_f64().unwrap_or(0.).max(0.),
+                    song["album"].as_str().unwrap_or("").to_owned()
+                ));
+                let annual = rows(&tx,
+                    "SELECT year,count FROM yearly_plays WHERE source=? AND song_key=? AND (? IS NULL OR year=?) AND count>0 ORDER BY year DESC",
+                    params![source, entry.song_key, request.year, request.year])?;
+                for row in annual {
+                    let year = row["year"].as_i64().unwrap_or(0) as i32;
+                    let count = row["count"].as_i64().unwrap_or(0);
+                    let latest: i64 = tx.query_row(
+                        "SELECT COALESCE(MAX(occurred_at),0) FROM playback_events WHERE source=? AND event_type='play' AND song_key=? AND CAST(strftime('%Y',occurred_at,'unixepoch','localtime') AS INTEGER)=?",
+                        params![source, entry.song_key, year], |r| r.get(0))?;
+                    total += count;
+                    years.push((entry.source.clone(), entry.song_key.clone(), year, count, latest));
+                }
+            }
+            ensure!(total == request.expected_count, "play_count_changed_reload_library");
+            let mut to_remove = total - request.new_count;
+            // Newest year and newest known event first. Imported legacy counts
+            // have no timestamps and are consumed only as aggregate counters.
+            years.sort_by(|a, b| b.2.cmp(&a.2).then_with(|| b.4.cmp(&a.4)));
+            let mut removed_per_song: HashMap<(String, String), i64> = HashMap::new();
+            let mut removed_seconds_per_song: HashMap<(String, String), f64> = HashMap::new();
+            let mut tracked_totals: HashMap<(String, String), f64> = HashMap::new();
+            for (source, key, _, _, _) in &years {
+                let identity = (source.clone(), key.clone());
+                if tracked_totals.contains_key(&identity) { continue; }
+                let tracked: f64 = tx.query_row(
+                    "SELECT COALESCE(SUM(seconds),0) FROM yearly_song_seconds WHERE source=? AND song_key=?",
+                    params![source, key], |r| r.get(0))?;
+                tracked_totals.insert(identity, tracked.max(0.));
+            }
+            for (source, key, year, year_count, _) in &years {
+                if to_remove == 0 { break; }
+                let removed = to_remove.min(*year_count);
+                to_remove -= removed;
+                let identity = (source.clone(), key.clone());
+                let (lifetime, old_seconds, _) = original.get(&identity).context("song_not_found")?;
+                *removed_per_song.entry(identity.clone()).or_default() += removed;
+                tx.execute("UPDATE yearly_plays SET count=count-? WHERE source=? AND year=? AND song_key=?",
+                    params![removed, source, year, key])?;
+                tx.execute("DELETE FROM yearly_plays WHERE source=? AND year=? AND song_key=? AND count=0",
+                    params![source, year, key])?;
+
+                // Listening seconds are measured across samples, not recorded
+                // per-event. Remove the corresponding fraction of the chosen
+                // year's attributed time, plus the proportion of older imports
+                // with no year-specific attribution.
+                let tracked: f64 = tx.query_row(
+                    "SELECT COALESCE(seconds,0) FROM yearly_song_seconds WHERE source=? AND year=? AND song_key=?",
+                    params![source, year, key], |r| r.get(0)).optional()?.unwrap_or(0.);
+                let tracked_debit = (tracked * removed as f64 / *year_count as f64).max(0.);
+                let legacy = (old_seconds - tracked_totals.get(&identity).copied().unwrap_or(0.)).max(0.);
+                let legacy_debit = legacy * removed as f64 / *lifetime as f64;
+                let debit = tracked_debit + legacy_debit;
+                *removed_seconds_per_song.entry(identity).or_default() += debit;
+                tx.execute("UPDATE yearly_song_seconds SET seconds=MAX(0,seconds-?) WHERE source=? AND year=? AND song_key=?",
+                    params![tracked_debit, source, year, key])?;
+                tx.execute("DELETE FROM yearly_song_seconds WHERE source=? AND year=? AND song_key=? AND seconds<0.000001",
+                    params![source, year, key])?;
+                tx.execute("UPDATE yearly_usage SET seconds=MAX(0,seconds-?) WHERE source=? AND year=? AND kind='listening'",
+                    params![debit, source, year])?;
+
+                let ids = rows(&tx,
+                    "SELECT id FROM playback_events WHERE source=? AND event_type='play' AND song_key=? AND CAST(strftime('%Y',occurred_at,'unixepoch','localtime') AS INTEGER)=? ORDER BY occurred_at DESC,id DESC LIMIT ?",
+                    params![source, key, year, removed])?;
+                for row in ids {
+                    tx.execute("DELETE FROM playback_events WHERE id=?", [row["id"].as_i64().unwrap_or(0)])?;
+                }
+            }
+            ensure!(to_remove == 0, "play_count_changed_reload_library");
+            let mut vinyl_albums = HashSet::new();
+            for ((source, key), removed) in &removed_per_song {
+                let (lifetime, old_seconds, album) = original.get(&(source.clone(), key.clone())).context("song_not_found")?;
+                let debit = removed_seconds_per_song.get(&(source.clone(), key.clone())).copied().unwrap_or(0.).min(*old_seconds);
+                let (table, key_column, seconds_column, totals) = if source == "vinyl" {
+                    ("songs", "song_key", "measured_listen_seconds", "listening_totals")
+                } else { ("spotify_songs", "track_id", "listened_seconds", "spotify_listening_totals") };
+                tx.execute(&format!("UPDATE {table} SET play_count=play_count-?, {seconds_column}=MAX(0,COALESCE({seconds_column},0)-?), updated_at=strftime('%s','now') WHERE {key_column}=?"),
+                    params![removed, debit, key])?;
+                tx.execute(&format!("UPDATE {totals} SET total_seconds=MAX(0,total_seconds-?) WHERE id=1"), [debit])?;
+                if source == "vinyl" && !album.is_empty() { vinyl_albums.insert(album.clone()); }
+                if removed == lifetime {
+                    if source == "vinyl" {
+                        tx.execute("UPDATE playback_events SET song_key=NULL WHERE source='vinyl' AND event_type='album_session' AND song_key=?", [key])?;
+                    }
+                    tx.execute("DELETE FROM yearly_song_seconds WHERE source=? AND song_key=?", params![source,key])?;
+                    tx.execute("DELETE FROM yearly_plays WHERE source=? AND song_key=?", params![source,key])?;
+                    tx.execute("DELETE FROM playback_events WHERE source=? AND event_type='play' AND song_key=?",params![source,key])?;
+                    tx.execute(&format!("DELETE FROM {table} WHERE {key_column}=?"), [key])?;
+                }
+            }
+            // Rebuild derived counters from primary rows to avoid drifting
+            // from earlier edits or from concurrent recognition writes.
+            tx.execute_batch("DELETE FROM artist_totals;
+                INSERT INTO artist_totals(artist,play_count) SELECT artist,SUM(play_count) FROM songs WHERE play_count>0 GROUP BY artist;
+                DELETE FROM spotify_artist_totals;
+                INSERT INTO spotify_artist_totals(artist,play_count) SELECT artist,SUM(play_count) FROM spotify_songs WHERE play_count>0 GROUP BY artist;
+                UPDATE spotify_album_totals SET play_count=COALESCE((SELECT SUM(play_count) FROM spotify_songs WHERE spotify_songs.album=spotify_album_totals.album),0);
+                DELETE FROM spotify_album_totals WHERE play_count<=0;
+                INSERT OR IGNORE INTO spotify_album_totals(album,artist,cover_url,play_count)
+                    SELECT album,MAX(artist),MAX(cover_url),SUM(play_count) FROM spotify_songs
+                    WHERE album IS NOT NULL AND trim(album)!='' AND play_count>0 GROUP BY album;
+                DELETE FROM yearly_albums WHERE source='spotify';
+                INSERT INTO yearly_albums(source,year,album,count)
+                    SELECT 'spotify',year,album,SUM(count) FROM yearly_plays
+                    WHERE source='spotify' AND album IS NOT NULL AND trim(album)!='' GROUP BY year,album;
+                DELETE FROM yearly_albums WHERE count<=0;")?;
+            for album in vinyl_albums {
+                let remaining: i64 = tx.query_row("SELECT COALESCE(SUM(play_count),0) FROM songs WHERE album=?", [&album], |r| r.get(0))?;
+                if remaining == 0 {
+                    tx.execute("DELETE FROM album_sessions WHERE album=?", [&album])?;
+                    tx.execute("DELETE FROM album_covers WHERE album=?", [&album])?;
+                    tx.execute("DELETE FROM yearly_albums WHERE source='vinyl' AND album=?", [&album])?;
+                    tx.execute("DELETE FROM playback_events WHERE source='vinyl' AND event_type='album_session' AND album=?", [&album])?;
+                }
+            }
+            tx.commit()?;
+            Ok(json!({"ok":true,"old_count":total,"new_count":request.new_count,
+                "removed_plays":total-request.new_count}))
+        })
+    }
+
+    /// Paginated real playback events. Imported legacy aggregates without
+    /// timestamps cannot be shown here as fabricated dated plays.
+    pub fn recent_plays(&self, scope: &str, offset: usize, limit: usize) -> Result<Value> {
+        ensure!(["vinyl", "spotify", "combined"].contains(&scope), "invalid_scope");
+        ensure!(offset <= 100_000 && (1..=100).contains(&limit), "invalid_pagination");
+        self.with(|c| {
+            let mut events = rows(c, "SELECT e.id,e.source,e.occurred_at,e.artist,e.title,e.album,
+                    COALESCE(CASE WHEN e.source='vinyl' THEN s.cover_url ELSE sp.cover_url END,'') cover_url
+                FROM playback_events e
+                LEFT JOIN songs s ON e.source='vinyl' AND e.song_key=s.song_key
+                LEFT JOIN spotify_songs sp ON e.source='spotify' AND e.song_key=sp.track_id
+                WHERE e.event_type='play' AND (?='combined' OR e.source=?)
+                ORDER BY e.occurred_at DESC,e.id DESC LIMIT ? OFFSET ?",
+                params![scope,scope,limit+1,offset])?;
+            let has_more = events.len() > limit;
+            events.truncate(limit);
+            Ok(json!({"ok":true,"items":events,"offset":offset,"has_more":has_more,
+                "note":"Older imported history has no individual play timestamps."}))
+        })
+    }
+
     pub fn seconds(&self, mode: Mode, key: Option<&str>, seconds: f64, pickup: bool) -> Result<()> {
         ensure!(
             seconds.is_finite() && (0.0..=1800.).contains(&seconds),

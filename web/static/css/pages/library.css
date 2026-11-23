@@ -59,10 +59,16 @@
     padding: 13px 0; min-width: 0; background: var(--surface);
     transition: transform .18s ease; touch-action: pan-y;
 }
-.library-swipe-item.is-revealed .library-hit { transform: translateX(-88px); }
+.library-swipe-item.is-revealed-delete .library-hit { transform: translateX(-88px); }
+.library-swipe-item.is-revealed-edit .library-hit { transform: translateX(88px); }
 .library-delete-action {
     position: absolute; inset: 0 0 0 auto; width: 88px; border: 0;
     color: #fff; background: #b92f3a; font: inherit; font-size: 12px; font-weight: 750;
+    cursor: pointer;
+}
+.library-edit-action {
+    position: absolute; inset: 0 auto 0 0; width: 88px; border: 0;
+    color: #fff; background: #226b63; font: inherit; font-size: 12px; font-weight: 750;
     cursor: pointer;
 }
 .library-delete-trigger {
@@ -72,6 +78,10 @@
 }
 .library-delete-trigger svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .library-delete-trigger:hover { color: #ff9fa4; background: rgba(239,68,68,.12); }
+.library-edit-trigger { flex: 0 0 auto; display: grid; place-items: center; width: 28px; height: 30px; margin-left: 2px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: var(--muted-2); cursor: pointer; }
+.library-edit-trigger svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.library-edit-trigger:hover { color: #87dcc4; background: rgba(46,163,135,.12); }
+.library-edit-trigger:focus-visible, .library-edit-action:focus-visible { outline: 2px solid var(--yellow); outline-offset: -2px; }
 .library-delete-trigger:focus-visible, .library-delete-action:focus-visible { outline: 2px solid var(--yellow); outline-offset: -2px; }
 .library-delete-dialog {
     width: min(420px, calc(100% - 32px)); padding: 24px;
@@ -85,6 +95,11 @@
 .library-delete-dialog button { min-height: 40px; padding: 8px 15px; border: 1px solid var(--border-strong); border-radius: 10px; background: var(--surface-3); color: var(--text); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
 .library-delete-dialog button.library-delete-confirm { border-color: rgba(239,68,68,.5); background: #a82e3b; color: #fff; }
 .library-delete-dialog button:disabled { opacity: .55; cursor: wait; }
+.library-edit-dialog .library-edit-label { display: flex; flex-direction: column; gap: 9px; margin: 0 0 8px; font-size: 13px; font-weight: 700; }
+.library-edit-dialog input { min-height: 45px; width: 100%; padding: 10px 13px; font: inherit; font-size: 17px; font-variant-numeric: tabular-nums; color: var(--text); background: var(--surface); border: 1px solid var(--border-strong); border-radius: 10px; }
+.library-edit-dialog input:focus-visible { outline: 2px solid var(--yellow); outline-offset: 2px; }
+.library-edit-dialog .library-edit-feedback { min-height: 20px; margin: 4px 0 18px; color: #ffa7b2; }
+.library-edit-dialog button.library-edit-confirm { border-color: rgba(57,194,157,.45); background: #226b63; color: #fff; }
 .library-artwork {
     display: grid; place-items: center; flex: 0 0 52px; width: 52px; height: 52px;
     border-radius: 9px; background: var(--kind-bg); color: var(--kind-color);
@@ -121,7 +136,7 @@
     .library-group-header { padding: 15px; }
     .library-group-list { padding: 0 14px; }
     .library-hit { gap: 10px; }
-    .library-delete-trigger { display: none; }
+    .library-delete-trigger, .library-edit-trigger { display: none; }
     .library-artwork { flex-basis: 42px; width: 42px; height: 42px; }
     .library-hit-count { min-width: 48px; }
 }

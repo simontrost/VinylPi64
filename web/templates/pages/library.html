@@ -4,11 +4,11 @@
 
 {% block page_styles %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/spotify.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/library.css') }}?v=20261106-delete">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/library.css') }}?v=20261123-edit">
 {% endblock %}
 
 {% block page_scripts %}
-    <script src="{{ url_for('static', filename='js/pages/stats_search.js') }}?v=20261106-delete" defer></script>
+    <script src="{{ url_for('static', filename='js/pages/stats_search.js') }}?v=20261123-edit" defer></script>
 {% endblock %}
 
 {% block content %}
@@ -71,6 +71,18 @@
         <div class="library-delete-dialog-actions">
             <button id="library-delete-cancel" type="button">Cancel</button>
             <button id="library-delete-submit" class="library-delete-confirm" type="button">Delete song</button>
+        </div>
+    </dialog>
+    <dialog id="library-edit-dialog" class="library-delete-dialog library-edit-dialog" aria-labelledby="library-edit-title" aria-describedby="library-edit-details">
+        <h2 id="library-edit-title">Edit play count</h2>
+        <p id="library-edit-details"></p>
+        <label class="library-edit-label" for="library-edit-count">Corrected play count
+            <input id="library-edit-count" type="number" min="0" step="1" inputmode="numeric" required>
+        </label>
+        <p id="library-edit-feedback" role="alert" class="library-edit-feedback"></p>
+        <div class="library-delete-dialog-actions">
+            <button id="library-edit-cancel" type="button">Cancel</button>
+            <button id="library-edit-submit" class="library-edit-confirm" type="button">Save changes</button>
         </div>
     </dialog>
 </main>

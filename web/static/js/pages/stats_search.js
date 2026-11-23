@@ -1,4 +1,4 @@
-/* Music library search and source-scoped removal of incorrect play history. */
+/* Music library search and source-scoped correction of incorrect play history. */
 document.addEventListener("DOMContentLoaded", () => {
     const input = document.getElementById("stats-search-input");
     const results = document.getElementById("stats-search-results");
@@ -34,6 +34,15 @@ document.addEventListener("DOMContentLoaded", () => {
     const deleteSubmit = document.getElementById("library-delete-submit");
     let pendingDelete = null;
     let deleting = false;
+    const editDialog = document.getElementById("library-edit-dialog");
+    const editTitle = document.getElementById("library-edit-title");
+    const editDetails = document.getElementById("library-edit-details");
+    const editCount = document.getElementById("library-edit-count");
+    const editFeedback = document.getElementById("library-edit-feedback");
+    const editCancel = document.getElementById("library-edit-cancel");
+    const editSubmit = document.getElementById("library-edit-submit");
+    let pendingEdit = null;
+    let editing = false;
 
     input.value = (query.get("q") || "").slice(0, 120);
 
@@ -168,30 +177,92 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
+    function openEditDialog(hit) {
+        if (editing || !editDialog || !hit.delete_entries?.length || !(Number(hit.count) > 0)) return;
+        pendingEdit = hit;
+        const count = Number(hit.count);
+        const sources = [...new Set(hit.delete_entries.map(entry => entry.source))]
+            .map(source => source === "spotify" ? "Spotify" : "Vinyl").join(" + ");
+        editTitle.textContent = `Edit “${hit.title}”`;
+        editDetails.textContent = `${sources} · ${year === "all" ? "All time" : year} · Currently ${count} plays. You can only reduce this count. The newest plays and their proportionate listening time will be removed.`;
+        editCount.value = String(count - 1);
+        editCount.max = String(count - 1);
+        editFeedback.textContent = "";
+        editDialog.showModal();
+        editCount.focus();
+        editCount.select();
+    }
+
+    async function saveEditedCount() {
+        if (!pendingEdit || editing) return;
+        const original = Number(pendingEdit.count);
+        const revised = Number(editCount.value);
+        if (!editCount.value.trim() || !Number.isSafeInteger(revised) || revised < 0 || revised >= original) {
+            editFeedback.textContent = `Enter a whole number between 0 and ${original - 1}.`;
+            return;
+        }
+        editing = true;
+        editCount.disabled = true;
+        editSubmit.disabled = true;
+        editCancel.disabled = true;
+        editSubmit.textContent = "Saving…";
+        try {
+            const response = await fetch("/api/stats/song/edit", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    entries: pendingEdit.delete_entries,
+                    expected_count: original,
+                    new_count: revised,
+                    year: year === "all" ? null : Number(year),
+                }),
+                cache: "no-store",
+            });
+            const body = await response.json();
+            if (!response.ok || !body.ok) throw new Error(body.error || `HTTP ${response.status}`);
+            editDialog.close();
+            pendingEdit = null;
+            startSearch();
+            feedback.textContent = `Play count reduced to ${body.new_count}. Listening time and statistics updated.`;
+        } catch (error) {
+            console.error("Could not update play count:", error);
+            editFeedback.textContent = error.message === "play_count_changed_reload_library"
+                ? "The counter changed meanwhile. Close this dialog and reload the Library."
+                : `No changes saved: ${error.message}`;
+        } finally {
+            editing = false;
+            editCount.disabled = false;
+            editSubmit.disabled = false;
+            editCancel.disabled = false;
+            editSubmit.textContent = "Save changes";
+        }
+    }
+
     function attachSwipe(item, surface) {
         let startX = null;
         let startY = null;
-        let dragging = false;
-        const reveal = () => item.classList.toggle("is-revealed", true);
-        const close = () => item.classList.remove("is-revealed");
+        const close = () => item.classList.remove("is-revealed-delete", "is-revealed-edit");
         surface.addEventListener("touchstart", event => {
             if (event.touches.length !== 1) return;
             startX = event.touches[0].clientX;
             startY = event.touches[0].clientY;
-            dragging = false;
         }, { passive: true });
         surface.addEventListener("touchmove", event => {
             if (startX === null || event.touches.length !== 1) return;
             const dx = event.touches[0].clientX - startX;
             const dy = event.touches[0].clientY - startY;
-            if (Math.abs(dy) > Math.abs(dx)) { startX = null; return; }
-            if (Math.abs(dx) > 14) dragging = true;
+            if (Math.abs(dy) > Math.abs(dx) + 8) startX = null;
         }, { passive: true });
         surface.addEventListener("touchend", event => {
-            if (startX === null || !dragging) return;
+            if (startX === null) return;
             const dx = event.changedTouches[0].clientX - startX;
-            if (dx < -45) reveal();
-            else if (dx > 45) close();
+            if (dx < -45) {
+                close();
+                item.classList.add("is-revealed-delete");
+            } else if (dx > 45) {
+                close();
+                item.classList.add("is-revealed-edit");
+            } else if (Math.abs(dx) > 12) close();
             startX = null;
         }, { passive: true });
         surface.addEventListener("touchcancel", () => { startX = null; }, { passive: true });
@@ -241,6 +312,13 @@ document.addEventListener("DOMContentLoaded", () => {
         surface.append(count);
         if (hit.kind === "song" && Array.isArray(hit.delete_entries) && hit.delete_entries.length) {
             item.classList.add("library-swipe-item--editable");
+            const editAction = document.createElement("button");
+            editAction.type = "button";
+            editAction.className = "library-edit-action";
+            editAction.textContent = "Edit";
+            editAction.setAttribute("aria-label", `Reduce play count for ${hit.title} by ${hit.artist}`);
+            editAction.addEventListener("click", () => openEditDialog(hit));
+            item.append(editAction);
             const action = document.createElement("button");
             action.type = "button";
             action.className = "library-delete-action";
@@ -255,6 +333,13 @@ document.addEventListener("DOMContentLoaded", () => {
             trigger.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6m4-6v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>';
             trigger.addEventListener("click", () => openDeleteDialog(hit));
             surface.append(trigger);
+            const editTrigger = document.createElement("button");
+            editTrigger.type = "button";
+            editTrigger.className = "library-edit-trigger";
+            editTrigger.setAttribute("aria-label", `Reduce play count for ${hit.title} by ${hit.artist}`);
+            editTrigger.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9M16.5 3.5l4 4L9 19H5v-4z"/></svg>';
+            editTrigger.addEventListener("click", () => openEditDialog(hit));
+            surface.append(editTrigger);
             attachSwipe(item, surface);
         }
         item.append(surface);
@@ -339,6 +424,14 @@ document.addEventListener("DOMContentLoaded", () => {
         confirmDialog.addEventListener("close", () => {
             if (!deleting) pendingDelete = null;
         });
+    }
+    if (editDialog) {
+        editCancel?.addEventListener("click", () => editDialog.close());
+        editSubmit?.addEventListener("click", saveEditedCount);
+        editCount?.addEventListener("keydown", event => {
+            if (event.key === "Enter") { event.preventDefault(); saveEditedCount(); }
+        });
+        editDialog.addEventListener("close", () => { if (!editing) pendingEdit = null; });
     }
     input.addEventListener("input", () => startSearch(280));
     more.addEventListener("click", () => fetchPage(requestId, true));

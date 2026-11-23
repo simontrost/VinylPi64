@@ -4,7 +4,7 @@
 
 {% block page_styles %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/vinyl-loader.css') }}?v=20261022">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/dashboard.css') }}?v=20261025-logo">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/dashboard.css') }}?v=20261123-recent">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/spotify.css') }}">
 {% endblock %}
 
@@ -21,6 +21,11 @@
             <div class="header-title pixel-title">Dashboard</div>
         </div>
         <div class="dashboard-header-actions">
+            <a href="/recent.html" class="dashboard-recent-link" aria-label="Recently played songs" title="Recently played songs">
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="9"></circle><path d="M12 6v6l4 3"></path>
+                </svg>
+            </a>
             <button id="random-record-button" class="random-record-trigger" type="button"
                     aria-label="Suggest a record" aria-haspopup="dialog" aria-controls="random-record-dialog"
                     title="Checking playback source…" disabled>

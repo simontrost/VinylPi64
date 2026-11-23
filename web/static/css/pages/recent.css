@@ -1,0 +1,35 @@
+/* Chronological, source-filterable listening history. */
+.recent-layout { width: min(var(--content-max), 100%); max-width: 960px; margin: 0 auto; }
+.recent-intro { padding: 23px; display: flex; justify-content: space-between; align-items: center; gap: 20px; flex-wrap: wrap; }
+.recent-intro h2 { margin: 6px 0; font-size: 23px; }
+.recent-intro p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+.recent-results { display: grid; gap: 18px; }
+.recent-day { overflow: hidden; }
+.recent-day-heading { display: flex; align-items: center; gap: 12px; margin: 0; padding: 17px 22px; font-size: 15px; border-bottom: 1px solid var(--border); }
+.recent-day-count { margin-left: auto; font-size: 11px; font-weight: 600; color: var(--muted); }
+.recent-list { list-style: none; padding: 0 20px; margin: 0; }
+.recent-item { display: flex; align-items: center; gap: 13px; padding: 12px 0; border-bottom: 1px solid var(--border); min-width: 0; }
+.recent-item:last-child { border-bottom: none; }
+.recent-cover { flex: 0 0 52px; width: 52px; height: 52px; overflow: hidden; border-radius: 9px; background: rgba(255,255,255,.075); display: grid; place-items: center; color: var(--muted); }
+.recent-cover img { height: 100%; width: 100%; object-fit: cover; }
+.recent-cover svg { height: 24px; width: 24px; stroke: currentColor; stroke-width: 1.7; fill: none; }
+.recent-copy { display: flex; flex-direction: column; flex: 1 1 auto; min-width: 0; gap: 4px; }
+.recent-title { font-size: 14px; overflow-wrap: anywhere; }
+.recent-subtitle { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+.recent-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; flex: 0 0 auto; }
+.recent-time { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.recent-source { text-transform: uppercase; font-size: 10px; font-weight: 750; letter-spacing: .04em; padding: 4px 7px; border: 1px solid var(--border); border-radius: 7px; color: var(--muted); }
+.recent-source--vinyl { color: #eeb8de; border-color: rgba(238,184,222,.3); }
+.recent-source--spotify { color: #8bd5a8; border-color: rgba(139,213,168,.3); }
+.recent-import-note { margin: 16px 4px 28px; color: var(--muted); font-size: 11px; line-height: 1.55; }
+@media (max-width: 620px) {
+    .recent-intro { padding: 18px; }
+    .recent-intro .stats-scope-control { width: 100%; justify-content: space-between; }
+    .recent-list { padding: 0 13px; }
+    .recent-day-heading { padding: 15px; }
+    .recent-item { gap: 10px; }
+    .recent-cover { flex-basis: 43px; width: 43px; height: 43px; }
+    .recent-title { font-size: 13px; }
+    .recent-meta { gap: 5px; }
+    .recent-time { font-size: 11px; }
+}

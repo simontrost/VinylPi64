@@ -299,3 +299,18 @@ body.random-record-open { overflow: hidden; }
 }
 .lyrics-loading .vinyl-loader { width: 32px; height: 32px; }
 #btn-lyrics:disabled { opacity: .7; cursor: wait; }
+
+/* Chronological listening history entry point. */
+.dashboard-recent-link {
+    display: inline-flex; align-items: center; justify-content: center;
+    flex: 0 0 44px; width: 44px; height: 44px;
+    border-radius: 12px; border: 1px solid var(--border);
+    color: var(--text); background: rgba(255,255,255,.045);
+    text-decoration: none;
+}
+.dashboard-recent-link:hover { border-color: var(--yellow); background: rgba(255,255,255,.09); }
+.dashboard-recent-link:focus-visible { outline: 2px solid var(--yellow); outline-offset: 3px; }
+@media (max-width: 400px) {
+    .dashboard-header-actions { gap: 7px; }
+    .dashboard-recent-link { flex-basis: 38px; width: 38px; height: 38px; }
+}

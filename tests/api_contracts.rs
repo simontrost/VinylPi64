@@ -220,3 +220,36 @@ async fn library_delete_requires_explicit_song_keys_and_updates_artist_counts() 
     assert_eq!(get(&server,"/api/stats/search?scope=vinyl&type=song&q=false").await.1["total"],0);
     server.shutdown().await.unwrap();
 }
+
+#[tokio::test]
+async fn recent_history_and_counter_edit_api_are_source_scoped_and_atomic() {
+    let (_tmp, server) = app().await;
+    let track = Track { artist:"Test artist".into(), title:"A track".into(),
+        album:Some("Test album".into()), cover_url:Some("https://example.org/art.jpg".into()), ..Default::default() };
+    for _ in 0..3 { server.db.record_play(Mode::Vinyl, &track, false).unwrap(); }
+    server.db.seconds(Mode::Vinyl, Some(&track.key(Mode::Vinyl)), 150., false).unwrap();
+    let (status, recent) = get(&server, "/api/stats/recent?scope=vinyl&limit=2").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(recent["items"].as_array().unwrap().len(), 2);
+    assert_eq!(recent["has_more"], true);
+    assert_eq!(recent["items"][0]["cover_url"], "https://example.org/art.jpg");
+    assert!(get(&server, "/api/stats/recent?scope=invalid").await.0.is_client_error());
+
+    let (_, found) = get(&server, "/api/stats/search?scope=vinyl&type=song&q=A%20track").await;
+    let edit = json!({"entries":found["items"][0]["delete_entries"],
+        "expected_count":3,"new_count":1,"year":null});
+    assert_eq!(post(&server, "/api/stats/song/edit", edit.clone()).await.0, StatusCode::OK);
+    assert_eq!(get(&server, "/api/stats/recent?scope=vinyl").await.1["items"].as_array().unwrap().len(), 1);
+    assert_eq!(get(&server, "/api/stats?scope=vinyl").await.1["top_songs"][0]["count"], 1);
+    // 150 recorded seconds / 3 plays * 1 remaining play = 50 seconds.
+    // The public total_minutes_listened is intentionally an integer of full minutes.
+    assert_eq!(get(&server, "/api/stats?scope=vinyl").await.1["total_minutes_listened"], 0);
+    let lifetime = server.db.query("SELECT total_seconds FROM listening_totals WHERE id=1", []).unwrap();
+    assert!((lifetime[0]["total_seconds"].as_f64().unwrap() - 50.0).abs() < 0.001);
+    let yearly = server.db.query("SELECT seconds FROM yearly_usage WHERE source='vinyl' AND kind='listening'", []).unwrap();
+    assert!((yearly[0]["seconds"].as_f64().unwrap() - 50.0).abs() < 0.001);
+    // A submitted stale counter or a request to increase it cannot change history.
+    assert_eq!(post(&server, "/api/stats/song/edit", edit).await.0, StatusCode::BAD_REQUEST);
+    assert_eq!(get(&server, "/api/stats?scope=vinyl").await.1["top_songs"][0]["count"], 1);
+    server.shutdown().await.unwrap();
+}

@@ -556,6 +556,7 @@ impl Engine {
         let mut next = tokio::time::Instant::now();
         let mut spotify_previous: Option<(String, i64, Instant)> = None;
         let mut unavailable = 0u32;
+        let mut audio_warning_last_logged: Option<Instant> = None;
         #[cfg(target_os = "linux")]
         let mut audio_monitor: Option<AudioMonitor> = None;
         let mut config_rx = s.config.tx.subscribe();
@@ -685,6 +686,7 @@ impl Engine {
                         display_fallback = true;
                         spotify_previous = None;
                         unavailable = 0;
+                        audio_warning_last_logged = None;
                         wake = Wake::default();
                         next = tokio::time::Instant::now() + Duration::from_millis(50);
                     }
@@ -710,9 +712,13 @@ impl Engine {
                             unavailable = (unavailable + 1).min(6);
                             let delay = (5u64 << unavailable.saturating_sub(1)).min(300);
                             next = tokio::time::Instant::now() + Duration::from_secs(delay);
-                            // Auto-wake probes USB in Off mode too. Do not turn a
-                            // missing turntable into a permanent stream of warnings.
-                            if mode != Mode::Off || unavailable == 1 {
+                            // Persist a warning for the first failure of an outage,
+                            // then at most once every 15 minutes. Retry details
+                            // stay at DEBUG instead of flooding the mobile Logs
+                            // page with 5/10/20/40-second warning duplicates.
+                            let should_log_warning = mode == Mode::Spotify || audio_warning_last_logged
+                                .is_none_or(|last| last.elapsed() >= Duration::from_secs(900));
+                            if should_log_warning {
                                 s.db.log(
                                     if mode == Mode::Off { "INFO" } else { "WARNING" },
                                     &format!(
@@ -721,6 +727,9 @@ impl Engine {
                                         if mode == Mode::Off { " (auto-wake is enabled; disable Vinyl auto wake in Settings to stop probing)" } else { "" },
                                     ),
                                 );
+                                audio_warning_last_logged = Some(Instant::now());
+                            } else if cfg.debug.logs {
+                                s.db.log("DEBUG", &format!("{} ALSA capture retry in {delay}s: {e}", mode.as_str()));
                             }
                             if mode != Mode::Off {
                                 let mut status = self.status.borrow().clone();
@@ -731,7 +740,11 @@ impl Engine {
                             spotify_previous = None;
                         }
                         Ok((track, level)) => {
+                            if unavailable > 1 && mode == Mode::Vinyl {
+                                s.db.log("INFO", "Vinyl USB audio capture recovered");
+                            }
                             unavailable = 0;
+                            audio_warning_last_logged = None;
                             if let Some((level, observed)) = level {
                                 if mode == Mode::Off {
                                     if wake.observe(level, seconds, &cfg) {

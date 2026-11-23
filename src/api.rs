@@ -173,6 +173,7 @@ pub fn router(app: Arc<App>) -> Router {
         .route("/settings.html", get(page))
         .route("/stats.html", get(page))
         .route("/library.html", get(page))
+        .route("/recent.html", get(page))
         .route("/pixoo.html", get(page))
         .route("/logs.html", get(page))
         .route("/about.html", get(page))
@@ -697,6 +698,23 @@ async fn api(
             ).context("Invalid song deletion entries")?;
             let db = app.db.clone();
             let result = tokio::task::spawn_blocking(move || db.delete_song_history(&entries))
+                .await.map_err(anyhow::Error::from)??;
+            ok(result)
+        }
+        ("stats/song/edit", _, true, _) => {
+            let edit: crate::stats_search::ReduceRequest = serde_json::from_value(body.clone())
+                .context("Invalid song edit request")?;
+            let db = app.db.clone();
+            let result = tokio::task::spawn_blocking(move || db.reduce_song_history(&edit))
+                .await.map_err(anyhow::Error::from)??;
+            ok(result)
+        }
+        ("stats/recent", true, _, _) => {
+            let scope = q.get("scope").map(String::as_str).unwrap_or("vinyl").to_owned();
+            let offset = q.get("offset").map_or(Ok(0), |s| s.parse::<usize>()).context("Invalid offset")?;
+            let limit = q.get("limit").map_or(Ok(40), |s| s.parse::<usize>()).context("Invalid limit")?;
+            let db = app.db.clone();
+            let result = tokio::task::spawn_blocking(move || db.recent_plays(&scope, offset, limit))
                 .await.map_err(anyhow::Error::from)??;
             ok(result)
         }

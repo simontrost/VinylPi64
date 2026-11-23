@@ -133,19 +133,12 @@ fn capture_lock() -> Result<std::sync::MutexGuard<'static, ()>> {
 }
 
 #[cfg(target_os = "linux")]
-fn start_capture_pcm(pcm: &alsa::pcm::PCM) -> Result<()> {
-    // ALSA can report an XRUN already at snd_pcm_start(), rather than readi().
-    // Recover it here as well; persistent USB timeouts are intentionally not
-    // masked by an unlimited recovery loop.
-    match pcm.start() {
-        Ok(()) => Ok(()),
-        Err(e) if e.errno() == 32 || e.errno() == 86 => {
-            pcm.try_recover(e, false).context("Recovering ALSA capture at start")?;
-            pcm.start().context("Restarting ALSA capture after recovery")?;
-            Ok(())
-        }
-        Err(e) => Err(e).context("Starting ALSA capture"),
-    }
+fn prepare_capture_pcm(pcm: &alsa::pcm::PCM) -> Result<()> {
+    // A capture stream starts automatically on the first readi(). Calling
+    // snd_pcm_start() explicitly, particularly *again* after snd_pcm_recover,
+    // can leave some USB Audio CODECs stuck in a repeated EPIPE/ESTRPIPE cycle.
+    // After recover the ALSA stream is prepared; let the next read start it.
+    pcm.prepare().context("Preparing ALSA USB capture")
 }
 
 /// Continuous, single-stream wake monitor, equivalent to Python's
@@ -179,7 +172,8 @@ pub fn monitor(
     let frames = (rate / 2).max(256) as usize;
     let mut data = vec![0i16; frames * channels];
     let io = pcm.io_i16()?;
-    start_capture_pcm(&pcm)?;
+    prepare_capture_pcm(&pcm)?;
+    let mut consecutive_recoveries = 0u32;
     tracing::debug!(device=%name, rate, channels, "Continuous Vinyl auto-wake stream started");
 
     loop {
@@ -196,12 +190,20 @@ pub fn monitor(
             match io.readi(&mut data[offset..]) {
                 Ok(n) => {
                     offset += n * channels;
-                    if n == 0 { std::thread::sleep(std::time::Duration::from_millis(10)); }
+                    if n > 0 { consecutive_recoveries = 0; }
+                    else { std::thread::sleep(std::time::Duration::from_millis(10)); }
                 }
                 Err(e) if e.errno() == 11 => {
                     std::thread::sleep(std::time::Duration::from_millis(10));
                 }
-                Err(e) => { pcm.try_recover(e, false).context("Recovering wake stream read")?; }
+                Err(e) => {
+                    consecutive_recoveries += 1;
+                    if consecutive_recoveries > 3 {
+                        bail!("USB auto-wake capture could not recover after 3 consecutive ALSA errors: {e}");
+                    }
+                    pcm.try_recover(e, false).context("Recovering wake stream read")?;
+                    std::thread::sleep(std::time::Duration::from_millis(40));
+                }
             }
         }
         match output.try_send(Ok(dbfs(&data))) {
@@ -237,7 +239,8 @@ pub fn capture(cfg: &Audio, seconds: f64, cancel: &CancellationToken, wav_path: 
     let count = (seconds * rate as f64) as usize * channels;
     let mut data = vec![0i16; count];
     let io = pcm.io_i16()?;
-    start_capture_pcm(&pcm)?;
+    prepare_capture_pcm(&pcm)?;
+    let mut consecutive_recoveries = 0u32;
     let mut offset = 0;
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs_f64(seconds + 5.);
     while offset < count {
@@ -250,13 +253,17 @@ pub fn capture(cfg: &Audio, seconds: f64, cancel: &CancellationToken, wav_path: 
         match io.readi(&mut data[offset..]) {
             Ok(n) => {
                 offset += n * channels;
-                if n == 0 {
-                    std::thread::sleep(std::time::Duration::from_millis(10));
-                }
+                if n > 0 { consecutive_recoveries = 0; }
+                else { std::thread::sleep(std::time::Duration::from_millis(10)); }
             }
             Err(e) if e.errno() == 11 => std::thread::sleep(std::time::Duration::from_millis(10)),
             Err(e) => {
+                consecutive_recoveries += 1;
+                if consecutive_recoveries > 3 {
+                    bail!("USB capture could not recover after 3 consecutive ALSA errors: {e}");
+                }
                 pcm.try_recover(e, false).context("Recovering ALSA capture read")?;
+                std::thread::sleep(std::time::Duration::from_millis(40));
             }
         }
     }

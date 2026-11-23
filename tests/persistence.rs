@@ -233,3 +233,90 @@ fn deleting_combined_selection_is_atomic_when_any_key_is_invalid() {
     assert_eq!(db.stats("combined",None).unwrap()["top_songs"],json!([]));
     assert!(db.query("SELECT * FROM yearly_plays",[]).unwrap().is_empty());
 }
+
+#[test]
+fn reducing_vinyl_play_count_reconciles_events_yearly_minutes_and_album_session() {
+    use vinylpi64::stats_search::{search, ReduceRequest};
+    let dir = tempfile::tempdir().unwrap();
+    let db = Db::open(&dir.path().join("edit.db")).unwrap();
+    let t = song("Overcounted", "Album A", Some("https://example.org/a.jpg"));
+    for i in 0..3 { db.record_play(Mode::Vinyl, &t, i == 0).unwrap(); }
+    db.seconds(Mode::Vinyl, Some(&t.key(Mode::Vinyl)), 180., false).unwrap();
+    db.seconds(Mode::Vinyl, None, 50., true).unwrap();
+    let entries = search(&db, "overcounted", "vinyl", None, "song", 0, 30).unwrap()["items"][0]["delete_entries"].clone();
+    let request = ReduceRequest { entries: serde_json::from_value(entries).unwrap(), expected_count: 3, new_count: 1, year: None };
+    let result = db.reduce_song_history(&request).unwrap();
+    assert_eq!(result["removed_plays"], 2);
+    assert_eq!(db.stats("vinyl", None).unwrap()["top_songs"][0]["count"], 1);
+    assert_eq!(db.stats("vinyl", None).unwrap()["top_artists"][0]["count"], 1);
+    assert_eq!(db.stats("vinyl", None).unwrap()["top_albums"][0]["count"], 1); // sessions are independent
+    assert_eq!(db.stats("vinyl", None).unwrap()["total_minutes_listened"], 1);
+    assert_eq!(db.stats("vinyl", None).unwrap()["pickup_usage_seconds"], 50.);
+    let seconds = db.query("SELECT measured_listen_seconds FROM songs WHERE song_key=?", [&t.key(Mode::Vinyl)]).unwrap();
+    assert!((seconds[0]["measured_listen_seconds"].as_f64().unwrap() - 60.).abs() < 0.00001);
+    let year = chrono::Local::now().year();
+    assert_eq!(db.stats("vinyl", Some(year)).unwrap()["top_songs"][0]["count"], 1);
+    assert_eq!(db.query("SELECT COUNT(*) n FROM playback_events WHERE event_type='play'", []).unwrap()[0]["n"], 1);
+    assert_eq!(db.recent_plays("vinyl", 0, 40).unwrap()["items"].as_array().unwrap().len(), 1);
+    assert!(db.reduce_song_history(&request).is_err()); // stale form rejected
+    assert_eq!(db.stats("vinyl", None).unwrap()["top_songs"][0]["count"], 1);
+}
+
+#[test]
+fn reducing_spotify_and_combined_counts_keeps_sources_isolated_and_never_increases() {
+    use vinylpi64::stats_search::{search, DeleteEntry, ReduceRequest};
+    let dir = tempfile::tempdir().unwrap();
+    let db = Db::open(&dir.path().join("edit.db")).unwrap();
+    let t = song("Same song", "Shared album", None);
+    db.record_play(Mode::Vinyl, &t, true).unwrap();
+    db.record_play(Mode::Spotify, &t, false).unwrap();
+    db.record_play(Mode::Spotify, &t, false).unwrap();
+    db.seconds(Mode::Spotify, Some(&t.key(Mode::Spotify)), 120., false).unwrap();
+    let entries = search(&db, "same song", "spotify", None, "song", 0, 30).unwrap()["items"][0]["delete_entries"].clone();
+    let entries: Vec<DeleteEntry> = serde_json::from_value(entries).unwrap();
+    assert!(db.reduce_song_history(&ReduceRequest { entries: entries.clone(), expected_count: 2, new_count: 3, year: None }).is_err());
+    assert!(db.reduce_song_history(&ReduceRequest { entries: entries.clone(), expected_count: 2, new_count: -1, year: None }).is_err());
+    assert!(db.reduce_song_history(&ReduceRequest { entries: entries.clone(), expected_count: 4, new_count: 1, year: None }).is_err());
+    db.reduce_song_history(&ReduceRequest { entries, expected_count: 2, new_count: 1, year: None }).unwrap();
+    assert_eq!(db.stats("vinyl", None).unwrap()["top_songs"][0]["count"], 1);
+    assert_eq!(db.stats("spotify", None).unwrap()["top_songs"][0]["count"], 1);
+    assert_eq!(db.stats("spotify", None).unwrap()["top_albums"][0]["count"], 1);
+    assert_eq!(db.stats("spotify", None).unwrap()["total_minutes_listened"], 1);
+    assert_eq!(db.stats("combined", None).unwrap()["top_songs"][0]["count"], 2);
+    assert_eq!(db.recent_plays("combined", 0, 2).unwrap()["items"].as_array().unwrap().len(), 2);
+    assert!(!db.recent_plays("combined", 0, 2).unwrap()["has_more"].as_bool().unwrap());
+    assert_eq!(db.recent_plays("combined", 0, 1).unwrap()["has_more"], true);
+    assert_eq!(db.recent_plays("spotify", 0, 40).unwrap()["items"].as_array().unwrap().len(), 1);
+}
+
+#[test]
+fn reducing_a_selected_year_only_changes_that_year_and_newest_playback_events() {
+    use vinylpi64::stats_search::{search, ReduceRequest};
+    let dir = tempfile::tempdir().unwrap();
+    let db = Db::open(&dir.path().join("by_year.db")).unwrap();
+    let t = song("Yearly song", "Yearly album", None);
+    let year = chrono::Local::now().year();
+    let older = year - 1;
+    for _ in 0..3 { db.record_play(Mode::Vinyl, &t, false).unwrap(); }
+    db.seconds(Mode::Vinyl, Some(&t.key(Mode::Vinyl)), 90., false).unwrap();
+    // Move one historical aggregate, its measured listening seconds and one
+    // event to the previous year while retaining the lifetime counter.
+    db.with(|c| {
+        c.execute("UPDATE yearly_plays SET count=2 WHERE source='vinyl' AND song_key=? AND year=?", rusqlite::params![t.key(Mode::Vinyl),year])?;
+        c.execute("INSERT INTO yearly_plays(source,year,song_key,artist,title,album,count) VALUES('vinyl',?,?,?,?,?,1)",
+            rusqlite::params![older,t.key(Mode::Vinyl),t.artist,t.title,t.album])?;
+        c.execute("UPDATE yearly_song_seconds SET seconds=60 WHERE source='vinyl' AND song_key=? AND year=?", rusqlite::params![t.key(Mode::Vinyl),year])?;
+        c.execute("INSERT INTO yearly_song_seconds(source,year,song_key,seconds) VALUES('vinyl',?,?,30)", rusqlite::params![older,t.key(Mode::Vinyl)])?;
+        c.execute("UPDATE yearly_usage SET seconds=60 WHERE source='vinyl' AND kind='listening' AND year=?",[year])?;
+        c.execute("INSERT INTO yearly_usage(source,year,kind,seconds) VALUES('vinyl',?,'listening',30)",[older])?;
+        c.execute("UPDATE playback_events SET occurred_at=strftime('%s',? || '-06-15 12:00:00') WHERE id=(SELECT MIN(id) FROM playback_events WHERE source='vinyl' AND event_type='play')",[older.to_string()])?;
+        Ok(())
+    }).unwrap();
+    let entries = search(&db, "yearly song", "vinyl", Some(year), "song", 0, 30).unwrap()["items"][0]["delete_entries"].clone();
+    db.reduce_song_history(&ReduceRequest { entries: serde_json::from_value(entries).unwrap(), expected_count: 2, new_count: 1, year: Some(year) }).unwrap();
+    assert_eq!(db.stats("vinyl", Some(year)).unwrap()["top_songs"][0]["count"], 1);
+    assert_eq!(db.stats("vinyl", Some(older)).unwrap()["top_songs"][0]["count"], 1);
+    assert_eq!(db.stats("vinyl", None).unwrap()["top_songs"][0]["count"], 2);
+    assert_eq!(db.query("SELECT COUNT(*) n FROM playback_events WHERE source='vinyl' AND event_type='play'", []).unwrap()[0]["n"], 2);
+    assert_eq!(db.query("PRAGMA integrity_check",[]).unwrap()[0]["integrity_check"], "ok");
+}
