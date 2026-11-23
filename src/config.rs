@@ -60,8 +60,10 @@ impl Config {
         }
         let mut defaults = serde_json::to_value(Self::default())?;
         merge(&mut defaults, value);
-        let cfg: Self =
+        let mut cfg: Self =
             serde_json::from_value(defaults).context("Invalid configuration field type")?;
+        // Diagnostic logging is always enabled, including for older saved configs.
+        cfg.debug.logs = true;
         cfg.validate()?;
         Ok(cfg)
     }
@@ -279,6 +281,13 @@ impl ConfigStore {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn detailed_logging_is_always_enabled() {
+        for enabled in [false, true] {
+            let cfg = Config::from_value(json!({"debug":{"logs":enabled}})).unwrap();
+            assert!(cfg.debug.logs);
+        }
+    }
     #[test]
     fn rejects_invalid_values_and_paths() {
         for v in [

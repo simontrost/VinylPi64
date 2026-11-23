@@ -1208,7 +1208,6 @@ document.addEventListener("DOMContentLoaded", () => {
     "sideFlipEnabled",
     "discoveryEnabled",
     "useHA",
-    "debugLogs",
     "discogsEnabled",
     "vinylAutoWakeEnabled",
     "vinylAudioSleepEnabled",
@@ -1487,8 +1486,6 @@ async function loadConfig() {
         shazam.timeout_seconds ?? 15;
 
     // DEBUG
-    document.getElementById("debugLogs").checked =
-        !!debug.logs;
     document.getElementById("debugPixooFrameEnabled").checked =
         !!debug.pixoo_frame_path;
     document.getElementById("debugPreviewEnabled").checked =
@@ -1729,8 +1726,7 @@ document.getElementById("settings-form").addEventListener("submit", async (e) =>
     );
 
     // DEBUG
-    debug.logs =
-        document.getElementById("debugLogs").checked;
+    debug.logs = true;
     // Fixed destinations inside the persistent data directory.
     debug.pixoo_frame_path = document.getElementById("debugPixooFrameEnabled").checked
         ? "data/debug/pixoo_frame.png" : "";

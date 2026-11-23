@@ -1,0 +1,186 @@
+/* VinylPi64 visual system: neutral surfaces, one violet/pink accent family,
+   restrained yellow highlights. Loaded after page styles to keep all views in sync. */
+:root {
+    color-scheme: dark;
+    --bg: #151518;
+    --bg-soft: #19191d;
+    --surface: #212125;
+    --surface-2: #29292f;
+    --surface-3: #36363e;
+    --surface-4: #131316;
+    --border: rgba(255, 255, 255, .085);
+    --border-strong: rgba(255, 255, 255, .17);
+    --text: #f2f1f4;
+    --muted: #aaa8b0;
+    --muted-2: #888690;
+    --pink: #e35c9d;
+    --purple: #b28cda;
+    --yellow: #ecc45e;
+    --danger: #e4858e;
+    --green: var(--purple);
+    --shadow: 0 6px 24px rgba(0, 0, 0, .14);
+    --brand-accent-bg: #50395e;
+    --brand-accent-hover: #614571;
+    --brand-accent-border: rgba(205, 146, 225, .43);
+    --brand-focus: rgba(227, 92, 157, .2);
+}
+
+/* No tinted page glow, gradients on cards, or decorative hairline gradients. */
+html, body { background: var(--bg); }
+.sidebar { background: var(--bg-soft); backdrop-filter: none; }
+@media (max-width: 800px) {
+    .sidebar { background: var(--bg-soft); box-shadow: 0 -4px 18px rgba(0,0,0,.22); }
+}
+.card, .stats-card, .stats-minutes-card, .control-section, .lyrics-card {
+    background: var(--surface);
+    box-shadow: var(--shadow);
+}
+.card::before, .stats-card::before, .stats-minutes-card::before,
+.control-section::before, .lyrics-card::before { display: none; }
+.profile-dialog, .random-record-dialog, .library-delete-dialog, .library-edit-dialog {
+    background: var(--surface-2);
+    border-color: var(--border-strong);
+}
+.song-card { background: var(--surface); box-shadow: var(--shadow); }
+.profile-trigger-icon, .profile-avatar { background: var(--brand-accent-bg); }
+.profile-auth-identity, .profile-edit-form { background: var(--surface); border-color: var(--border); }
+.profile-choice-card:hover, .profile-choice-card:focus-visible {
+    background: var(--surface-2); border-color: var(--brand-accent-border);
+}
+.nav a.active { background: rgba(255,255,255,.055); }
+.nav a.active::after { background: var(--pink); }
+.nav-center .nav-orb, .nav a.nav-center.active .nav-orb {
+    background: #27212d;
+    border-color: var(--brand-accent-border);
+    box-shadow: 0 4px 12px rgba(0,0,0,.18);
+}
+.nav-center .nav-orb::before, .nav a.nav-center.active .nav-orb::before {
+    background: var(--brand-accent-bg);
+    box-shadow: none;
+}
+.nav-center .nav-orb::after { box-shadow: none; }
+.logs-unread-badge { background: var(--pink); }
+
+/* Buttons and interactive states are consistent, regardless of page/source. */
+.btn-primary, button.btn-primary, .profile-login-submit, .profile-create-submit {
+    color: var(--text);
+    background: var(--brand-accent-bg);
+    border-color: var(--brand-accent-border);
+}
+.btn-primary:hover:not(:disabled), button.btn-primary:hover:not(:disabled),
+.profile-login-submit:hover:not(:disabled), .profile-create-submit:hover:not(:disabled) {
+    color: var(--text);
+    background: var(--brand-accent-hover);
+    border-color: var(--purple);
+}
+input:not([type="checkbox"]):not([type="radio"]), select, textarea,
+.form-row input[type="text"], .form-row input[type="password"],
+.form-row input[type="number"], .pixoo-select {
+    background: var(--surface-4);
+    box-shadow: none;
+}
+:where(input, select, textarea, button, a):focus-visible {
+    border-color: var(--pink);
+    box-shadow: 0 0 0 3px var(--brand-focus);
+}
+input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color: var(--pink); }
+.form-row input[type="checkbox"]:checked, .toggle-switch input:checked + .toggle-slider {
+    background: var(--pink); border-color: var(--pink);
+}
+
+/* All three listening-source choices share the SAME active state.
+   Applies to the dashboard, statistics, library and Recently Played. */
+.source-control, .stats-scope-control {
+    background: var(--surface-4);
+    border-color: var(--border);
+    box-shadow: none;
+}
+.source-control-button.active, .stats-scope-button.active,
+.source-control-button[data-source-mode="vinyl"].active,
+.source-control-button[data-source-mode="spotify"].active,
+.source-control-button[data-source-mode="off"].active,
+.stats-scope-button[data-stats-scope="vinyl"].active,
+.stats-scope-button[data-stats-scope="spotify"].active,
+.stats-scope-button[data-stats-scope="combined"].active {
+    color: var(--text);
+    background: var(--brand-accent-bg);
+    border-color: var(--brand-accent-border);
+    box-shadow: none;
+}
+.source-control-button:hover:not(.active), .stats-scope-button:hover:not(.active) {
+    background: rgba(255,255,255,.075);
+}
+.source-control-button:focus-visible, .stats-scope-button:focus-visible {
+    border-color: var(--pink); box-shadow: 0 0 0 3px var(--brand-focus);
+}
+.stats-content-layout, .stats-content-layout[data-stats-scope="spotify"],
+.stats-content-layout[data-stats-scope="combined"] { --vinyl-accent: var(--purple); }
+.library-type-filter.is-active { border-color: var(--brand-accent-border); background: var(--brand-accent-bg); color: var(--text); }
+.library-input-wrap:focus-within { border-color: var(--pink); }
+
+/* Subdued Spotify connection indicators instead of an additional green palette. */
+.spotify-connect-row, .spotify-settings-profile-badge {
+    background: rgba(178,140,218,.075);
+    border-color: rgba(178,140,218,.23);
+    color: var(--muted);
+}
+.spotify-connect-button, .spotify-connect-button:hover {
+    background: var(--surface-3);
+    border-color: var(--brand-accent-border);
+    color: var(--text);
+}
+.spotify-connect-button:hover { background: var(--brand-accent-bg); }
+.spotify-feedback.is-success { color: var(--purple); }
+.spotify-settings-profile-badge { color: var(--purple); }
+.spotify-settings-status-dot.connected, .discogs-status-dot.connected {
+    background: var(--purple);
+    box-shadow: 0 0 0 4px rgba(178,140,218,.12);
+}
+.credentials-state.is-configured { color: var(--purple); }
+.rec-status-running {
+    border-color: rgba(178,140,218,.28);
+    background: rgba(178,140,218,.09);
+    color: var(--purple);
+}
+.profile-dialog-message, .profile-inline-message {
+    color: var(--muted); border-color: var(--border); background: var(--surface);
+}
+
+/* Music Library: edits and saves never introduce turquoise/teal. */
+.library-group--artist { --kind-color: var(--purple); --kind-bg: rgba(178,140,218,.12); }
+.library-group--album { --kind-color: var(--yellow); --kind-bg: rgba(236,196,94,.095); }
+.library-group--song { --kind-color: var(--pink); --kind-bg: rgba(227,92,157,.095); }
+.library-edit-action, .library-edit-action:hover,
+.library-edit-dialog button.library-edit-confirm {
+    background: var(--brand-accent-bg);
+    border-color: var(--brand-accent-border);
+    color: var(--text);
+}
+.library-edit-dialog button.library-edit-confirm:hover:not(:disabled) {
+    background: var(--brand-accent-hover);
+    border-color: var(--purple);
+}
+.library-edit-trigger:hover { color: var(--purple); background: rgba(178,140,218,.085); }
+.library-edit-dialog input:focus-visible { outline: 2px solid var(--pink); outline-offset: 2px; }
+.library-edit-dialog .library-edit-feedback { color: var(--danger); }
+.library-delete-action { background: #803d4d; }
+.library-delete-dialog button.library-delete-confirm { background: #803d4d; }
+
+/* States and meters share the palette; critical errors can retain red. */
+.gallery-item.current, .font-gallery-item.current {
+    border-color: var(--purple); box-shadow: none;
+}
+.display-fit-card { background: var(--surface); border-color: var(--border); }
+.display-fit-status, .mobile-display-preview-fit { color: var(--muted); }
+.discogs-progress-track span, .display-fit-track span { background: var(--purple); }
+.display-range-row input[type="range"] { background: var(--surface-3); }
+.settings-card::after { background: var(--pink); }
+.form-group, .adaptive-sample-block, .mobile-settings-menu, .display-preview-panel {
+    background: var(--surface-2);
+}
+.random-record-dialog, .discogs-side-flip, .discogs-tracklist-row.is-current,
+.lyrics-toggle { background: var(--surface-2); }
+.random-record-trigger { background: var(--surface-2); color: var(--pink); }
+.random-record-trigger:hover:not(:disabled) { background: var(--surface-3); }
+.recent-source--vinyl { color: var(--muted); border-color: var(--border); }
+.recent-source--spotify { color: var(--muted); border-color: var(--border); }
