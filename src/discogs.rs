@@ -121,6 +121,49 @@ fn supplement_track_durations(tracks: &mut [Value], release: &Value, approximate
     added
 }
 
+/// MusicBrainz is a secondary source, never the exact duration of a vinyl
+/// pressing. Only accept an album with the same full track count and order.
+/// MusicBrainz track lengths are milliseconds; Discogs stores seconds.
+fn aligned_musicbrainz_durations(tracks: &[Value], release: &Value) -> Option<Vec<Option<i64>>> {
+    let media = release["media"].as_array()?;
+    let mb_tracks = media.iter().flat_map(|medium| {
+        medium["tracks"].as_array().into_iter().flatten()
+    }).collect::<Vec<_>>();
+    if mb_tracks.len() != tracks.len() || tracks.is_empty() {
+        return None;
+    }
+    if !tracks.iter().zip(&mb_tracks).all(|(local, mb)| {
+        let mb_title = mb["title"].as_str()
+            .or_else(|| mb["recording"]["title"].as_str())
+            .unwrap_or("");
+        let expected = normalized(mb_title);
+        !expected.is_empty() && normalized(&text(local, "title")) == expected
+    }) {
+        return None;
+    }
+    Some(mb_tracks.into_iter().map(|track| {
+        track["length"].as_i64()
+            .or_else(|| track["recording"]["length"].as_i64())
+            .filter(|ms| (15_000..=24 * 3_600_000).contains(ms))
+            .map(|ms| (ms + 500) / 1000)
+    }).collect())
+}
+
+fn supplement_musicbrainz_durations(tracks: &mut [Value], durations: &[Option<i64>]) -> usize {
+    if tracks.len() != durations.len() { return 0; }
+    let mut added = 0;
+    for (track, seconds) in tracks.iter_mut().zip(durations) {
+        if track["duration_seconds"].as_i64().is_some_and(|v| v > 0) { continue; }
+        if let Some(seconds) = seconds.filter(|v| *v > 0) {
+            track["duration_seconds"] = json!(seconds);
+            track["duration_approximate"] = json!(true);
+            track["duration_source"] = json!("musicbrainz");
+            added += 1;
+        }
+    }
+    added
+}
+
 fn side_for_position(position: &str) -> String {
     position.chars().take_while(char::is_ascii_alphabetic).collect()
 }
@@ -486,73 +529,146 @@ impl Discogs {
             json!({"ok":true,"release_id":id,"title":release["title"],"artist":release["artist"],"tracks":tracks,"track_count":tracks.len()}),
         )
     }
-    /// Existing releases may omit durations. Try the exact Discogs release first,
-    /// then the associated master tracklist as an *explicitly approximate* value.
-    /// Network failures never prevent access to the locally stored tracklist.
+    /// Supplement incomplete tracklists without inventing exact pressing lengths:
+    /// cached / exact Discogs release first, Discogs master second, MusicBrainz last.
+    /// A missing external service must never break the locally stored tracklist.
     pub async fn tracklist_with_durations(&self, id: i64) -> Result<Value> {
         let mut result = self.tracklist(id)?;
-        let needs_durations = result["tracks"]
-            .as_array()
-            .is_some_and(|tracks| tracks.iter().any(|track| track["duration_seconds"].as_i64().is_none_or(|v| v <= 0)));
-        if !needs_durations || std::env::var("DISCOGS_API_TOKEN").unwrap_or_default().trim().is_empty() {
-            return Ok(result);
-        }
+        let needs_durations = |data: &Value| data["tracks"].as_array().is_some_and(|tracks| {
+            tracks.iter().any(|track| track["duration_seconds"].as_i64().is_none_or(|v| v <= 0))
+        });
+        if !needs_durations(&result) { return Ok(result); }
 
-        // One lookup per release per week; both positive and negative results
-        // are cached so opening the dashboard never repeatedly hits Discogs.
-        let key = format!("discogs-track-duration-lookup:{id}");
-        let supplement = if let Some(cached) = self.db.cache(&key)? {
-            cached
-        } else {
-            let release = match self.get(&format!("/releases/{id}")).await {
-                Ok(release) => release,
-                Err(error) => {
-                    tracing::warn!(release_id = id, %error, "Discogs duration lookup unavailable");
-                    return Ok(result);
-                }
-            };
-            let master_id = release["master_id"].as_i64().filter(|id| *id > 0);
-            let master = if let Some(master_id) = master_id {
-                match self.get(&format!("/masters/{master_id}")).await {
-                    Ok(master) => master,
-                    Err(error) => {
-                        tracing::warn!(release_id = id, master_id, %error, "Discogs master durations unavailable");
-                        Value::Null
-                    }
-                }
+        if !std::env::var("DISCOGS_API_TOKEN").unwrap_or_default().trim().is_empty() {
+            // Both positive and negative Discogs lookups are cached for one week.
+            let key = format!("discogs-track-duration-lookup:{id}");
+            let supplement = if let Some(cached) = self.db.cache(&key)? {
+                Some(cached)
             } else {
-                Value::Null
-            };
-            let supplement = json!({"release":release,"master":master});
-            self.db.put_cache(&key, &supplement, 7 * 86400)?;
-            supplement
-        };
-
-        let Some(tracks) = result["tracks"].as_array_mut() else {
-            return Ok(result);
-        };
-        let exact = supplement_track_durations(tracks, &supplement["release"], false);
-        if exact > 0 {
-            // Persist only durations from the user's exact release. Durations
-            // from the master may differ between pressings and stay response-only.
-            self.db.with(|conn| {
-                let tx = conn.transaction()?;
-                for track in tracks.iter() {
-                    if let (Some(index), Some(seconds)) = (
-                        track["track_index"].as_i64(), track["duration_seconds"].as_i64(),
-                    ) {
-                        tx.execute(
-                            "UPDATE discogs_tracks SET duration_seconds=? WHERE release_id=? AND track_index=? AND (duration_seconds IS NULL OR duration_seconds<=0)",
-                            params![seconds, id, index],
-                        )?;
+                match self.get(&format!("/releases/{id}")).await {
+                    Ok(release) => {
+                        let master_id = release["master_id"].as_i64().filter(|id| *id > 0);
+                        let master = if let Some(master_id) = master_id {
+                            match self.get(&format!("/masters/{master_id}")).await {
+                                Ok(master) => master,
+                                Err(error) => {
+                                    tracing::warn!(release_id = id, master_id, %error, "Discogs master durations unavailable");
+                                    Value::Null
+                                }
+                            }
+                        } else { Value::Null };
+                        let supplement = json!({"release": release, "master": master});
+                        self.db.put_cache(&key, &supplement, 7 * 86400)?;
+                        Some(supplement)
+                    }
+                    Err(error) => {
+                        tracing::warn!(release_id = id, %error, "Discogs duration lookup unavailable; trying MusicBrainz");
+                        None
                     }
                 }
-                tx.commit()?;
-                Ok(())
-            })?;
+            };
+            if let Some(supplement) = supplement
+                && let Some(tracks) = result["tracks"].as_array_mut() {
+                let exact = supplement_track_durations(tracks, &supplement["release"], false);
+                if exact > 0 {
+                    // Only the user's exact Discogs release is persisted as exact.
+                    self.db.with(|conn| {
+                        let tx = conn.transaction()?;
+                        for track in tracks.iter() {
+                            if let (Some(index), Some(seconds)) = (
+                                track["track_index"].as_i64(), track["duration_seconds"].as_i64(),
+                            ) {
+                                tx.execute(
+                                    "UPDATE discogs_tracks SET duration_seconds=? WHERE release_id=? AND track_index=? AND (duration_seconds IS NULL OR duration_seconds<=0)",
+                                    params![seconds, id, index],
+                                )?;
+                            }
+                        }
+                        tx.commit()?;
+                        Ok(())
+                    })?;
+                }
+                supplement_track_durations(tracks, &supplement["master"], true);
+            }
         }
-        supplement_track_durations(tracks, &supplement["master"], true);
+
+        if needs_durations(&result) {
+            match self.supplement_musicbrainz_tracklist(id, &mut result).await {
+                Ok(()) => {
+                    // Avoid duplicate browser requests on rebuilt binaries.
+                    result["duration_lookup_attempted"] = json!(true);
+                }
+                Err(error) => {
+                    tracing::warn!(release_id = id, %error, "MusicBrainz track durations unavailable; showing local tracklist");
+                    // Leave the compatibility fallback enabled if the Pi has
+                    // no internet but the dashboard browser does.
+                }
+            }
+        }
         Ok(result)
+    }
+
+    /// Rate-limit MusicBrainz lookups and keep them out of the hot playback path.
+    /// This is only called when the user expands a tracklist with missing lengths.
+    async fn musicbrainz_request(&self, request: reqwest::RequestBuilder) -> Result<Value> {
+        let mut last = self.rate.lock().await;
+        tokio::time::sleep_until(*last).await;
+        *last = tokio::time::Instant::now() + Duration::from_millis(1100);
+        drop(last);
+        net::json(request).await
+    }
+
+    async fn find_musicbrainz_durations(&self, release: &Value) -> Result<Option<Vec<Option<i64>>>> {
+        let title = release["title"].as_str().unwrap_or("").trim();
+        let artist = release["artist"].as_str().unwrap_or("").trim();
+        if title.is_empty() || artist.is_empty() { return Ok(None); }
+        // Quoted Lucene terms prevent unrelated artists / albums being matched.
+        let clean = |s: &str| s.replace(['"', '\\'], " ");
+        let query = format!("release:\"{}\" AND artist:\"{}\"", clean(title), clean(artist));
+        let search = self.musicbrainz_request(
+            self.client.get("https://musicbrainz.org/ws/2/release")
+                .query(&[("query", query.as_str()), ("fmt", "json"), ("limit", "12")]),
+        ).await?;
+        let candidates = search["releases"].as_array().cloned().unwrap_or_default();
+        let mut checked = 0;
+        for candidate in candidates {
+            let candidate_title = candidate["title"].as_str().unwrap_or("");
+            if normalized(candidate_title) != normalized(title)
+                || candidate["score"].as_i64().unwrap_or(0) < 90 { continue; }
+            let Some(mbid) = candidate["id"].as_str() else { continue; };
+            // A handful of editions are enough; never perform unbounded API calls.
+            if checked >= 4 { break; }
+            checked += 1;
+            let detail = self.musicbrainz_request(
+                self.client.get(format!("https://musicbrainz.org/ws/2/release/{mbid}"))
+                    .query(&[("inc", "recordings"), ("fmt", "json")]),
+            ).await?;
+            if let Some(durations) = aligned_musicbrainz_durations(
+                release["tracks"].as_array().map(Vec::as_slice).unwrap_or(&[]), &detail,
+            ) && durations.iter().any(Option::is_some) {
+                return Ok(Some(durations));
+            }
+        }
+        Ok(None)
+    }
+
+    async fn supplement_musicbrainz_tracklist(&self, id: i64, result: &mut Value) -> Result<()> {
+        let key = format!("discogs-track-duration-mb:{id}");
+        let durations = if let Some(cached) = self.db.cache(&key)? {
+            cached["durations"].as_array().map(|values| {
+                values.iter().map(Value::as_i64).collect::<Vec<_>>()
+            })
+        } else {
+            let found = self.find_musicbrainz_durations(result).await?;
+            // Short negative cache; valid approximate lengths are reusable for a month.
+            self.db.put_cache(&key, &json!({"durations": found}),
+                if found.is_some() { 30 * 86400 } else { 86400 })?;
+            found
+        };
+        if let (Some(tracks), Some(durations)) = (result["tracks"].as_array_mut(), durations) {
+            supplement_musicbrainz_durations(tracks, &durations);
+        }
+        Ok(())
     }
 
     pub async fn sync(self: Arc<Self>, cfg: Config, cancel: CancellationToken) -> Result<bool> {
@@ -1019,6 +1135,43 @@ mod track_duration_tests {
         let missing_track = json!({"tracklist":[{"title":"One Of These Days","duration":"5:56"}]});
         assert_eq!(supplement_track_durations(&mut unchanged, &missing_track, true), 0);
         assert_eq!(unchanged, local);
+    }
+
+    #[test]
+    fn musicbrainz_durations_are_aligned_and_never_replace_exact_pressing_data() {
+        let mut local = vec![
+            json!({"title":"Don't Let Me Go", "duration_seconds":null}),
+            json!({"title":"Kiss It Off Me", "duration_seconds":200}),
+            json!({"title":"Heavenly", "duration_seconds":null}),
+        ];
+        let mb = json!({"media":[{"tracks":[
+            {"title":"Don't Let Me Go", "length":264_200},
+            {"recording":{"title":"Kiss It Off Me", "length":254_500}},
+            {"title":"Heavenly", "length":null}
+        ]}]});
+        let durations = aligned_musicbrainz_durations(&local, &mb).unwrap();
+        assert_eq!(durations, vec![Some(264), Some(255), None]);
+        assert_eq!(supplement_musicbrainz_durations(&mut local, &durations), 1);
+        assert_eq!(local[0]["duration_seconds"], 264);
+        assert_eq!(local[0]["duration_approximate"], true);
+        assert_eq!(local[0]["duration_source"], "musicbrainz");
+        assert_eq!(local[1]["duration_seconds"], 200);
+        assert!(local[1]["duration_approximate"].is_null());
+        assert!(local[2]["duration_seconds"].is_null());
+
+        let wrong = json!({"media":[{"tracks":[
+            {"title":"Heavenly", "length":250_000},
+            {"title":"Kiss It Off Me", "length":200_000},
+            {"title":"Don't Let Me Go", "length":260_000}
+        ]}]});
+        assert!(aligned_musicbrainz_durations(&local, &wrong).is_none());
+        let bonus = json!({"media":[{"tracks":[
+            {"title":"Don't Let Me Go", "length":250_000},
+            {"title":"Kiss It Off Me", "length":200_000},
+            {"title":"Heavenly", "length":260_000},
+            {"title":"Bonus", "length":100_000}
+        ]}]});
+        assert!(aligned_musicbrainz_durations(&local, &bonus).is_none());
     }
 
     #[test]

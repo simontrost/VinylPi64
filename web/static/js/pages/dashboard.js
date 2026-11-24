@@ -250,6 +250,98 @@ function formatTracklistDuration(seconds) {
     return `${minutes}:${remainder}`;
 }
 
+// Compatibility with existing prebuilt Rust binaries: those already expose
+// /api/discogs/releases/:id/tracklist, but may return no durations. Resolve
+// missing values from an identically ordered MusicBrainz release in the browser
+// without requiring users to compile Rust on a Pi Zero 2 W. New binaries perform
+// this server-side and set duration_lookup_attempted to avoid duplicate lookups.
+function normalizeTracklistTitle(value) {
+    return String(value || "").normalize("NFKD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().replace(/\s+/g, " ");
+}
+
+function alignMusicBrainzTrackDurations(tracks, release) {
+    if (!Array.isArray(tracks) || !Array.isArray(release?.media)) return null;
+    const candidates = release.media.flatMap(medium => Array.isArray(medium.tracks) ? medium.tracks : []);
+    if (!tracks.length || tracks.length !== candidates.length) return null;
+    const aligned = tracks.every((track, i) => {
+        const title = candidates[i].title || candidates[i].recording?.title;
+        return normalizeTracklistTitle(track.title)
+            && normalizeTracklistTitle(track.title) === normalizeTracklistTitle(title);
+    });
+    if (!aligned) return null;
+    return candidates.map(track => {
+        const milliseconds = Number(track.length ?? track.recording?.length);
+        return Number.isFinite(milliseconds) && milliseconds >= 15000 && milliseconds <= 86400000
+            ? Math.round(milliseconds / 1000) : null;
+    });
+}
+
+async function fallbackMusicBrainzTrackDurations(data, releaseId, signal) {
+    const tracks = data?.tracks;
+    if (data?.duration_lookup_attempted || !Array.isArray(tracks)
+        || !tracks.some(track => !Number.isFinite(Number(track.duration_seconds)) || Number(track.duration_seconds) <= 0)) {
+        return false;
+    }
+    const title = String(data.title || "").trim();
+    const artist = String(data.artist || "").trim();
+    if (!title || !artist) return false;
+
+    const cacheKey = `vinylpi-mb-track-durations-v1:${releaseId}`;
+    let durations;
+    try {
+        const saved = JSON.parse(sessionStorage.getItem(cacheKey) || "null");
+        if (saved && Date.now() - saved.at < (saved.durations ? 30 : 1) * 86400000) {
+            durations = saved.durations;
+        }
+    } catch (_) { /* Session storage can be disabled. */ }
+
+    if (durations === undefined) {
+        const getJson = async url => {
+            const response = await fetch(url, { signal, cache: "no-store" });
+            if (!response.ok) throw new Error(`MusicBrainz HTTP ${response.status}`);
+            return response.json();
+        };
+        const clean = value => value.replace(/["\\]/g, " ");
+        const query = `release:"${clean(title)}" AND artist:"${clean(artist)}"`;
+        const searchUrl = new URL("https://musicbrainz.org/ws/2/release");
+        searchUrl.search = new URLSearchParams({ query, fmt: "json", limit: "12" }).toString();
+        const search = await getJson(searchUrl);
+        durations = null;
+        let checked = 0;
+        for (const candidate of search.releases || []) {
+            if (normalizeTracklistTitle(candidate.title) !== normalizeTracklistTitle(title)
+                || Number(candidate.score) < 90 || !candidate.id) continue;
+            if (checked++ >= 4) break;
+            // MusicBrainz permits roughly one request per second per client.
+            await new Promise(resolve => setTimeout(resolve, 1150));
+            if (signal?.aborted) return false;
+            const url = new URL(`https://musicbrainz.org/ws/2/release/${encodeURIComponent(candidate.id)}`);
+            url.search = new URLSearchParams({ inc: "recordings", fmt: "json" }).toString();
+            const detail = await getJson(url);
+            const matched = alignMusicBrainzTrackDurations(tracks, detail);
+            if (matched?.some(seconds => seconds > 0)) {
+                durations = matched;
+                break;
+            }
+        }
+        try { sessionStorage.setItem(cacheKey, JSON.stringify({ at: Date.now(), durations })); }
+        catch (_) { /* Optional cache. */ }
+    }
+
+    if (signal?.aborted || !Array.isArray(durations) || durations.length !== tracks.length) return false;
+    let changed = false;
+    tracks.forEach((track, i) => {
+        if (Number(track.duration_seconds) > 0 || !Number.isFinite(durations[i]) || durations[i] <= 0) return;
+        track.duration_seconds = durations[i];
+        track.duration_approximate = true;
+        track.duration_source = "musicbrainz";
+        changed = true;
+    });
+    return changed;
+}
+
 function resetDiscogsTracklist({ preserveRelease = false } = {}) {
     discogsTracklistRequest?.abort();
     discogsTracklistRequest = null;
@@ -284,7 +376,8 @@ function setTracklistRowPlaying(row, isCurrent) {
         const marker = document.createElement("span");
         marker.className = "discogs-tracklist-playing";
         marker.innerHTML = '<span class="discogs-tracklist-playing-dot" aria-hidden="true"></span><span>Playing</span>';
-        trailing.appendChild(marker);
+        // Keep the length anchored to the right edge, including on the playing row.
+        trailing.prepend(marker);
     }
 }
 
@@ -322,15 +415,21 @@ function makeTracklistRow(track, releaseArtist) {
     trailing.className = "discogs-tracklist-trailing";
 
     const duration = formatTracklistDuration(track.duration_seconds);
+    const durationElement = document.createElement("span");
+    durationElement.className = "discogs-tracklist-duration";
     if (duration) {
-        const durationElement = document.createElement("span");
-        durationElement.className = "discogs-tracklist-duration";
         durationElement.textContent = `${track.duration_approximate ? "≈ " : ""}${duration}`;
         if (track.duration_approximate) {
-            durationElement.title = "Approximate duration from a related Discogs master release; may differ from this pressing";
+            durationElement.title = track.duration_source === "musicbrainz"
+                ? "Approximate duration from MusicBrainz; this vinyl pressing may differ"
+                : "Approximate duration from a related Discogs master release; this pressing may differ";
         }
-        trailing.appendChild(durationElement);
+    } else {
+        // Discogs does not always supply lengths. Never present guessed times.
+        durationElement.textContent = "—";
+        durationElement.title = "No reliable track duration available";
     }
+    trailing.appendChild(durationElement);
 
     row.append(position, copy, trailing);
     setTracklistRowPlaying(row, isCurrent);
@@ -497,6 +596,20 @@ async function toggleDiscogsTracklist() {
 
         discogsTracklistCache.set(releaseId, data);
         renderDiscogsTracklist(data);
+        // Render the locally stored list immediately. Older Rust binaries may
+        // need an additional (optional) MusicBrainz lookup for missing times.
+        try {
+            if (await fallbackMusicBrainzTrackDurations(data, releaseId, controller.signal)
+                && String(CURRENT_TRACK.discogsReleaseId || "") === releaseId
+                && !controller.signal.aborted) {
+                // Same object is cached; invalidate the render identity so the
+                // newly found durations appear without waiting for another song.
+                renderedDiscogsTracklist = null;
+                renderDiscogsTracklist(data);
+            }
+        } catch (lookupError) {
+            if (lookupError.name !== "AbortError") console.warn("Optional track duration lookup failed:", lookupError);
+        }
     } catch (error) {
         if (error.name === "AbortError") return;
         console.error(error);
