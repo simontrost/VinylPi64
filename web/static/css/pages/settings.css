@@ -2270,6 +2270,18 @@ body.mobile-display-preview-open {
 }
 .cover-source-segmented input:disabled { cursor: not-allowed; }
 
+/* Three playback choices, without changing other two-option controls. */
+.playback-mode-segmented {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.playback-mode-segmented span {
+    padding-inline: 4px;
+    text-align: center;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+    height: 100%;
+}
+
 /* Keep the sampling settings visually separate from the adaptive stages. */
 .audio-sample-rate-row { margin-top: 12px; }
 

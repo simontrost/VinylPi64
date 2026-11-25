@@ -1430,7 +1430,8 @@ async function loadConfig() {
         divoom.timeout ?? 2.0;
     document.getElementById("divoomAutoResetGif").checked =
         !!divoom.auto_reset_gif_id;
-    const selectedAnimation = divoom.animation_mode === "gif_url" ? "gif_url" : "stream";
+    const selectedAnimation = ["stream", "gif_url", "rgb_animation"].includes(divoom.animation_mode)
+        ? divoom.animation_mode : "stream";
     document.querySelector(`input[name="divoomAnimationMode"][value="${selectedAnimation}"]`).checked = true;
     syncPixooAnimationMode();
 
@@ -1648,8 +1649,7 @@ document.getElementById("settings-form").addEventListener("submit", async (e) =>
         parseFloat(document.getElementById("divoomTimeout").value) || 2.0;
     divoom.auto_reset_gif_id =
         document.getElementById("divoomAutoResetGif").checked;
-    divoom.animation_mode = document.querySelector('input[name="divoomAnimationMode"]:checked')?.value === "gif_url"
-        ? "gif_url" : "stream";
+    divoom.animation_mode = document.querySelector('input[name="divoomAnimationMode"]:checked')?.value || "stream";
     delete divoom.native_text_font;
     delete divoom.native_text_height;
 
@@ -1955,9 +1955,12 @@ document.addEventListener("DOMContentLoaded", () => {
 function syncPixooAnimationMode() {
     const mode = document.querySelector('input[name="divoomAnimationMode"]:checked')?.value || "stream";
     const hint = document.getElementById("pixooAnimationHint");
-    if (hint) hint.textContent = mode === "gif_url"
-        ? "Smooth on-device animation; a short load may occur when the track changes."
-        : "Continuous frame updates; no initial GIF loading.";
+    const hints = {
+        stream: "Continuous frame updates; no initial GIF loading.",
+        gif_url: "Smooth on-device animation; a short load may occur when the track changes.",
+        rgb_animation: "Experimental on-device RGB animation without color quantization. Up to 59 frames; longer text may use larger scroll steps and loading may take longer.",
+    };
+    if (hint) hint.textContent = hints[mode] || hints.stream;
 }
 
 function syncPixooOffAction({ loadGifs = false } = {}) {

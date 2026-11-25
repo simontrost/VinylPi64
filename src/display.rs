@@ -229,6 +229,38 @@ impl Composition {
         self.lines.iter().any(|(s, _)| s.width() > 64)
     }
 }
+// Conservative compatibility limit used by pixoo-rest for Draw/SendHttpGif.
+// This is not a verified upper bound for every Pixoo firmware version.
+const RGB_ANIMATION_MAX_FRAMES: u32 = 59;
+
+/// Sample the entire scroll cycle evenly, rather than cutting off long titles.
+/// The uniform frame interval preserves the requested average scroll speed.
+fn rgb_animation_plan(composition: Option<&Composition>, marquee_speed: f64) -> (Vec<u32>, u32) {
+    let Some(c) = composition.filter(|c| c.animated()) else {
+        return (vec![0], 100);
+    };
+    let cycle = c.scroll_cycle();
+    let count = cycle.min(RGB_ANIMATION_MAX_FRAMES);
+    let offsets = (0..count).map(|i| i * cycle / count).collect();
+    let delay_ms = (1000.0 * f64::from(cycle) / (f64::from(count) * marquee_speed))
+        .round()
+        .max(1.0) as u32;
+    (offsets, delay_ms)
+}
+
+fn rgb_animation_payload(frame: &RgbImage, count: usize, index: usize, delay_ms: u32) -> Value {
+    json!({
+        "Command": "Draw/SendHttpGif",
+        "PicNum": count,
+        "PicWidth": 64,
+        "PicOffset": index,
+        "PicID": 1,
+        "PicSpeed": delay_ms,
+        "PicSpped": delay_ms,
+        "PicData": base64::engine::general_purpose::STANDARD.encode(frame.as_raw()),
+    })
+}
+
 /// Build one adaptive palette for the *entire* Pixoo GIF. The generic GIF
 /// encoder derives a new palette for each frame: even unchanged artwork then
 /// acquires slightly different colors, causing visible flicker.
@@ -475,6 +507,47 @@ impl Pixoo {
         let id = self.post(&json!({"Command":"Draw/GetHttpGifId"})).await?;
         let id = id["PicId"].as_i64().or(id["PicID"].as_i64()).unwrap_or(1);
         self.post(&json!({"Command":"Draw/SendHttpGif","PicNum":1,"PicWidth":64,"PicOffset":0,"PicID":id,"PicSpeed":100,"PicSpped":100,"PicData":data})).await?;
+        Ok(())
+    }
+    /// Upload an entire RGB sequence under one device lock. Unlike live frames,
+    /// all offsets share the same PicID and the Pixoo plays them autonomously.
+    /// Each new sequence starts with a reset, including a one-frame still.
+    async fn rgb_animation(
+        &self,
+        composition: Option<&Composition>,
+        still: Option<&RgbImage>,
+        marquee_speed: f64,
+        revision: u64,
+        current: &AtomicU64,
+    ) -> Result<()> {
+        let (offsets, delay_ms) = rgb_animation_plan(composition, marquee_speed);
+        ensure!(composition.is_some() || still.is_some(), "No RGB frame");
+        let _guard = self.gate.lock().await;
+        if current.load(Ordering::SeqCst) != revision {
+            return Ok(());
+        }
+        // Reset once per sequence, independent of the live-frame reset setting.
+        // This resets the HTTP frame buffer; it is not a documented URL-GIF stop.
+        self.post(&json!({"Command":"Draw/ResetHttpGifId"})).await?;
+        let cfg = self.cfg.get();
+        for (index, offset) in offsets.iter().copied().enumerate() {
+            if current.load(Ordering::SeqCst) != revision {
+                return Ok(());
+            }
+            let rendered;
+            let frame = if let Some(c) = composition {
+                rendered = c.frame(offset);
+                &rendered
+            } else {
+                still.context("No RGB frame")?
+            };
+            let payload = rgb_animation_payload(frame, offsets.len(), index, delay_ms);
+            // Keep the sequence on the same device; a failed frame requires a
+            // fresh reset and complete retry, not a discovery halfway through.
+            self.post_at(&cfg.divoom.ip, &payload, cfg.divoom.timeout)
+                .await
+                .with_context(|| format!("RGB animation frame {}/{}", index + 1, offsets.len()))?;
+        }
         Ok(())
     }
     pub async fn cloud(&self, path: &str, payload: Option<Value>) -> Result<Value> {
@@ -746,6 +819,21 @@ impl Display {
                         .await?;
                     return Ok(());
                 }
+                if cfg.divoom.animation_mode == "rgb_animation" {
+                    let started = Instant::now();
+                    self.pixoo.rgb_animation(
+                        composition.as_ref(), still.as_ref(), cfg.image.marquee_speed,
+                        revision, &self.generation,
+                    ).await?;
+                    if self.generation.load(Ordering::SeqCst) == revision {
+                        let (offsets, delay_ms) = rgb_animation_plan(composition.as_ref(), cfg.image.marquee_speed);
+                        db.log("DEBUG", &format!(
+                            "Pixoo RGB animation uploaded: {} frame(s), {} ms/frame, upload {:.0} ms",
+                            offsets.len(), delay_ms, started.elapsed().as_secs_f64() * 1000.0
+                        ));
+                    }
+                    return Ok(());
+                }
                 let animated = composition.as_ref().is_some_and(Composition::animated);
                 let scroll_started = Instant::now();
                 let mut last_sent_offset = None;
@@ -813,9 +901,9 @@ impl Display {
                         retry_delay = (retry_delay * 2).min(Duration::from_secs(30));
                     } else {
                         retry_delay = Duration::from_secs(2);
-                        // URL-GIFs loop on the Pixoo itself. Avoid restarting
-                        // them every 30 seconds, especially for static prompts.
-                        if cfg.divoom.animation_mode == "gif_url" {
+                        // Both device-side animation modes loop autonomously.
+                        // Avoid restarting their playback every 30 seconds.
+                        if matches!(cfg.divoom.animation_mode.as_str(), "gif_url" | "rgb_animation") {
                             wait = Duration::from_secs(5 * 60);
                         }
                     }
@@ -846,6 +934,48 @@ mod tests {
         };
         assert_eq!(c.frame(0).as_raw().len(), 12288);
         assert_eq!(c.frame(20).get_pixel(0, 0).0, [12, 34, 56]);
+    }
+
+    #[test]
+    fn rgb_animation_samples_full_cycle_with_bounded_frame_count() {
+        let c = Composition {
+            base: RgbImage::new(64, 64),
+            lines: vec![(RgbImage::new(140, 5), 55)],
+            background: [0, 0, 0],
+        };
+        let (offsets, delay_ms) = rgb_animation_plan(Some(&c), 30.0);
+        assert_eq!(offsets.len(), 59);
+        assert_eq!(offsets[0], 0);
+        assert_eq!(offsets[58], 157);
+        assert!(offsets.windows(2).all(|w| (2..=3).contains(&(w[1] - w[0]))));
+        assert_eq!(delay_ms, 90);
+        assert!((f64::from(delay_ms) * offsets.len() as f64 - 160_000.0 / 30.0).abs() < 30.0);
+    }
+
+    #[test]
+    fn rgb_animation_static_content_has_exactly_one_frame() {
+        let c = Composition {
+            base: RgbImage::new(64, 64),
+            lines: vec![(RgbImage::new(64, 5), 55)],
+            background: [0, 0, 0],
+        };
+        assert_eq!(rgb_animation_plan(Some(&c), 30.0), (vec![0], 100));
+        assert_eq!(rgb_animation_plan(None, 30.0), (vec![0], 100));
+    }
+
+    #[test]
+    fn rgb_animation_payload_preserves_colors_and_sequence_metadata() {
+        let frame = RgbImage::from_fn(64, 64, |x, y| Rgb([x as u8, y as u8, 123]));
+        let payload = rgb_animation_payload(&frame, 59, 58, 90);
+        assert_eq!(payload["Command"], "Draw/SendHttpGif");
+        assert_eq!(payload["PicNum"], 59);
+        assert_eq!(payload["PicOffset"], 58);
+        assert_eq!(payload["PicID"], 1);
+        assert_eq!(payload["PicSpeed"], 90);
+        assert_eq!(payload["PicWidth"], 64);
+        let decoded = base64::engine::general_purpose::STANDARD
+            .decode(payload["PicData"].as_str().unwrap()).unwrap();
+        assert_eq!(decoded.as_slice(), frame.as_raw().as_slice());
     }
 
     #[test]

@@ -167,7 +167,7 @@ impl Config {
             "Invalid off_action"
         );
         ensure!(
-            ["stream", "gif_url"].contains(&self.divoom.animation_mode.as_str()),
+            ["stream", "gif_url", "rgb_animation"].contains(&self.divoom.animation_mode.as_str()),
             "Invalid animation mode"
         );
         ensure!(
@@ -287,6 +287,14 @@ mod tests {
             let cfg = Config::from_value(json!({"debug":{"logs":enabled}})).unwrap();
             assert!(cfg.debug.logs);
         }
+    }
+    #[test]
+    fn accepts_all_three_pixoo_animation_modes() {
+        for mode in ["stream", "gif_url", "rgb_animation"] {
+            let cfg = Config::from_value(json!({"divoom":{"animation_mode":mode}})).unwrap();
+            assert_eq!(cfg.divoom.animation_mode, mode);
+        }
+        assert!(Config::from_value(json!({"divoom":{"animation_mode":"unknown"}})).is_err());
     }
     #[test]
     fn rejects_invalid_values_and_paths() {
