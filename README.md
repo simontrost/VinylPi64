@@ -77,6 +77,26 @@ Other hardware can work as well, but may require adjustments. A turntable withou
 
 ## Quick setup
 
+### Existing Python installations
+
+If you previously installed the Python version from the `master` branch, migrate your existing checkout to `legacy-python` before pulling any further changes.
+
+> [!IMPORTANT]
+> Back up your configuration and database before switching branches and ensure that your working tree is clean. The `master` branch now contains the Rust implementation and is no longer compatible with existing Python installations.
+
+```bash
+git fetch origin --prune
+git switch -c legacy-python --track origin/legacy-python
+```
+
+If the `legacy-python` branch already exists locally, use `git switch legacy-python` instead.
+
+Any future maintenance updates to the Python implementation can be retrieved using:
+
+```bash
+git pull --ff-only
+```
+
 ### 1. Install system packages
 
 On Raspberry Pi OS or another Debian-based system:
@@ -89,7 +109,7 @@ sudo apt install -y git python3-venv python3-dev ffmpeg libportaudio2
 ### 2. Clone and install
 
 ```bash
-git clone https://github.com/simontrost/VinylPi64.git
+git clone --branch legacy-python https://github.com/simontrost/VinylPi64.git
 cd VinylPi64
 python3 -m venv venv
 source venv/bin/activate

@@ -1,12 +1,12 @@
-name: Unit tests
+name: Python Legacy CI
 
 on:
   push:
     branches:
-      - master
+      - legacy-python
   pull_request:
     branches:
-      - master
+      - legacy-python
   workflow_dispatch:
 
 permissions:

@@ -13,6 +13,7 @@ data/logs.db
 data/logs.db-wal
 data/logs.db-shm
 
+venv/
 .env
 vinylpi.env
 
