@@ -2,9 +2,9 @@ name: Rust CI and Pi ARM64
 
 on:
   push:
-    branches: [master, refactor/rust]
+    branches: [master]
   pull_request:
-    branches: [master, refactor/rust]
+    branches: [master]
   workflow_dispatch:
 
 permissions:
@@ -49,8 +49,8 @@ jobs:
   pi_arm64:
     name: Build Raspberry Pi Linux ARM64
     needs: test
-    # Never publish unreviewed PRs, master builds, or failed test runs.
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/refactor/rust'
+    # Publish only tested builds from master, never pull requests.
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
     runs-on: ubuntu-22.04-arm
     timeout-minutes: 50
     permissions:

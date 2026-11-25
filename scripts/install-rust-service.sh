@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Optional one-time systemd setup for the experimental Rust instance (port 8081).
+# Optional one-time systemd setup for the Rust instance (port 8080).
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 BIN="$ROOT/target/release/vinylpi64"
@@ -35,7 +35,7 @@ unit="$(mktemp)"
 trap 'rm -f "$unit"' EXIT
 cat > "$unit" <<EOF
 [Unit]
-Description=VinylPi64 Rust (experimental, port 8081)
+Description=VinylPi64 Rust (port 8080)
 After=network-online.target
 Wants=network-online.target
 
@@ -56,4 +56,4 @@ sudo install -m 0644 "$unit" "/etc/systemd/system/$SERVICE"
 sudo systemctl daemon-reload
 sudo systemctl enable --now "$SERVICE"
 echo "Installed $SERVICE. Status: sudo systemctl status $SERVICE"
-echo 'The existing Python service is not stopped. Keep its recognizer inactive while testing Rust hardware.'
+echo 'The existing Python service is not stopped. Make sure it is stopped before running Rust on the same port or hardware.'

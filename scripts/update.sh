@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Pi Zero 2 W (64-bit): install the tested ARM64 build for the current refactor/rust head.
+# Pi Zero 2 W (64-bit): install the tested ARM64 build for the current master head.
 # Requires public GitHub releases. Does not compile anything or require Docker.
 set -Eeuo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 cd "$ROOT"
-BRANCH=refactor/rust
+BRANCH=master
 SERVICE=vinylpi64-rust.service
 BIN="$ROOT/target/release/vinylpi64"
 DATA_DIR="${VINYLPI_UPDATE_DATA_DIR:-$ROOT/.rust-smoke-data}"
