@@ -1,5 +1,14 @@
 # VinylPi64
 
+> [!WARNING]
+> **Legacy Python implementation, no longer maintained**
+>
+> This branch contains the original Python implementation of VinylPi64. Active development has moved to the Rust implementation on the [master branch](https://github.com/simontrost/VinylPi64/tree/master).
+>
+> This branch is preserved for existing users and historical reference but is no longer actively maintained.
+>
+> If you are interested in taking over maintenance of the Python implementation, feel free to reach out or open an issue.
+
 <p align="center">
   <img src="https://img.shields.io/badge/platform-Raspberry%20Pi%20Zero%202%20W-red" alt="Platform: Raspberry Pi Zero 2 W">
   <img src="https://img.shields.io/badge/python-3.11%2B-yellow" alt="Python 3.11+">
