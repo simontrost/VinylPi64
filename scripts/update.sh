@@ -6,9 +6,9 @@ set -Eeuo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 cd "$ROOT"
 BRANCH=master
-SERVICE=vinylpi64-rust.service
+SERVICE=vinylpi64.service
 BIN="$ROOT/target/release/vinylpi64"
-DATA_DIR="${VINYLPI_UPDATE_DATA_DIR:-$ROOT/.rust-smoke-data}"
+DATA_DIR="${VINYLPI_UPDATE_DATA_DIR:-$ROOT/data/global}"
 BACKUP_ROOT="$ROOT/data/rust-update-backups"
 PORT="${VINYLPI_UPDATE_PORT:-8080}"
 
@@ -18,6 +18,14 @@ command -v git >/dev/null && command -v curl >/dev/null && command -v sha256sum 
 [[ "$(git symbolic-ref --quiet --short HEAD)" == "$BRANCH" ]] || fail "Checkout branch $BRANCH first"
 [[ -z "$(git status --porcelain --untracked-files=no)" ]] || fail 'Tracked files are modified. Commit or stash them first'
 [[ "$(git remote get-url origin)" =~ (^git@github\.com:|^https://github\.com/|^ssh://git@github\.com/)simontrost/VinylPi64(\.git)?$ ]] || fail 'The origin remote must point to simontrost/VinylPi64'
+
+# Do not update an installation that still uses the previous deployment layout.
+if systemctl is-active --quiet vinylpi64-rust.service; then
+  fail 'The old vinylpi64-rust.service is still running. Migrate the service before using this updater.'
+fi
+if [[ -d "$ROOT/.rust-smoke-data" && ! -d "$DATA_DIR" ]]; then
+  fail 'Existing Rust data found in .rust-smoke-data. Migrate it to the configured data directory before updating.'
+fi
 
 before="$(git rev-parse HEAD)"
 echo "Fetching $BRANCH..."
@@ -123,7 +131,7 @@ if $was_running; then
     fi
     sleep 1
   done
-  $healthy || fail 'Updated service did not pass health check; see journalctl -u vinylpi64-rust'
+  $healthy || fail 'Updated service did not pass health check; see journalctl -u vinylpi64.service'
   echo "Updated and verified $SERVICE."
 else
   echo 'Binary updated. No running Rust systemd service detected.'
@@ -131,7 +139,7 @@ else
     echo "Start when ready: sudo systemctl start $SERVICE"
   else
     echo "For manual testing: $BIN --root $ROOT --data-dir $DATA_DIR --port $PORT"
-    echo 'Optional one-time auto-start: bash scripts/install-rust-service.sh'
+    echo 'Optional one-time auto-start: bash scripts/install-service.sh'
   fi
 fi
 updating=false
