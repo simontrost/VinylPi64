@@ -71,15 +71,185 @@ Other hardware can work as well, but may require adjustments. A turntable withou
 |---|---|---|
 | <img src="assets/readme/mobile_pixoo.jpg" height="600" alt="Pixoo on mobile"> | <img src="assets/readme/mobile_settings.jpg" height="600" alt="Settings on mobile"> | <img src="assets/readme/mobile_logs.jpg" height="600" alt="Logs on mobile"> |
 
-## Rust setup and deployment
+## Installation and deployment
 
-VinylPi64 is now developed on the `master` branch with a Rust/Axum backend. The HTML/CSS/JavaScript frontend remains. The original, no longer actively maintained Python implementation is available on the [`legacy-python` branch](https://github.com/simontrost/VinylPi64/tree/legacy-python). The rolling ARM64 builds are still experimental; validate ALSA audio and Divoom hardware on your Raspberry Pi before production deployment.
+VinylPi64 is developed in Rust using the Axum framework, with an HTML/CSS/JavaScript frontend. The original Python implementation is available on the [`legacy-python` branch](https://github.com/simontrost/VinylPi64/tree/legacy-python) but is no longer actively maintained.
 
-### Build requirements (Linux)
+The prebuilt binaries currently target **64-bit Raspberry Pi OS (`aarch64`)**. They are published as experimental prereleases. Validate USB audio, Pixoo connectivity and your configuration before enabling automatic startup.
+
+> [!IMPORTANT]
+> The following instructions are for a fresh installation. If you already have a Python or Rust installation, read [Existing installations](#existing-installations) first. Do not overwrite existing runtime data or run two instances controlling the same hardware.
+
+### 1. Install system packages
+
+On 64-bit Raspberry Pi OS:
+
+```bash
+sudo apt update
+sudo apt install -y git curl alsa-utils tar coreutils
+```
+
+### 2. Clone and install
+
+```bash
+git clone --branch master https://github.com/simontrost/VinylPi64.git ~/VinylPi64
+cd ~/VinylPi64
+mkdir -p data/global
+bash scripts/update.sh
+```
+
+The updater downloads the tested ARM64 binary from GitHub Releases. No local Rust compiler, Docker installation or GitHub token is required.
+
+### 3. Validate the installation
+
+Check the configuration and database before starting the server:
+
+```bash
+./target/release/vinylpi64 --root . --data-dir data/global check
+```
+
+Check whether your USB audio device is available:
+
+```bash
+arecord -l
+```
+
+### 4. Start the web app
+
+```bash
+./target/release/vinylpi64 --root . --data-dir data/global --bind 0.0.0.0 --port 8080
+```
+
+Open:
+
+```text
+http://<device-ip>:8080/
+```
+
+On many local networks, this may also work:
+
+```text
+http://vinylpi.local:8080/
+```
+
+### 5. Enable automatic startup (optional)
+
+Once you have verified the hardware and web interface, stop the manually started instance with Ctrl+C. Make sure any previous Python or Rust service is stopped and disabled before installing the new service.
+
+```bash
+bash scripts/install-service.sh
+```
+
+The installer creates and enables `vinylpi64.service`, using port 8080 and `data/global` for persistent runtime data. It refuses to overwrite an existing service with the same name.
+
+Useful commands:
+
+```bash
+sudo systemctl start vinylpi64.service
+sudo systemctl stop vinylpi64.service
+sudo systemctl restart vinylpi64.service
+sudo systemctl status vinylpi64.service
+journalctl -u vinylpi64.service -f
+```
+
+## Updating VinylPi64
+
+On the Raspberry Pi, from a clean `master` checkout:
+
+```bash
+cd ~/VinylPi64
+bash scripts/update.sh
+```
+
+Each push to `master` triggers automated Rust tests, static analysis and a native ARM64 build through GitHub Actions. Successfully tested builds are published to the rolling, experimental [`rust-dev` release](https://github.com/simontrost/VinylPi64/releases/tag/rust-dev). If the build for the newest commit is not available yet, the updater stops without replacing the installed binary. Check [GitHub Actions](https://github.com/simontrost/VinylPi64/actions) before updating.
+
+The updater automatically:
+
+- Fetches the latest `master` commit.
+- Downloads the corresponding ARM64 binary.
+- Verifies the commit identity and SHA-256 checksum.
+- Updates the source checkout using a fast-forward.
+- Stops the running systemd service, if installed and active.
+- Backs up the existing executable and runtime data.
+- Installs the new executable.
+- Restarts the previously running service and performs an HTTP health check.
+
+Stop any manually started instance with Ctrl+C before updating. If the service was not running, the updater does not start it automatically. For a custom service data directory or port, set `VINYLPI_UPDATE_DATA_DIR` or `VINYLPI_UPDATE_PORT` to match the service configuration.
+
+If the health check fails, the updater attempts to restore the previous executable and source checkout.
+
+> [!IMPORTANT]
+> Database migrations are not automatically rolled back. Runtime data backups are retained in `data/rust-update-backups/`. Keep backups until the updated installation has been verified.
+
+## Existing installations
+
+### Previous Rust installations
+
+Earlier Rust installations used the following deployment layout:
+
+| Component | Previous | Current |
+|---|---|---|
+| Branch | `refactor/rust` | `master` |
+| Project directory | `~/VinylPi64-rust` | `~/VinylPi64` |
+| Runtime data | `.rust-smoke-data/` | `data/global/` |
+| systemd service | `vinylpi64-rust.service` | `vinylpi64.service` |
+| Service installer | `scripts/install-rust-service.sh` | `scripts/install-service.sh` |
+
+Existing installations must be migrated to the current deployment layout before using the new updater.
+
+If the Rust checkout still uses `refactor/rust`, ensure the working tree is clean and no local branch named `master` exists, then rename the branch and update its upstream:
+
+```bash
+cd ~/VinylPi64-rust
+git fetch origin --prune
+git switch refactor/rust
+git branch -m master
+git branch --set-upstream-to=origin/master master
+git merge-base --is-ancestor HEAD origin/master
+```
+
+The last command must succeed before continuing. Do not merge the old Python branch into Rust or pull the source independently of the matching binary.
+
+Stop and disable the old Rust service, back up the configuration, database and service unit, and move the existing checkout and runtime data to the new paths. If `~/VinylPi64` already contains a Python installation, preserve it separately first. Do not overwrite an existing `data/global` directory. Preserve any local environment files and update custom shell aliases or service paths.
+
+After migrating the paths and disabling the old service, use the new updater from the remote branch if your local updater still references the old layout:
+
+```bash
+cd ~/VinylPi64
+git fetch origin --prune
+git show origin/master:scripts/update.sh > scripts/.migration-update.sh
+bash scripts/.migration-update.sh
+```
+
+After a successful update, remove the temporary script and install the new service:
+
+```bash
+rm scripts/.migration-update.sh
+bash scripts/install-service.sh
+sudo systemctl status vinylpi64.service --no-pager
+curl --fail http://127.0.0.1:8080/api/health
+```
+
+Verify that your existing settings, statistics and hardware still work before removing the previous installation or backups.
+
+### Previous Python installations
+
+The Python implementation is preserved on the [`legacy-python` branch](https://github.com/simontrost/VinylPi64/tree/legacy-python). Do not pull the Rust `master` into an existing Python checkout.
+
+Migration of legacy Python data must be performed explicitly using `migration-sources` and `migrate --source ...`. Always back up the original data first. The migration command requires a new destination; do not initialize or overwrite the intended Rust data directory before migrating, and do not merge multiple Python profiles without reviewing their contents.
+
+Keep the original Python installation separate until migration and hardware validation are complete.
+
+## Building from source
+
+### Requirements
 
 - Rust stable (1.88+)
-- `pkg-config` and `libasound2-dev`
+- `pkg-config`
+- `libasound2-dev`
 - Optional: `alsa-utils` for `arecord -l`
+
+On Linux:
 
 ```bash
 sudo apt update
@@ -88,73 +258,7 @@ cargo test --locked --workspace
 cargo build --release --locked
 ```
 
-A Pi Zero 2 W only has 512 MB RAM; compiling directly on the device may exceed its memory and disk capacity. Prefer the native ARM64 build produced by GitHub Actions or build on a stronger ARM64 Linux host. The repository does not currently provide a local cross-compilation script.
-
-### Developer updates via GitHub Actions (no local Docker)
-
-On the `master` branch, each push triggers Rust tests and an **ARM64 native build** on GitHub Actions (`ubuntu-22.04-arm`). Only if all tests and the ARM64 build succeed does CI publish the binary to the rolling, **experimental** [`rust-dev` release](https://github.com/simontrost/VinylPi64/releases/tag/rust-dev). The release archive includes the full commit SHA and a SHA-256 checksum. This is **not** an official v1.0 release.
-
-#### Existing Rust installations (previous `refactor/rust` branch)
-
-If your existing Rust checkout still uses `refactor/rust`, migrate it to `master` once. Back up your runtime data first and ensure your working tree is clean. These commands assume no local `master` branch already exists in this Rust checkout:
-
-```bash
-cd ~/VinylPi64-rust
-git status
-git fetch origin --prune
-git switch refactor/rust
-git branch -m master
-git branch --set-upstream-to=origin/master master
-git merge --ff-only origin/master
-```
-
-If you already have a local branch named `master`, inspect it before renaming any branch; do not merge the old Python implementation into Rust. The branch switch does not migrate Python data or change the installed service.
-
-#### Install or update the ARM64 binary
-
-On the Pi, from a clean `master` checkout, run the updater after GitHub Actions has successfully published the build:
-
-```bash
-cd ~/VinylPi64-rust
-bash scripts/update.sh
-```
-
-The update script fetches the latest `master` commit, downloads the matching verified GitHub release asset, checks its commit SHA, fast-forwards Git, backs up the current executable and experimental data, and replaces the binary. If the separate `vinylpi64-rust.service` is running, it is stopped and restarted with an HTTP health check. A failed restart restores the previous binary and source checkout; any pre-update data backup is preserved for manual recovery. **Data migrations themselves are not automatically rolled back.** Old backups accumulate in `data/rust-update-backups`; remove obsolete ones manually after checking the new version.
-
-A manually started server must be stopped with Ctrl+C before running the updater. If no service has been installed, `update.sh` updates the binary but does not start it automatically. To configure automatic startup **once**, stop any existing Python service first if it uses port 8080 or controls the same hardware:
-
-```bash
-cd ~/VinylPi64-rust
-bash scripts/install-rust-service.sh
-sudo systemctl status vinylpi64-rust.service
-```
-
-The service installer uses port **8080** and the separate `.rust-smoke-data` directory. It does not disable or remove the old Python service. Stop the old Python service before starting Rust on the same port, and never let both applications actively control the same USB input and Pixoo simultaneously. For an existing Rust service configured on port 8081, run `VINYLPI_UPDATE_PORT=8081 bash scripts/update.sh` so the updater checks the correct port. The installer refuses to replace an existing systemd service file. This setup currently targets **64-bit Raspberry Pi OS (`aarch64`) only**.
-
-The Pi needs `git`, `curl`, `tar` and `sha256sum`. Releases are fetched from this **public** GitHub repository; no personal GitHub token is stored on the Pi. If CI has not yet published the binary for the newest commit, the updater stops without replacing the installed binary. To check the build, open [GitHub Actions](https://github.com/simontrost/VinylPi64/actions).
-
-### Safe first run (separate from the existing Python installation)
-
-Clone this branch into a separate directory. Never point the experimental Rust process at the old Python data directory. The following example downloads the tested ARM64 build and uses port 8081 for a separate manual hardware trial:
-
-```bash
-git clone --branch master https://github.com/simontrost/VinylPi64.git ~/VinylPi64-rust
-cd ~/VinylPi64-rust
-mkdir -p .rust-smoke-data
-bash scripts/update.sh
-./target/release/vinylpi64 --root . --data-dir .rust-smoke-data --port 8081 check
-./target/release/vinylpi64 --root . --data-dir .rust-smoke-data --bind 0.0.0.0 --port 8081
-```
-
-The application uses the supplied directory for isolated runtime state; it does not need a profile login. The server root is required for templates, fonts, and image assets. Browse to `http://<pi-ip>:8081/` on the home network. Leave music playback stopped in the Rust instance while the original Python service controls the same Pixoo and USB input.
-
-### Existing data migration
-
-The default Rust data directory is `data/global`. Migrating legacy Python data should be performed explicitly and only after backup, using `migration-sources` and `migrate --source ...`; do not merge or overwrite multiple existing profiles without reviewing their contents. For a fresh smoke test use a dedicated empty `--data-dir` instead.
-
-### Deployment
-
-For a first hardware trial run the binary manually, not via systemd. Once the Raspberry Pi hardware functions are tested, a dedicated systemd unit may be created using `WorkingDirectory=<clone>` and `ExecStart=<clone>/target/release/vinylpi64 --root <clone> --data-dir <persistent-data-dir> --port 8080`. Disable or stop the old Python service before enabling production auto-start for the Rust version.
+Compiling directly on a Raspberry Pi Zero 2 W may exceed its available memory and disk capacity. Using the prebuilt ARM64 binary from GitHub Releases or building on a stronger ARM64 Linux host is recommended. The repository does not currently provide a local cross-compilation script.
 
 ## Configuration
 
@@ -182,10 +286,6 @@ data/global/vinylpi.db
 
 This database contains song history, play counts, listening statistics, caches, and the current dashboard state.
 
-## Start on boot (after hardware validation)
-
-Do not enable the Rust service until USB audio, Pixoo recovery and data migration have been tested and the old Python service is disabled. For an initial test run the Rust binary manually on port 8081. Once stable, create a dedicated systemd service pointing to the actual checkout and data directory; never reuse the old Python `ExecStart`.
-
 ## Optional: API token
 
 Home Assistant control endpoints (`/api/ha/*`) require an API token:
@@ -194,7 +294,7 @@ Home Assistant control endpoints (`/api/ha/*`) require an API token:
 VINYLPI_API_TOKEN=replace_with_a_long_random_value
 ```
 
-Store it in `vinylpi.env` and keep that file private. **The other dashboard and device-control endpoints are not authenticated by this token.** Run the server only on trusted networks; do not expose port 8080/8081 directly to the public internet. Host and cross-origin checks are not a substitute for authentication.
+Store it in `vinylpi.env` and keep that file private. **The other dashboard and device-control endpoints are not authenticated by this token.** Run the server only on trusted networks; do not expose the web server (port 8080 by default) directly to the public internet. Host and cross-origin checks are not a substitute for authentication.
 
 ## Optional: Home Assistant
 
@@ -271,15 +371,21 @@ Check the service logs or run the recognizer manually:
 
 ### Service fails after an update
 
+Check the service status and logs:
+
 ```bash
-sudo journalctl -u vinylpi64-rust.service -n 100 --no-pager
-sudo systemctl status vinylpi64-rust.service
-# If installed through scripts/install-rust-service.sh, re-run the updater
-# after fixing the GitHub Actions build or configuration:
+sudo systemctl status vinylpi64.service --no-pager
+sudo journalctl -u vinylpi64.service -n 100 --no-pager
+```
+
+After resolving the issue, run the updater again:
+
+```bash
+cd ~/VinylPi64
 bash scripts/update.sh
 ```
 
-The updater retains the previous executable and a pre-update data archive in `data/rust-update-backups`. If a database schema changed, restore a backup only after inspecting its contents and stopping the Rust service.
+The updater retains the previous executable and a pre-update data archive in `data/rust-update-backups/`. If a database schema has changed, restore a backup only after inspecting its contents and stopping the service.
 
 ## License
 
