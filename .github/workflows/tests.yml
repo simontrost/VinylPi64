@@ -99,13 +99,12 @@ jobs:
           version="$(awk -F '"' '/^version = "/ {print $2; exit}' Cargo.toml)"
           [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
 
-          series="${version%.*}.0"
-          tag="v${series}"
+          tag="v${version}"
           archive="vinylpi64-aarch64-${GITHUB_SHA}.tar.gz"
 
           cp vinylpi64-aarch64.tar.gz "$archive"
 
-          notes="Current version: v${version}. Latest tested ARM64 commit: ${GITHUB_SHA}. This release tracks the ${series%.*}.x series."
+          notes="Current version: v${version}. Latest tested ARM64 commit: ${GITHUB_SHA}. This release tracks version v${version}."
 
           if gh release view "$tag" >/dev/null 2>&1; then
             gh release upload "$tag" "$archive" --clobber
@@ -116,7 +115,7 @@ jobs:
               --notes "$notes"
           fi
 
-          # Keep the rolling series tag aligned with its binary.
+          # Keep the version tag aligned with its binary.
           gh api --method PATCH \
             "repos/$GITHUB_REPOSITORY/git/refs/tags/$tag" \
             -f sha="$GITHUB_SHA" \

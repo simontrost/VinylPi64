@@ -9,7 +9,6 @@ BRANCH=master
 SERVICE=vinylpi64.service
 BIN="$ROOT/target/release/vinylpi64"
 DATA_DIR="${VINYLPI_UPDATE_DATA_DIR:-$ROOT/data/global}"
-BACKUP_ROOT="$ROOT/data/rust-update-backups"
 PORT="${VINYLPI_UPDATE_PORT:-8080}"
 
 fail() { echo "ERROR: $*" >&2; exit 1; }
@@ -28,22 +27,48 @@ if [[ -d "$ROOT/.rust-smoke-data" && ! -d "$DATA_DIR" ]]; then
 fi
 
 before="$(git rev-parse HEAD)"
-echo "Fetching $BRANCH..."
-git fetch origin "$BRANCH"
-wanted="$(git rev-parse FETCH_HEAD)"
+
+if [[ "${1:-}" != "--apply" ]]; then
+  [[ $# -eq 0 ]] || fail 'Unexpected arguments'
+
+  echo "Fetching $BRANCH..."
+  git fetch --no-tags origin "$BRANCH"
+  wanted="$(git rev-parse FETCH_HEAD)"
+
+  git merge-base --is-ancestor "$before" "$wanted" \
+    || fail 'Remote is not a fast-forward'
+
+  tmp_updater="$(mktemp "$ROOT/scripts/.update-XXXXXXXX")"
+  trap 'rm -f "$tmp_updater"' EXIT
+
+  git show "$wanted:scripts/update.sh" > "$tmp_updater"
+
+  echo 'Using updater from requested commit...'
+  bash "$tmp_updater" --apply "$wanted"
+  exit $?
+fi
+
+[[ $# -eq 2 ]] || fail 'Missing target commit'
+wanted="$2"
+[[ "$wanted" =~ ^[a-f0-9]{40}$ ]] || fail 'Invalid target commit'
+
+command -v flock >/dev/null || fail 'flock is required'
+exec 9>"$(git rev-parse --git-path vinylpi-update.lock)"
+flock -n 9 || fail 'Another update is running'
+
 git merge-base --is-ancestor "$before" "$wanted" || fail 'Remote is not a fast-forward; refusing to update'
 echo "Requested commit: $wanted"
 # Every commit uses its own immutable release filename. The rolling asset URL
 # previously served stale archives from GitHub/CDN caches after --clobber.
 version="$(git show "$wanted:Cargo.toml" | awk -F '"' '/^version = "/ {print $2; exit}')"
 [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail 'Invalid package version'
-tag="v${version%.*}.0"
+tag="v${version}"
 echo "Requested version: v${version} (release $tag)"
 URL="https://github.com/simontrost/VinylPi64/releases/download/${tag}/vinylpi64-aarch64-${wanted}.tar.gz"
 
 stage="$(mktemp -d)"
 updating=false
-backup=""
+backup="$stage"
 had_binary=false
 new_binary_installed=false
 rollback() {
@@ -56,8 +81,7 @@ rollback() {
   fi
   git reset --hard "$before" || true
   if $was_running; then sudo systemctl start "$SERVICE" || true; fi
-  echo "Preserved backup folder: $backup" >&2
-  echo 'Database state is not automatically reverted. A pre-update data archive is kept if available.' >&2
+  echo 'Database state is not automatically reverted.' >&2
 }
 cleanup() {
   result=$?
@@ -101,12 +125,12 @@ if $was_running; then
   sudo -v || fail 'sudo access is required to restart the Rust service'
 fi
 
-# Source and binary must have the same commit. Backups are saved outside Git.
+# Source and binary must have the same commit.
+# Only a temporary binary rollback copy is retained.
 echo 'Fast-forwarding source checkout...'
 git merge --ff-only "$wanted" || fail 'Git fast-forward failed; binary was not changed'
 updating=true
-mkdir -p "$(dirname "$BIN")" "$BACKUP_ROOT"
-backup="$(mktemp -d "$BACKUP_ROOT/update-XXXXXXXX")"
+mkdir -p "$(dirname "$BIN")"
 if $was_running; then
   echo "Stopping $SERVICE for safe replacement..."
   sudo systemctl stop "$SERVICE"
@@ -114,10 +138,6 @@ fi
 if [[ -f "$BIN" ]]; then
   had_binary=true
   cp -p "$BIN" "$backup/vinylpi64.previous"
-fi
-# Snapshot config and SQLite only while the Rust service is stopped.
-if [[ -d "$DATA_DIR" ]]; then
-  tar -czf "$backup/data.tar.gz" -C "$(dirname "$DATA_DIR")" "$(basename "$DATA_DIR")" || fail 'Data backup failed'
 fi
 install -m 755 "$stage/vinylpi64" "$BIN.new"
 mv -f "$BIN.new" "$BIN"
@@ -147,4 +167,4 @@ else
   fi
 fi
 updating=false
-printf 'Installed commit: %s\nBackup: %s\n' "$wanted" "$backup"
+printf 'Installed commit: %s\n' "$wanted"

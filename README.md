@@ -45,11 +45,11 @@ Other hardware can work as well, but may require adjustments. A turntable withou
 
 ## Screenshots
 
-### Generated Pixoo frame
+### Generated Pixoo frames
 
-<p align="left">
-  <img src="assets/readme/preview.png" width="600" alt="Generated Pixoo frame">
-</p>
+| Static frame examples | Scrolling text |
+|---|---|
+| <img src="assets/readme/preview.png" width="480" alt="Generated Pixoo frame examples"> | <img src="assets/readme/scroll_example.gif" width="256" alt="Animated Pixoo frame with scrolling artist and song title"> |
 
 ### Hardware setup
 
