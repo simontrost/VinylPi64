@@ -14,7 +14,12 @@
 
     <section class="about-section">
         <div class="card about-version-card" aria-label="Installed VinylPi version">
-            <span class="about-version-label">Version</span>
+            <div class="about-version-identity">
+                <img src="/static/images/logo.webp"
+                     class="about-version-logo"
+                     alt="VinylPi64 logo">
+                <span class="about-version-label">Version</span>
+            </div>
             <strong class="about-version-number">{{ version_info.display }}</strong>
         </div>
         <div class="about-grid">

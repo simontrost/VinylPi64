@@ -271,7 +271,7 @@ async fn page(State(app): State<Arc<App>>, request: Request) -> ApiResult {
         .templates
         .get_template(&format!("pages/{name}.html"))
         .map_err(anyhow::Error::from)?;
-    let html=template.render(minijinja::context!(active_page=>name,version_info=>json!({"display":format!("{} · Rust",env!("CARGO_PKG_VERSION"))}))).map_err(anyhow::Error::from)?;
+    let html=template.render(minijinja::context!(active_page=>name,version_info=>json!({"display":format!("v{}",env!("CARGO_PKG_VERSION"))}))).map_err(anyhow::Error::from)?;
     Ok(Html(html).into_response())
 }
 async fn events(State(app): State<Arc<App>>) -> Response {

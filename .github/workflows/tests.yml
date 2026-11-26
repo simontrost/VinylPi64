@@ -54,7 +54,7 @@ jobs:
     runs-on: ubuntu-22.04-arm
     timeout-minutes: 50
     permissions:
-      contents: write  # Required only to publish the experimental GitHub release.
+      contents: write  # Required to publish versioned GitHub releases.
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -82,23 +82,64 @@ jobs:
           path: vinylpi64-aarch64.tar.gz
           if-no-files-found: error
           retention-days: 14
-      - name: Publish rolling experimental release
+      - name: Publish versioned ARM64 release
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
-          if ! gh release view rust-dev >/dev/null 2>&1; then
-            gh release create rust-dev --prerelease \
-              --target "$GITHUB_SHA" \
-              --title 'Rust development build (ARM64)' \
-              --notes 'Experimental Rust branch build. For Pi Zero 2 W 64-bit Raspberry Pi OS. Not a stable release.'
+
+          # Do not publish an outdated master build.
+          head="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/master" --jq '.object.sha')"
+          if [[ "$head" != "$GITHUB_SHA" ]]; then
+            echo "Newer master commit exists; skipping publication."
+            exit 0
           fi
-          # Commit-specific filenames avoid stale CDN caches for the previous
-          # rolling filename. Re-runs of the same SHA may replace their asset.
+
+          version="$(awk -F '"' '/^version = "/ {print $2; exit}' Cargo.toml)"
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+
+          series="${version%.*}.0"
+          tag="v${series}"
           archive="vinylpi64-aarch64-${GITHUB_SHA}.tar.gz"
+
           cp vinylpi64-aarch64.tar.gz "$archive"
-          gh release upload rust-dev "$archive" --clobber
-          gh release edit rust-dev --prerelease \
-            --title 'Rust development build (ARM64)' \
-            --notes "Latest tested branch commit: ${GITHUB_SHA}. Experimental; use scripts/update.sh on Pi."
+
+          notes="Current version: v${version}. Latest tested ARM64 commit: ${GITHUB_SHA}. This release tracks the ${series%.*}.x series."
+
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" "$archive" --clobber
+          else
+            gh release create "$tag" "$archive" \
+              --target "$GITHUB_SHA" \
+              --title "$tag" \
+              --notes "$notes"
+          fi
+
+          # Keep the rolling series tag aligned with its binary.
+          gh api --method PATCH \
+            "repos/$GITHUB_REPOSITORY/git/refs/tags/$tag" \
+            -f sha="$GITHUB_SHA" \
+            -F force=true >/dev/null
+
+          gh release edit "$tag" \
+            --title "$tag" \
+            --notes "$notes" \
+            --latest
+
+          # Delete superseded binaries only after successful publication.
+          assets="$(gh release view "$tag" --json assets --jq '.assets[].name')"
+          while IFS= read -r asset; do
+            case "$asset" in
+              vinylpi64-aarch64*.tar.gz)
+                if [[ "$asset" != "$archive" ]]; then
+                  gh release delete-asset "$tag" "$asset" --yes
+                fi
+                ;;
+            esac
+          done <<< "$assets"
+
+          # Retire the previous experimental release.
+          if gh release view rust-dev >/dev/null 2>&1; then
+            gh release delete rust-dev --yes
+          fi

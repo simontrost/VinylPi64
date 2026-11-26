@@ -35,7 +35,11 @@ git merge-base --is-ancestor "$before" "$wanted" || fail 'Remote is not a fast-f
 echo "Requested commit: $wanted"
 # Every commit uses its own immutable release filename. The rolling asset URL
 # previously served stale archives from GitHub/CDN caches after --clobber.
-URL="https://github.com/simontrost/VinylPi64/releases/download/rust-dev/vinylpi64-aarch64-${wanted}.tar.gz"
+version="$(git show "$wanted:Cargo.toml" | awk -F '"' '/^version = "/ {print $2; exit}')"
+[[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail 'Invalid package version'
+tag="v${version%.*}.0"
+echo "Requested version: v${version} (release $tag)"
+URL="https://github.com/simontrost/VinylPi64/releases/download/${tag}/vinylpi64-aarch64-${wanted}.tar.gz"
 
 stage="$(mktemp -d)"
 updating=false
